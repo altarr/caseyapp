@@ -42,9 +42,11 @@
 **Key adaptations:**
 - Strip email alert overlay features (not needed)
 - Add click interceptor (capture before V1 gets the event)
-- Add periodic screenshot capture (every N seconds + on click)
-- Add S3 upload module
+- **Silent screenshot on every click** — use `chrome.tabs.captureVisibleTab()` triggered by click listener. Must be invisible to user — no flash, no delay, no UI indication. Screenshot saved with timestamp + DOM path of what was clicked.
+- Add periodic screenshot capture (every N seconds as fallback)
+- Add S3 upload module (batch upload, not per-click — avoid network overhead during demo)
 - Add session start/stop triggered by polling system
+- Video analysis with screenshots is a future enhancement (post-hackathon)
 
 ---
 
