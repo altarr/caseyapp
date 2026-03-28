@@ -1,0 +1,18 @@
+{
+  "id": "inf-05-load-tests",
+  "workstream": "infra",
+  "title": "Load simulation tests for tenant pool + session orchestration",
+  "description": "Simulate real conference conditions to verify the system handles burst load. Tests: (1) Burst: all 6 PCs start demos simultaneously, end within 5 min, start again immediately. (2) Sustained: 6 PCs running continuous 15-min demos for 4 hours. (3) Mixed: random demo lengths 5-60 min across 6 PCs for 8 hours. (4) Failure: simulate 1-2 tenant provisioning failures. (5) Recovery: pool drops to 0, verify recovery. (6) Multi-day: 3-day conference, pool tops up overnight. Log every event. Produce a report.",
+  "priority": 5,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["inf-03-tenant-pool", "inf-04-session-orchestrator"],
+  "tests": [
+    "Burst test: 0 wait time for any PC across 12 rapid sessions",
+    "Sustained test: pool depth never hits 0 over 4 hours",
+    "Failure test: system recovers from 2 simultaneous provisioning failures",
+    "Recovery test: pool refills from 0 to 15 within 60 minutes",
+    "Report generated showing all events, pool depth over time, any violations"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "ext-01-fork-blueprint",
+  "workstream": "extension",
+  "title": "Fork Blueprint Extra MCP extension into v1-helper",
+  "description": "Copy the Blueprint Extra MCP Chrome extension source into extension/ directory. Update manifest.json with name 'V1-Helper', update description. Replace all Blueprint logos/icons with TrendAI spark logo. Remove 'Upgrade to Pro' banner from popup UI. Keep all 30 MCP tools working. Verify extension loads in Chrome and connects to MCP relay.",
+  "priority": 1,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": [],
+  "source_project": "ProjectsCL1/MCP/blueprint-extra-mcp/extensions/"
+}

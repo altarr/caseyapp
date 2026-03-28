@@ -1,0 +1,19 @@
+{
+  "id": "ana-03-claude-analysis",
+  "workstream": "analysis",
+  "title": "Build Claude analysis engine for booth demo sessions",
+  "description": "Send the correlated timeline to Claude API (via RONE AI endpoint) for analysis. Claude should determine: (1) which products/features were shown, (2) what the visitor asked about or showed interest in, (3) key moments worth highlighting, (4) recommended follow-up actions for the SDR. Use recording-analyzer engine pattern (modular, template-based). Output summary.json matching DATA-CONTRACT.md schema.",
+  "priority": 3,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["ana-02-correlator"],
+  "source_project": "ProjectsCL1/recording-analyzer/engines/",
+  "tests": [
+    "Feed sample timeline -> summary.json has all required fields",
+    "Products shown list is accurate (not hallucinated)",
+    "Visitor interests have evidence field referencing actual transcript/click",
+    "Recommendations are actionable (not generic 'follow up')",
+    "Analysis completes within 60 seconds for a 15-minute demo"
+  ]
+}

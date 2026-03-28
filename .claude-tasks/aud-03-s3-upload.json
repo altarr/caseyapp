@@ -1,0 +1,17 @@
+{
+  "id": "aud-03-s3-upload",
+  "workstream": "audio",
+  "title": "Upload audio + transcript to S3 session folder",
+  "description": "After recording stops and transcription completes, upload recording.wav to sessions/<id>/audio/ and transcript.json to sessions/<id>/transcript/. Must use hackathon AWS profile. Handle upload failures with retry (3 attempts). Mark session audio as 'uploaded' in metadata. Large file upload should use multipart for WAV files over 100MB.",
+  "priority": 3,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["aud-02-transcriber"],
+  "tests": [
+    "Upload 100MB WAV -> completes within 60s on decent connection",
+    "Network failure mid-upload -> retries, completes on retry",
+    "Verify files in S3 match local files (checksum)",
+    "Session folder structure matches DATA-CONTRACT.md"
+  ]
+}

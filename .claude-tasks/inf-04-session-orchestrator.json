@@ -1,0 +1,18 @@
+{
+  "id": "inf-04-session-orchestrator",
+  "workstream": "infra",
+  "title": "Build session orchestrator (start/stop coordination)",
+  "description": "When Android app creates a session (badge photo taken), orchestrator: (1) creates session folder in S3 with metadata.json, (2) claims a V1 tenant from pool, writes tenant.json, (3) writes start command for the correct demo PC to poll, (4) on end signal: writes stop command. Demo PCs poll S3 every 1s for start, every 5s for end. Each demo PC has a unique ID and only reads its own commands.",
+  "priority": 4,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["inf-01-s3-setup", "inf-03-tenant-pool"],
+  "tests": [
+    "Create session -> S3 folder created with metadata.json + tenant.json within 5s",
+    "Demo PC polls -> detects session start within 2s",
+    "End session -> demo PC detects within 5s, stops recording",
+    "Two sessions on different PCs simultaneously -> no cross-talk",
+    "Session created but no demo PC available -> queued, not lost"
+  ]
+}

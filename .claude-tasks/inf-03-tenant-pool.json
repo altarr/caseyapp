@@ -1,0 +1,19 @@
+{
+  "id": "inf-03-tenant-pool",
+  "workstream": "infra",
+  "title": "Build V1 tenant pool manager",
+  "description": "Manage a pool of 15 V1 tenants (6 active on demo PCs, 6 warming up, 3 buffer). Auto-provision replacement when tenant is claimed. Preserve claimed tenants for 30 days tagged with visitor info. Connect each new tenant to the shared AWS environment. Track pool state. Alert when pool is running low. Research V1 tenant provisioning API or automation path (ask Chris LaFleur for access).",
+  "priority": 3,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["inf-02-shared-aws-env"],
+  "tests": [
+    "Provision a V1 tenant -> tenant accessible within 30 minutes",
+    "Claim a tenant -> pool auto-starts provisioning replacement",
+    "All 6 PCs claim simultaneously -> 6 tenants served, 3 buffer remaining",
+    "Provisioning failure -> retry triggered, alert sent, pool doesn't crash",
+    "Preserved tenant accessible 30 days later with visitor's changes intact",
+    "Pool state accurately tracks all 15 tenants (active/warming/buffer/claimed/expired)"
+  ]
+}

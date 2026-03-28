@@ -1,0 +1,19 @@
+{
+  "id": "aud-01-recorder",
+  "workstream": "audio",
+  "title": "Adapt ffmpeg audio recorder for session-triggered start/stop",
+  "description": "Port the meeting-recorder ffmpeg script into a session-aware recorder. Must: auto-detect USB mic device name via 'ffmpeg -list_devices true -f dshow -i dummy', start recording when session starts (S3 polling), stop on session end or 'stop audio' command, output WAV 44100Hz stereo to session folder, handle graceful SIGINT for clean stop. No interactive prompts. Config via environment variables (AUDIO_DEVICE, SESSION_POLL_URL).",
+  "priority": 1,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": [],
+  "source_project": "ProjectsCL1/meeting-recorder/record-audio-ffmpeg.sh",
+  "tests": [
+    "Run with no USB mic -> error message with list of available devices",
+    "Run with valid device -> WAV file created, 44100Hz stereo verified",
+    "Send stop signal -> recording stops cleanly, file is valid (not corrupted)",
+    "10-minute recording -> file size reasonable (~100MB WAV), no gaps",
+    "Auto-detect picks correct USB mic when multiple audio devices exist"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "ana-02-correlator",
+  "workstream": "analysis",
+  "title": "Build timestamp correlator (audio + clicks + screenshots)",
+  "description": "Given a session's transcript.json and clicks.json, correlate audio timestamps with click timestamps to create a unified timeline. For each click, find what was being said at that moment. For each transcript segment, find what was on screen. Output: a merged timeline JSON that the analysis engine can consume. Include screenshot references at each point.",
+  "priority": 2,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["ana-01-session-watcher"],
+  "tests": [
+    "Click at 00:05:30 + transcript entry at 00:05:28 -> correctly correlated",
+    "Timeline is sorted chronologically",
+    "Screenshots referenced in timeline exist in S3",
+    "Session with no clicks (audio only) -> timeline still valid",
+    "Session with no audio (clicks only) -> timeline still valid"
+  ]
+}

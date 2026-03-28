@@ -1,0 +1,20 @@
+{
+  "id": "ana-04-html-report",
+  "workstream": "analysis",
+  "title": "Build HTML summary report generator",
+  "description": "Generate a self-contained HTML report from summary.json. Must include: visitor name, demo duration, products shown (with screenshots), interest areas, recommended follow-up, V1 tenant link (prominent), key moments with clickable screenshots. All CSS/images inline (no external deps). Email-ready. Dark mode. Adapt v1-helper report generator HTML template patterns. Upload to S3 as output/summary.html.",
+  "priority": 4,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["ana-03-claude-analysis"],
+  "source_project": "ProjectsCL1/v1-helper/scripts/report_generator.py",
+  "tests": [
+    "Generated HTML opens in browser without errors",
+    "All images are inline base64 (no broken external refs)",
+    "V1 tenant link is clickable and prominent",
+    "Screenshots in key moments are visible and correctly referenced",
+    "HTML file size under 5MB for a 15-minute session",
+    "Renders correctly in Outlook email preview (basic HTML compat)"
+  ]
+}

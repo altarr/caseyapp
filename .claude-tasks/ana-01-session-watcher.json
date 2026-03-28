@@ -1,0 +1,17 @@
+{
+  "id": "ana-01-session-watcher",
+  "workstream": "analysis",
+  "title": "Build session completion watcher",
+  "description": "Monitor S3 for completed sessions. A session is complete when metadata.json has status 'completed' AND clicks/clicks.json exists AND transcript/transcript.json exists. Poll every 30 seconds. When a complete session is found, trigger the analysis pipeline. Track which sessions have already been analyzed to avoid re-processing.",
+  "priority": 1,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": [],
+  "tests": [
+    "Incomplete session (no transcript yet) -> not triggered",
+    "Complete session -> analysis triggered within 30s",
+    "Same session not analyzed twice",
+    "Multiple sessions complete simultaneously -> all get analyzed"
+  ]
+}

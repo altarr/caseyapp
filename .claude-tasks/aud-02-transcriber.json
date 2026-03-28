@@ -1,0 +1,18 @@
+{
+  "id": "aud-02-transcriber",
+  "workstream": "audio",
+  "title": "Build audio-to-transcript pipeline",
+  "description": "After recording ends, transcribe the WAV file to text. Research and choose best approach: local Whisper, AWS Transcribe, or Azure Speech-to-Text. Must produce transcript.json matching DATA-CONTRACT.md schema (entries with timestamp, speaker, text). Speaker diarization is nice-to-have (distinguish SE vs visitor). Upload transcript.json to S3 session folder when done.",
+  "priority": 2,
+  "status": "pending",
+  "assigned_worker": null,
+  "substeps": [],
+  "depends_on": ["aud-01-recorder"],
+  "tests": [
+    "Feed 5-minute WAV -> transcript.json produced with correct schema",
+    "Timestamps are accurate within 2 seconds",
+    "Non-English words/names handled gracefully (not dropped)",
+    "Empty/silent audio -> empty entries array, no error",
+    "Large file (60-minute recording) completes within 5 minutes"
+  ]
+}
