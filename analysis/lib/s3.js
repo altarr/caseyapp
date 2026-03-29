@@ -87,24 +87,16 @@ async function isAlreadyClaimed(bucket, sessionId) {
   return objectExists(bucket, `sessions/${sessionId}/output/.analysis-claimed`);
 }
 
-// Check whether a session is fully complete and ready for analysis
-// Complete = metadata.json with status 'completed' + clicks/clicks.json + transcript/transcript.json
+// Check whether a session is ready for analysis.
+// Ready = metadata.json with status 'ended' or 'completed' + clicks/clicks.json + transcript/transcript.json
+// Returns: { ready: boolean, needsTranscription: boolean } or false
 async function isSessionComplete(bucket, sessionId) {
   const metadataKey = `sessions/${sessionId}/metadata.json`;
   const clicksKey = `sessions/${sessionId}/clicks/clicks.json`;
   const transcriptKey = `sessions/${sessionId}/transcript/transcript.json`;
+  const audioKey = `sessions/${sessionId}/audio/recording.wav`;
 
-  // Check all three files exist in parallel
-  const [clicksExist, transcriptExist] = await Promise.all([
-    objectExists(bucket, clicksKey),
-    objectExists(bucket, transcriptKey),
-  ]);
-
-  if (!clicksExist || !transcriptExist) {
-    return false;
-  }
-
-  // Check metadata last (cheapest path: bail early if data files missing)
+  // Check metadata first — bail if still active
   let metadata;
   try {
     metadata = await getJson(bucket, metadataKey);
@@ -115,7 +107,27 @@ async function isSessionComplete(bucket, sessionId) {
     throw err;
   }
 
-  return metadata.status === 'completed';
+  if (metadata.status !== 'ended' && metadata.status !== 'completed') {
+    return false;
+  }
+
+  // Check data files in parallel
+  const [clicksExist, transcriptExist, audioExist] = await Promise.all([
+    objectExists(bucket, clicksKey),
+    objectExists(bucket, transcriptKey),
+    objectExists(bucket, audioKey),
+  ]);
+
+  if (!clicksExist) return false;
+
+  // If transcript exists, fully ready
+  if (transcriptExist) return true;
+
+  // If audio exists but transcript doesn't, needs transcription first
+  if (audioExist) return { needsTranscription: true };
+
+  // No transcript and no audio — can't proceed
+  return false;
 }
 
 // Helper: convert readable stream to string

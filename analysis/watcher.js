@@ -22,6 +22,8 @@
 
 const { listSessions, isSessionComplete, isAlreadyClaimed, writeMarker } = require('./lib/s3');
 const { triggerPipeline } = require('./lib/pipeline');
+const { spawn } = require('child_process');
+const path = require('path');
 
 const BUCKET = process.env.S3_BUCKET;
 const POLL_INTERVAL_MS = (parseInt(process.env.POLL_INTERVAL_SECONDS, 10) || 30) * 1000;
@@ -62,6 +64,18 @@ async function pollOnce() {
         return;
       }
 
+      // If audio exists but no transcript, run transcriber first
+      if (complete && complete.needsTranscription) {
+        log(`  ${sessionId}: audio found, running transcriber...`);
+        try {
+          await runTranscriber(sessionId);
+          log(`  ${sessionId}: transcription complete`);
+        } catch (err) {
+          log(`  ${sessionId}: transcription FAILED — ${err.message}`);
+          return; // Don't proceed to analysis without transcript
+        }
+      }
+
       log(`  ${sessionId}: COMPLETE — claiming and triggering analysis`);
 
       // Write claim marker before launching pipeline to prevent double-dispatch
@@ -81,6 +95,19 @@ async function pollOnce() {
       log(`  ${sessionId}: ERROR checking session — ${err.message}`);
     }
   }));
+}
+
+function runTranscriber(sessionId) {
+  return new Promise((resolve, reject) => {
+    const script = path.resolve(__dirname, '..', 'audio', 'transcriber', 'index.js');
+    const env = { ...process.env, S3_BUCKET: BUCKET };
+    const proc = spawn(process.execPath, [script, sessionId], { env, stdio: 'inherit' });
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Transcriber exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
 }
 
 async function run() {
