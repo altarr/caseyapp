@@ -11,6 +11,15 @@ After a demo session ends and data is uploaded to S3, this pipeline:
 4. Generates an HTML summary report + structured JSON
 5. Generates follow-up recommendations for SDR team
 
+## Pipeline Components
+
+- **watcher** (`watcher.js`) — Polls S3 every 30s for completed sessions. A session is ready when `metadata.json` shows `status: completed` and both `clicks.json` and `transcript.json` exist. Claims the session by writing an `.analysis-claimed` marker, then spawns `pipeline-run.js`. Exposes a health-check endpoint on port 8090.
+- **correlator** (`lib/correlator.js`) — Pure function that merges click events and transcript segments into a single unified timeline sorted by timestamp. No I/O; receives data from the pipeline runner.
+- **analyzer** (`analyze.py` + `engines/`) — Two-pass Claude analysis: first extracts facts (what was shown, questions asked, interest signals), then generates contextual follow-up recommendations. Outputs `summary.json`, `summary.html`, and `follow-up.json`.
+- **pipeline-run** (`pipeline-run.js`) — Orchestrates end-to-end processing for a single session. Fetches clicks and transcript from S3, calls the correlator to build a timeline, invokes the analyzer, and writes all output artifacts back to the session's S3 folder.
+
+The pipeline runs automatically: watcher detects → pipeline-run orchestrates → correlator merges → analyzer produces the final report.
+
 ## Base
 Adapted from recording-analyzer (template-based analysis engines) and v1-helper (HTML report generator).
 
