@@ -112,10 +112,22 @@ function handleClick(event) {
     buffer.events.push(clickEvent);
     saveClickBuffer(buffer);
 
-    // Notify background service worker so it can forward to the relay / S3
+    // Notify background service worker — it captures a screenshot and returns
+    // the filename so we can backfill screenshot_file on the stored event.
     chrome.runtime.sendMessage({
       type: 'click_event',
       event: clickEvent,
+    }).then((response) => {
+      if (response && response.filename) {
+        loadClickBuffer((buf) => {
+          if (!buf) return;
+          const evt = buf.events.find(e => e.index === clickEvent.index);
+          if (evt) {
+            evt.screenshot_file = response.filename;
+            saveClickBuffer(buf);
+          }
+        });
+      }
     }).catch(() => {
       // Background may not be listening yet — silently ignore
     });
