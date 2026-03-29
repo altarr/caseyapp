@@ -5,7 +5,8 @@
   "description": "TrendAI V1-Helper: Chrome extension providing access to MCP tools for AI-assisted workflows. Connects to the MCP relay to expose 30 tools directly in your browser.",
   "permissions": [
     "activeTab",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",
