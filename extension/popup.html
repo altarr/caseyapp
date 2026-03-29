@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V1-Helper</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      min-height: 200px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f14;
+      color: #e8e8f0;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-bottom: 1px solid #2a2a4a;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .spark {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #a78bfa;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 1px;
+    }
+
+    .status-bar {
+      padding: 10px 20px;
+      background: #12121c;
+      border-bottom: 1px solid #1e1e30;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #6b7280;
+    }
+
+    .status-dot.connected {
+      background: #34d399;
+      box-shadow: 0 0 6px #34d39966;
+    }
+
+    .status-text {
+      color: #9ca3af;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    .tool-count {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tool-count-label {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .tool-count-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #a78bfa;
+    }
+
+    .footer {
+      padding: 12px 20px;
+      border-top: 1px solid #1e1e30;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 11px;
+      color: #4b5563;
+    }
+
+    .footer-text span {
+      color: #7c3aed;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="spark">&#9889;</div>
+    <div class="brand">
+      <div class="brand-name">V1-Helper</div>
+      <div class="brand-sub">by TrendAI</div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Connecting to MCP relay...</span>
+  </div>
+
+  <div class="content">
+    <div class="section-title">MCP Tools</div>
+    <div class="tool-count">
+      <span class="tool-count-label">Available tools</span>
+      <span class="tool-count-value" id="toolCount">--</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-text">Powered by <span>TrendAI</span></div>
+  </div>
+
+  <script>
+    // Placeholder: MCP relay connection logic goes here in Part 2
+    document.getElementById('statusText').textContent = 'MCP relay not configured';
+    document.getElementById('toolCount').textContent = '30';
+  </script>
+</body>
+</html>
