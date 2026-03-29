@@ -20,10 +20,15 @@
 
 'use strict';
 
+const http = require('http');
 const { listSessions, isSessionComplete, isAlreadyClaimed, writeMarker } = require('./lib/s3');
 const { triggerPipeline } = require('./lib/pipeline');
 const { spawn } = require('child_process');
 const path = require('path');
+
+const HEALTH_PORT = parseInt(process.env.HEALTH_PORT, 10) || 8090;
+const startTime = Date.now();
+let sessionsProcessed = 0;
 
 const BUCKET = process.env.S3_BUCKET;
 const POLL_INTERVAL_MS = (parseInt(process.env.POLL_INTERVAL_SECONDS, 10) || 30) * 1000;
@@ -85,6 +90,7 @@ async function pollOnce() {
         claimed_by: process.env.HOSTNAME || 'watcher',
       });
       dispatched.add(sessionId);
+      sessionsProcessed++;
 
       // Trigger pipeline (fire-and-forget — errors are logged, not fatal)
       triggerPipeline(sessionId, BUCKET)
@@ -117,6 +123,24 @@ async function run() {
   }
 
   log(`Starting — bucket=${BUCKET} poll_interval=${POLL_INTERVAL_MS / 1000}s`);
+
+  // Start health check HTTP server
+  const healthServer = http.createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'ok',
+        uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
+        sessions_processed: sessionsProcessed,
+      }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+  healthServer.listen(HEALTH_PORT, () => {
+    log(`Health check listening on port ${HEALTH_PORT}`);
+  });
 
   // Run immediately on start, then on interval
   await pollOnce();
