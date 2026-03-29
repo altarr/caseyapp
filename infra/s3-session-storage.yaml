@@ -190,22 +190,23 @@ Resources:
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/metadata.json"
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/badge.jpg"
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/v1-tenant/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/commands/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/active-session.json"
           - Sid: ReadSessionFiles
             Effect: Allow
             Action:
               - s3:GetObject
+              - s3:HeadObject
             Resource:
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/commands/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/active-session.json"
           - Sid: ListSessionBucket
             Effect: Allow
             Action:
               - s3:ListBucket
             Resource:
               - !Sub "arn:aws:s3:::${SessionBucket}"
-            Condition:
-              StringLike:
-                "s3:prefix":
-                  - "sessions/*"
 
   # ── IAM Roles ──────────────────────────────────────────────────────────────
 
