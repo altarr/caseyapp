@@ -4,9 +4,31 @@
   "title": "Set up S3 session storage bucket with proper structure",
   "description": "Create S3 bucket for session data on hackathon AWS account (us-east-1). Structure: sessions/<session-id>/ with subfolders per DATA-CONTRACT.md. Add lifecycle policy: session data expires after 90 days. Add CORS for extension upload. Create IAM policy with least-privilege for each workstream (extension writes clicks/screenshots, audio writes audio/transcript, analysis writes output/). Use CloudFormation.",
   "priority": 1,
-  "status": "pending",
-  "assigned_worker": null,
-  "substeps": [],
+  "status": "in_progress",
+  "assigned_worker": "claude-portable-worker",
+  "substeps": [
+    {
+      "id": "cf-template",
+      "title": "Write CloudFormation template (bucket, lifecycle, CORS, IAM roles)",
+      "status": "completed",
+      "pr": null,
+      "notes": "infra/s3-session-storage.yaml — passes cfn-lint validation. Bucket, lifecycle (90 days), CORS (chrome-extension://*), 4 IAM policies + roles (extension, audio, analysis, app)."
+    },
+    {
+      "id": "test-script",
+      "title": "Write test script for the 5 task tests",
+      "status": "completed",
+      "pr": null,
+      "notes": "infra/test-s3-setup.sh — runs all 5 verification tests against deployed stack."
+    },
+    {
+      "id": "deploy",
+      "title": "Deploy stack to hackathon account and run tests",
+      "status": "blocked",
+      "pr": null,
+      "notes": "EC2 worker instance role (156805546859) does not have cloudformation permissions and is not the hackathon account (752266476357). Deployment must be done by Joel from a machine with hackathon profile credentials: cd boothapp && aws --profile hackathon cloudformation deploy --stack-name boothapp-sessions --template-file infra/s3-session-storage.yaml --capabilities CAPABILITY_NAMED_IAM. Then run: AWS_PROFILE=hackathon bash infra/test-s3-setup.sh"
+    }
+  ],
   "depends_on": [],
   "tests": [
     "Upload a test file to sessions/test-123/clicks/test.json -> succeeds",

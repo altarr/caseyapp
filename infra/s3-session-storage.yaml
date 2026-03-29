@@ -1,0 +1,321 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  BoothApp S3 session storage bucket with lifecycle policy, CORS for Chrome extension,
+  and least-privilege IAM roles per workstream (Extension, Audio, Analysis, App).
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: boothapp-sessions
+    Description: Base name for the S3 bucket (account ID suffix auto-appended)
+
+  SessionRetentionDays:
+    Type: Number
+    Default: 90
+    Description: Days before session objects are automatically deleted
+
+Resources:
+
+  # ── S3 Bucket ──────────────────────────────────────────────────────────────
+
+  SessionBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketName}-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Suspended
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireSessionData
+            Status: Enabled
+            Prefix: sessions/
+            ExpirationInDays: !Ref SessionRetentionDays
+      CorsConfiguration:
+        CorsRules:
+          # Chrome extension uploads (clicks, screenshots)
+          - Id: ChromeExtensionUpload
+            AllowedOrigins:
+              - "chrome-extension://*"
+            AllowedMethods:
+              - PUT
+              - POST
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3600
+          # Local dev / web UI access
+          - Id: LocalDevAccess
+            AllowedOrigins:
+              - "http://localhost:*"
+              - "https://localhost:*"
+            AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            MaxAge: 3600
+      Tags:
+        - Key: Project
+          Value: boothapp
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ── IAM Policies ───────────────────────────────────────────────────────────
+
+  # Extension: writes clicks/ and screenshots/ — reads all session files
+  ExtensionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: boothapp-extension-policy
+      Description: Chrome extension — write clicks/ and screenshots/, read all session files
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteClicksAndScreenshots
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/clicks/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/screenshots/*"
+          - Sid: ReadSessionFiles
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*"
+          - Sid: ListSessionBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}"
+            Condition:
+              StringLike:
+                "s3:prefix":
+                  - "sessions/*"
+
+  # Audio: writes audio/ and transcript/ — reads all session files
+  AudioPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: boothapp-audio-policy
+      Description: Audio workstream — write audio/ and transcript/, read all session files
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteAudioAndTranscript
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/audio/*"
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/transcript/*"
+          - Sid: ReadSessionFiles
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*"
+          - Sid: ListSessionBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}"
+            Condition:
+              StringLike:
+                "s3:prefix":
+                  - "sessions/*"
+
+  # Analysis: writes output/ — reads all session files
+  AnalysisPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: boothapp-analysis-policy
+      Description: Analysis workstream — write output/, read all session files
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteOutput
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/output/*"
+          - Sid: ReadSessionFiles
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*"
+          - Sid: ListSessionBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}"
+            Condition:
+              StringLike:
+                "s3:prefix":
+                  - "sessions/*"
+
+  # App (Android / dispatcher): creates sessions, writes metadata and v1-tenant/
+  AppPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: boothapp-app-policy
+      Description: Android app / dispatcher — create sessions, write metadata and v1-tenant/, read all
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSessionRoot
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/metadata.json"
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/badge.jpg"
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/v1-tenant/*"
+          - Sid: ReadSessionFiles
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*"
+          - Sid: ListSessionBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${SessionBucket}"
+            Condition:
+              StringLike:
+                "s3:prefix":
+                  - "sessions/*"
+
+  # ── IAM Roles ──────────────────────────────────────────────────────────────
+
+  ExtensionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: boothapp-extension-role
+      Description: Assumed by Chrome extension (via pre-signed URLs or Cognito)
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref ExtensionPolicy
+      Tags:
+        - Key: Project
+          Value: boothapp
+
+  AudioRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: boothapp-audio-role
+      Description: Assumed by audio capture / transcription service
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AudioPolicy
+      Tags:
+        - Key: Project
+          Value: boothapp
+
+  AnalysisRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: boothapp-analysis-role
+      Description: Assumed by Claude analysis service
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AnalysisPolicy
+      Tags:
+        - Key: Project
+          Value: boothapp
+
+  AppRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: boothapp-app-role
+      Description: Assumed by Android app / dispatcher for session management
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AppPolicy
+      Tags:
+        - Key: Project
+          Value: boothapp
+
+# ── Outputs ──────────────────────────────────────────────────────────────────
+
+Outputs:
+  BucketName:
+    Description: S3 bucket name for session storage
+    Value: !Ref SessionBucket
+    Export:
+      Name: boothapp-sessions-bucket-name
+
+  BucketArn:
+    Description: ARN of the session storage bucket
+    Value: !GetAtt SessionBucket.Arn
+    Export:
+      Name: boothapp-sessions-bucket-arn
+
+  ExtensionRoleArn:
+    Description: IAM role ARN for Chrome extension workstream
+    Value: !GetAtt ExtensionRole.Arn
+    Export:
+      Name: boothapp-extension-role-arn
+
+  AudioRoleArn:
+    Description: IAM role ARN for audio workstream
+    Value: !GetAtt AudioRole.Arn
+    Export:
+      Name: boothapp-audio-role-arn
+
+  AnalysisRoleArn:
+    Description: IAM role ARN for analysis workstream
+    Value: !GetAtt AnalysisRole.Arn
+    Export:
+      Name: boothapp-analysis-role-arn
+
+  AppRoleArn:
+    Description: IAM role ARN for Android app / dispatcher
+    Value: !GetAtt AppRole.Arn
+    Export:
+      Name: boothapp-app-role-arn
