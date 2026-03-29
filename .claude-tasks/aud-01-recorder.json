@@ -4,9 +4,15 @@
   "title": "Adapt ffmpeg audio recorder for session-triggered start/stop",
   "description": "Port the meeting-recorder ffmpeg script into a session-aware recorder. Must: auto-detect USB mic device name via 'ffmpeg -list_devices true -f dshow -i dummy', start recording when session starts (S3 polling), stop on session end or 'stop audio' command, output WAV 44100Hz stereo to session folder, handle graceful SIGINT for clean stop. No interactive prompts. Config via environment variables (AUDIO_DEVICE, SESSION_POLL_URL).",
   "priority": 1,
-  "status": "pending",
-  "assigned_worker": null,
-  "substeps": [],
+  "status": "completed",
+  "assigned_worker": "ccc-worker-aud-01",
+  "completed_at": "2026-03-28T00:00:00Z",
+  "substeps": [
+    {"id": "device-detect", "title": "USB mic auto-detection via ffmpeg dshow", "status": "completed", "pr": null, "notes": "audio/lib/device-detect.js — scores devices by keyword, AUDIO_DEVICE override"},
+    {"id": "session-poller", "title": "S3 polling for session start/stop events", "status": "completed", "pr": null, "notes": "audio/lib/session-poller.js — EventEmitter, polls metadata.json + stop-audio command"},
+    {"id": "ffmpeg-recorder", "title": "Core ffmpeg recorder with start/stop/SIGINT", "status": "completed", "pr": null, "notes": "audio/lib/ffmpeg-recorder.js — 44100Hz stereo WAV, graceful q-stop with SIGTERM fallback"},
+    {"id": "main-entry", "title": "Main orchestrator + package.json + README", "status": "completed", "pr": null, "notes": "audio/recorder.js — wires detector+poller+recorder, SIGINT/SIGTERM handlers"}
+  ],
   "depends_on": [],
   "source_project": "ProjectsCL1/meeting-recorder/record-audio-ffmpeg.sh",
   "tests": [
@@ -15,5 +21,6 @@
     "Send stop signal -> recording stops cleanly, file is valid (not corrupted)",
     "10-minute recording -> file size reasonable (~100MB WAV), no gaps",
     "Auto-detect picks correct USB mic when multiple audio devices exist"
-  ]
+  ],
+  "research_notes": "ffmpeg DirectShow on Windows: use '-f dshow -list_devices true -i dummy' to enumerate. Device names contain 'Microphone', 'USB', 'Wireless'. S3 polling reads sessions/<session_id>/metadata.json; start on status=active, stop on status=completed or ended_at set. Output: WAV 44100Hz stereo (-ar 44100 -ac 2). SIGINT handler must kill ffmpeg child process cleanly — ffmpeg accepts 'q' on stdin or SIGINT/SIGTERM which flushes buffers before exit."
 }
