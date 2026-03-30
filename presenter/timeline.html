@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Timeline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b1120;
+      --surface: #151d2e;
+      --surface2: #1a2540;
+      --border: #243049;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --text3: #64748b;
+      --accent: #3b82f6;
+      --accent-dim: #1e40af;
+      --green: #4ade80;
+      --yellow: #facc15;
+      --red: #f87171;
+      --purple: #a78bfa;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Loading / Error ─────────────────────────────────── */
+    #loading, #error, #setup {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
+      padding: 24px;
+    }
+    #loading .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error { color: var(--red); }
+    #error .msg { max-width: 500px; text-align: center; color: var(--text2); }
+
+    /* ── Setup Form ──────────────────────────────────────── */
+    #setup { max-width: 440px; margin: 0 auto; }
+    #setup h2 { font-size: 20px; color: var(--text); }
+    #setup p { color: var(--text2); font-size: 14px; text-align: center; }
+    #setup form { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    #setup label { font-size: 13px; color: var(--text2); font-weight: 600; }
+    #setup input {
+      width: 100%; padding: 10px 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 14px;
+    }
+    #setup input:focus { outline: none; border-color: var(--accent); }
+    #setup button {
+      padding: 10px 20px; background: var(--accent); color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+    #setup button:hover { background: #2563eb; }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    .page-header {
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 28px 0;
+    }
+    .page-header h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 4px; }
+
+    /* ── Visitor Card ─────────────────────────────────────── */
+    .visitor-card {
+      display: flex; gap: 20px; align-items: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin: 24px 0;
+    }
+    .visitor-card .badge-photo {
+      width: 80px; height: 80px; border-radius: 8px;
+      object-fit: cover; background: var(--surface2); border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .visitor-card .badge-photo.placeholder {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; color: var(--text3);
+    }
+    .visitor-card .info h2 { font-size: 22px; font-weight: 700; color: #f1f5f9; }
+    .visitor-card .info .meta { color: var(--text2); font-size: 13px; margin-top: 4px; }
+    .visitor-card .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      display: inline-block; padding: 3px 10px; border-radius: 14px;
+      font-size: 12px; font-weight: 600; background: var(--surface2);
+      border: 1px solid var(--border); color: var(--text2);
+    }
+    .chip.accent { background: var(--accent-dim); color: #bfdbfe; border-color: var(--accent-dim); }
+    .chip.green { background: #14532d; color: var(--green); border-color: #166534; }
+
+    /* ── Section ──────────────────────────────────────────── */
+    .section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 24px; overflow: hidden;
+    }
+    .section-title {
+      padding: 14px 20px; font-size: 13px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text3); border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .section-body { padding: 20px; }
+
+    /* ── Timeline ─────────────────────────────────────────── */
+    .timeline { position: relative; padding-left: 36px; }
+    .timeline::before {
+      content: ''; position: absolute; left: 14px; top: 0; bottom: 0;
+      width: 2px; background: var(--border);
+    }
+    .tl-item { position: relative; margin-bottom: 24px; }
+    .tl-item:last-child { margin-bottom: 0; }
+    .tl-dot {
+      position: absolute; left: -36px; top: 4px;
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid var(--border); background: var(--bg);
+    }
+    .tl-item.type-click .tl-dot { border-color: var(--accent); background: var(--accent); }
+    .tl-item.type-speech .tl-dot { border-color: var(--purple); background: var(--purple); }
+    .tl-item.type-screenshot .tl-dot { border-color: var(--green); background: var(--green); }
+
+    .tl-time {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px; color: var(--text3); margin-bottom: 4px;
+    }
+    .tl-content { color: var(--text); font-size: 14px; }
+    .tl-label {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;
+    }
+    .tl-label.click { background: rgba(59,130,246,0.15); color: var(--accent); }
+    .tl-label.speech { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+    .tl-click-detail {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; margin-top: 8px;
+    }
+    .tl-click-detail .page { font-size: 12px; color: var(--text3); margin-bottom: 2px; }
+    .tl-click-detail .element { font-size: 13px; color: var(--text2); }
+    .tl-click-detail .element strong { color: var(--text); }
+
+    .tl-screenshot {
+      margin-top: 10px; border-radius: 8px; overflow: hidden;
+      border: 1px solid var(--border); max-width: 100%; cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .tl-screenshot:hover { transform: scale(1.01); }
+    .tl-screenshot img {
+      display: block; width: 100%; height: auto;
+      background: var(--surface2); min-height: 80px;
+    }
+    .tl-screenshot .ss-error {
+      display: flex; align-items: center; justify-content: center;
+      height: 80px; color: var(--text3); font-size: 12px;
+      background: var(--surface2);
+    }
+
+    .tl-speech-text { margin-top: 4px; }
+    .tl-speaker {
+      font-weight: 700; font-size: 13px; margin-right: 6px;
+    }
+    .tl-speaker.se { color: var(--accent); }
+    .tl-speaker.visitor { color: var(--green); }
+
+    /* ── Transcript ───────────────────────────────────────── */
+    .transcript-entry { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .transcript-entry:last-child { border-bottom: none; }
+    .transcript-entry .ts {
+      font-family: monospace; font-size: 12px; color: var(--text3);
+      margin-right: 10px; min-width: 80px; display: inline-block;
+    }
+
+    /* ── Summary ──────────────────────────────────────────── */
+    .interests-table { width: 100%; border-collapse: collapse; }
+    .interests-table th {
+      text-align: left; padding: 8px 12px; font-size: 12px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text3); border-bottom: 2px solid var(--border);
+    }
+    .interests-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      font-size: 14px; color: var(--text);
+    }
+    .confidence-high { color: var(--green); font-weight: 700; }
+    .confidence-medium { color: var(--yellow); font-weight: 700; }
+    .confidence-low { color: var(--text3); font-weight: 700; }
+
+    .followup-list { list-style: none; }
+    .followup-list li {
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      color: var(--text); display: flex; gap: 10px; align-items: flex-start;
+      font-size: 14px;
+    }
+    .followup-list li:last-child { border-bottom: none; }
+    .followup-list .arrow { color: var(--accent); font-size: 18px; flex-shrink: 0; line-height: 1; }
+
+    .sdr-notes {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px 16px; color: var(--text2);
+      font-size: 14px; line-height: 1.7;
+    }
+
+    /* ── Lightbox ─────────────────────────────────────────── */
+    .lightbox {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .page-footer {
+      border-top: 1px solid var(--border); padding: 20px 0;
+      color: var(--text3); font-size: 12px; text-align: center;
+      margin-top: 16px;
+    }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .visitor-card { flex-direction: column; align-items: flex-start; }
+      .visitor-card .badge-photo { width: 64px; height: 64px; }
+      .container { padding: 0 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Setup screen (shown when no AWS credentials in localStorage) -->
+<div id="setup" style="display:none">
+  <h2>AWS Credentials</h2>
+  <p>Enter your AWS credentials to load session data from S3. Stored in localStorage only.</p>
+  <form id="setup-form">
+    <label>Access Key ID</label>
+    <input type="text" id="input-access-key" required autocomplete="off">
+    <label>Secret Access Key</label>
+    <input type="password" id="input-secret-key" required autocomplete="off">
+    <label>Region (default: us-east-1)</label>
+    <input type="text" id="input-region" value="us-east-1">
+    <label>S3 Bucket</label>
+    <input type="text" id="input-bucket" value="boothapp-sessions-752266476357">
+    <button type="submit">Save &amp; Load</button>
+  </form>
+</div>
+
+<!-- Loading spinner -->
+<div id="loading" style="display:none">
+  <div class="spinner"></div>
+  <div style="color:var(--text2);font-size:14px">Loading session data...</div>
+</div>
+
+<!-- Error screen -->
+<div id="error" style="display:none">
+  <div style="font-size:24px;font-weight:700">Error</div>
+  <div class="msg" id="error-msg"></div>
+  <button onclick="document.getElementById('error').style.display='none';showSetup()" style="margin-top:12px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer">Reconfigure</button>
+</div>
+
+<!-- Main content (hidden until loaded) -->
+<div id="app" style="display:none">
+
+  <div class="page-header">
+    <div class="container">
+      <h1>Session Timeline</h1>
+      <div id="session-id-display" style="color:var(--text);font-size:20px;font-weight:700;margin-top:2px"></div>
+    </div>
+  </div>
+
+  <div class="container" style="padding-top:4px;padding-bottom:40px">
+
+    <!-- Visitor Info Card -->
+    <div class="visitor-card" id="visitor-card"></div>
+
+    <!-- Interactive Timeline -->
+    <div class="section">
+      <div class="section-title">Timeline</div>
+      <div class="section-body">
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+
+    <!-- Full Transcript -->
+    <div class="section">
+      <div class="section-title">Full Transcript</div>
+      <div class="section-body" id="transcript"></div>
+    </div>
+
+    <!-- Analysis Summary -->
+    <div class="section" id="summary-section" style="display:none">
+      <div class="section-title">Analysis Summary</div>
+      <div class="section-body" id="summary-body"></div>
+    </div>
+
+    <!-- Follow-Up Actions -->
+    <div class="section" id="followup-section" style="display:none">
+      <div class="section-title">Follow-Up Actions</div>
+      <div class="section-body" id="followup-body"></div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <div class="container">Trend Micro Vision One Booth App</div>
+  </div>
+</div>
+
+<!-- Lightbox for screenshots -->
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
+  <img id="lightbox-img" src="" alt="Screenshot">
+</div>
+
+<!-- AWS SDK v3 from CDN (S3 client bundle) -->
+<script src="https://cdn.jsdelivr.net/npm/@aws-sdk/client-s3@3.540.0/dist-es/bundle.min.js" onerror="loadSdkFallback()"></script>
+<script type="module">
+// We use dynamic import for the AWS SDK since CDN bundles vary.
+// Fall back to constructing the client manually if the global isn't available.
+
+const SCREENS = { setup: 'setup', loading: 'loading', error: 'error', app: 'app' };
+
+function show(screen) {
+  Object.values(SCREENS).forEach(id => {
+    document.getElementById(id).style.display = id === screen ? (id === 'app' ? 'block' : 'flex') : 'none';
+  });
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  show('error');
+}
+
+window.showSetup = function() { show('setup'); };
+
+function esc(str) {
+  if (str == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+// ── Credential Storage ──────────────────────────────────────
+
+function getCredentials() {
+  const ak = localStorage.getItem('booth_aws_access_key');
+  const sk = localStorage.getItem('booth_aws_secret_key');
+  const region = localStorage.getItem('booth_aws_region') || 'us-east-1';
+  const bucket = localStorage.getItem('booth_aws_bucket') || 'boothapp-sessions-752266476357';
+  if (!ak || !sk) return null;
+  return { accessKeyId: ak, secretAccessKey: sk, region, bucket };
+}
+
+function saveCredentials(ak, sk, region, bucket) {
+  localStorage.setItem('booth_aws_access_key', ak);
+  localStorage.setItem('booth_aws_secret_key', sk);
+  localStorage.setItem('booth_aws_region', region || 'us-east-1');
+  localStorage.setItem('booth_aws_bucket', bucket || 'boothapp-sessions-752266476357');
+}
+
+// ── S3 Client ───────────────────────────────────────────────
+
+let s3Client = null;
+let bucketName = '';
+
+async function initS3() {
+  const creds = getCredentials();
+  if (!creds) return false;
+  bucketName = creds.bucket;
+
+  // Dynamic import of AWS SDK v3 from CDN
+  const { S3Client, GetObjectCommand } = await import(
+    'https://cdn.jsdelivr.net/npm/@aws-sdk/client-s3@3.540.0/+esm'
+  );
+  window._S3Client = S3Client;
+  window._GetObjectCommand = GetObjectCommand;
+
+  s3Client = new S3Client({
+    region: creds.region,
+    credentials: {
+      accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey,
+    },
+  });
+  return true;
+}
+
+async function getS3Json(key) {
+  const resp = await s3Client.send(new window._GetObjectCommand({
+    Bucket: bucketName, Key: key,
+  }));
+  const text = await resp.Body.transformToString();
+  return JSON.parse(text);
+}
+
+async function getS3ImageUrl(key) {
+  try {
+    const resp = await s3Client.send(new window._GetObjectCommand({
+      Bucket: bucketName, Key: key,
+    }));
+    const bytes = await resp.Body.transformToByteArray();
+    const blob = new Blob([bytes], { type: 'image/jpeg' });
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+// ── Parse URL Params ────────────────────────────────────────
+
+function getSessionId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('session') || params.get('sessionId') || params.get('id') || '';
+}
+
+// ── Time Helpers ────────────────────────────────────────────
+
+function isoToRelative(isoStr, startIso) {
+  const start = new Date(startIso).getTime();
+  const t = new Date(isoStr).getTime();
+  const diffMs = t - start;
+  if (isNaN(diffMs)) return isoStr;
+  const totalSec = Math.max(0, Math.floor(diffMs / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function transcriptTsToSeconds(ts) {
+  // "00:05:30.000" or "00:05:30"
+  const parts = ts.replace(/\.\d+$/, '').split(':');
+  if (parts.length === 3) return (+parts[0]) * 3600 + (+parts[1]) * 60 + (+parts[2]);
+  if (parts.length === 2) return (+parts[0]) * 60 + (+parts[1]);
+  return 0;
+}
+
+function formatDuration(startIso, endIso) {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  const mins = Math.round(ms / 60000);
+  return mins + ' min';
+}
+
+// ── Render Functions ────────────────────────────────────────
+
+function renderVisitorCard(metadata, badgeUrl) {
+  const card = document.getElementById('visitor-card');
+  const photoHtml = badgeUrl
+    ? `<img class="badge-photo" src="${badgeUrl}" alt="Badge">`
+    : `<div class="badge-photo placeholder">[?]</div>`;
+
+  const duration = metadata.started_at && metadata.ended_at
+    ? formatDuration(metadata.started_at, metadata.ended_at) : '?';
+
+  const startTime = metadata.started_at
+    ? new Date(metadata.started_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
+  card.innerHTML = `
+    ${photoHtml}
+    <div class="info">
+      <h2>${esc(metadata.visitor_name || 'Unknown Visitor')}</h2>
+      <div class="meta">${esc(startTime)}${metadata.se_name ? ' &middot; SE: ' + esc(metadata.se_name) : ''}${metadata.demo_pc ? ' &middot; ' + esc(metadata.demo_pc) : ''}</div>
+      <div class="chips">
+        <span class="chip accent">${esc(duration)}</span>
+        <span class="chip">${esc(metadata.session_id)}</span>
+        ${metadata.status ? `<span class="chip green">${esc(metadata.status)}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderTimeline(clicks, transcript, metadata, screenshotUrls) {
+  const startIso = metadata.started_at || '';
+  const startSec = startIso ? new Date(startIso).getTime() / 1000 : 0;
+
+  // Build merged event list
+  const events = [];
+
+  // Click events
+  if (clicks && clicks.events) {
+    for (const ev of clicks.events) {
+      const sec = startIso ? (new Date(ev.timestamp).getTime() / 1000 - startSec) : ev.index;
+      events.push({
+        type: 'click',
+        seconds: sec,
+        timestamp: ev.timestamp,
+        data: ev,
+        screenshotUrl: screenshotUrls[ev.screenshot_file] || null,
+      });
+    }
+  }
+
+  // Transcript entries
+  if (transcript && transcript.entries) {
+    for (const entry of transcript.entries) {
+      const sec = transcriptTsToSeconds(entry.timestamp);
+      events.push({
+        type: 'speech',
+        seconds: sec,
+        data: entry,
+      });
+    }
+  }
+
+  // Sort chronologically
+  events.sort((a, b) => a.seconds - b.seconds);
+
+  const container = document.getElementById('timeline');
+  if (events.length === 0) {
+    container.innerHTML = '<div style="color:var(--text3);font-style:italic">No timeline events</div>';
+    return;
+  }
+
+  let html = '';
+  for (const ev of events) {
+    if (ev.type === 'click') {
+      const d = ev.data;
+      const relTime = startIso ? isoToRelative(d.timestamp, startIso) : `#${d.index}`;
+      const ssHtml = ev.screenshotUrl
+        ? `<div class="tl-screenshot" onclick="openLightbox('${ev.screenshotUrl}')"><img src="${ev.screenshotUrl}" alt="Screenshot" loading="lazy"></div>`
+        : (d.screenshot_file ? `<div class="tl-screenshot"><div class="ss-error">${esc(d.screenshot_file)}</div></div>` : '');
+
+      html += `
+        <div class="tl-item type-click">
+          <div class="tl-dot"></div>
+          <div class="tl-time">${esc(relTime)}</div>
+          <div class="tl-content">
+            <div class="tl-label click">Click</div>
+            <div class="tl-click-detail">
+              <div class="page">${esc(d.page_title || d.page_url || '')}</div>
+              <div class="element"><strong>${esc(d.element?.text || d.dom_path || '')}</strong></div>
+            </div>
+            ${ssHtml}
+          </div>
+        </div>`;
+    } else {
+      const d = ev.data;
+      const speakerClass = (d.speaker || '').toLowerCase() === 'se' ? 'se' : 'visitor';
+      html += `
+        <div class="tl-item type-speech">
+          <div class="tl-dot"></div>
+          <div class="tl-time">${esc(d.timestamp)}</div>
+          <div class="tl-content">
+            <div class="tl-label speech">${esc(d.speaker)}</div>
+            <div class="tl-speech-text">
+              <span class="tl-speaker ${speakerClass}">${esc(d.speaker)}:</span>
+              ${esc(d.text)}
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+function renderTranscript(transcript) {
+  const container = document.getElementById('transcript');
+  if (!transcript || !transcript.entries || transcript.entries.length === 0) {
+    container.innerHTML = '<div style="color:var(--text3);font-style:italic">No transcript available</div>';
+    return;
+  }
+
+  let html = '';
+  for (const entry of transcript.entries) {
+    const speakerClass = (entry.speaker || '').toLowerCase() === 'se' ? 'se' : 'visitor';
+    html += `
+      <div class="transcript-entry">
+        <span class="ts">${esc(entry.timestamp)}</span>
+        <span class="tl-speaker ${speakerClass}">${esc(entry.speaker)}:</span>
+        ${esc(entry.text)}
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderSummary(summary) {
+  if (!summary) return;
+  const section = document.getElementById('summary-section');
+  const body = document.getElementById('summary-body');
+  section.style.display = 'block';
+
+  let html = '';
+
+  // Products shown
+  if (summary.products_shown && summary.products_shown.length) {
+    html += '<div style="margin-bottom:20px"><div style="font-size:13px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Products Demonstrated</div>';
+    html += summary.products_shown.map(p =>
+      `<span class="chip accent" style="margin-right:6px;margin-bottom:4px">${esc(p)}</span>`
+    ).join('');
+    html += '</div>';
+  }
+
+  // Visitor interests
+  if (summary.visitor_interests && summary.visitor_interests.length) {
+    html += `<table class="interests-table">
+      <thead><tr><th>Topic</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody>`;
+    for (const i of summary.visitor_interests) {
+      const cls = 'confidence-' + (i.confidence || 'low').toLowerCase();
+      html += `<tr>
+        <td style="font-weight:500">${esc(i.topic)}</td>
+        <td><span class="${cls}" style="text-transform:uppercase;font-size:12px;letter-spacing:0.05em">${esc(i.confidence)}</span></td>
+        <td style="color:var(--text2);font-size:13px">${esc(i.evidence)}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+  }
+
+  // Key moments
+  if (summary.key_moments && summary.key_moments.length) {
+    html += '<div style="margin-top:20px"><div style="font-size:13px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">Key Moments</div>';
+    for (const m of summary.key_moments) {
+      html += `<div style="display:flex;gap:12px;margin-bottom:12px;align-items:flex-start">
+        <span style="font-family:monospace;font-size:12px;color:var(--text3);min-width:70px">${esc(m.timestamp)}</span>
+        <span style="color:var(--text);font-size:14px">${esc(m.description)}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // SDR notes from follow-up
+  if (summary._followUp && summary._followUp.sdr_notes) {
+    html += `<div style="margin-top:20px">
+      <div style="font-size:13px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">SDR Notes</div>
+      <div class="sdr-notes">${esc(summary._followUp.sdr_notes)}</div>
+    </div>`;
+  }
+
+  body.innerHTML = html;
+}
+
+function renderFollowUp(summary, followUp) {
+  const actions = summary?.recommended_follow_up || [];
+  if (actions.length === 0 && !followUp) return;
+
+  const section = document.getElementById('followup-section');
+  const body = document.getElementById('followup-body');
+  section.style.display = 'block';
+
+  let html = '';
+
+  if (actions.length) {
+    html += '<ul class="followup-list">';
+    for (const a of actions) {
+      html += `<li><span class="arrow">></span><span>${esc(a)}</span></li>`;
+    }
+    html += '</ul>';
+  }
+
+  if (followUp) {
+    if (followUp.priority) {
+      const colors = { high: 'var(--red)', medium: 'var(--yellow)', low: 'var(--text3)' };
+      const c = colors[(followUp.priority || '').toLowerCase()] || colors.medium;
+      html += `<div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <span style="font-size:13px;color:var(--text3);font-weight:700;text-transform:uppercase">Priority</span>
+        <span style="color:${c};font-weight:700;text-transform:uppercase;font-size:13px">${esc(followUp.priority)}</span>
+      </div>`;
+    }
+    if (followUp.tags && followUp.tags.length) {
+      html += '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+      for (const t of followUp.tags) {
+        html += `<span class="chip">${esc(t)}</span>`;
+      }
+      html += '</div>';
+    }
+    if (followUp.visitor_email) {
+      html += `<div style="margin-top:10px;font-size:13px;color:var(--text2)">Email: ${esc(followUp.visitor_email)}</div>`;
+    }
+    if (followUp.tenant_url || followUp.summary_url) {
+      html += '<div style="margin-top:10px">';
+      if (followUp.tenant_url) {
+        html += `<div style="font-size:13px;margin-bottom:4px">V1 Tenant: <a href="${esc(followUp.tenant_url)}" style="color:var(--accent);text-decoration:none" target="_blank">${esc(followUp.tenant_url)}</a></div>`;
+      }
+      if (followUp.summary_url) {
+        html += `<div style="font-size:13px">Summary: <a href="${esc(followUp.summary_url)}" style="color:var(--accent);text-decoration:none" target="_blank">${esc(followUp.summary_url)}</a></div>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  body.innerHTML = html;
+}
+
+// ── Lightbox ────────────────────────────────────────────────
+
+window.openLightbox = function(url) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.classList.add('active');
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+});
+
+// ── Demo Mode (load from local sample files, no S3 needed) ──
+
+function isDemoMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has('demo');
+}
+
+async function fetchLocalJson(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+// ── Main Load ───────────────────────────────────────────────
+
+async function loadSession() {
+  const sessionId = getSessionId();
+
+  // Demo mode: load from local sample_data files
+  if (isDemoMode()) {
+    show('loading');
+    document.getElementById('session-id-display').textContent = sessionId || 'DEMO';
+    try {
+      const base = '../analysis/sample_data';
+      const [metadata, clicks, transcript] = await Promise.all([
+        fetchLocalJson(`${base}/sample_metadata.json`),
+        fetchLocalJson(`${base}/sample_clicks.json`),
+        fetchLocalJson(`${base}/sample_transcript.json`),
+      ]);
+      show('app');
+      renderVisitorCard(metadata || {}, null);
+      renderTimeline(clicks, transcript, metadata || {}, {});
+      renderTranscript(transcript);
+    } catch (err) {
+      showError('Demo mode failed: ' + err.message);
+    }
+    return;
+  }
+
+  if (!sessionId) {
+    showError('No session ID in URL. Use ?session=SESSION_ID or ?demo for sample data');
+    return;
+  }
+
+  document.getElementById('session-id-display').textContent = sessionId;
+
+  const ok = await initS3();
+  if (!ok) {
+    show('setup');
+    return;
+  }
+
+  show('loading');
+
+  const prefix = `sessions/${sessionId}`;
+
+  try {
+    // Load all data in parallel
+    const [metadata, clicks, transcript] = await Promise.all([
+      getS3Json(`${prefix}/metadata.json`).catch(() => null),
+      getS3Json(`${prefix}/clicks/clicks.json`).catch(() => null),
+      getS3Json(`${prefix}/transcript/transcript.json`).catch(() => null),
+    ]);
+
+    if (!metadata) {
+      showError(`Session "${sessionId}" not found in S3 (no metadata.json)`);
+      return;
+    }
+
+    // Load optional analysis files
+    const [summary, followUp] = await Promise.all([
+      getS3Json(`${prefix}/output/summary.json`).catch(() => null),
+      getS3Json(`${prefix}/output/follow-up.json`).catch(() => null),
+    ]);
+
+    // Load badge photo
+    const badgeUrl = await getS3ImageUrl(`${prefix}/badge.jpg`).catch(() => null);
+
+    // Load screenshot images for click events
+    const screenshotUrls = {};
+    if (clicks && clicks.events) {
+      const ssFiles = [...new Set(clicks.events.map(e => e.screenshot_file).filter(Boolean))];
+      const ssPromises = ssFiles.map(async f => {
+        const url = await getS3ImageUrl(`${prefix}/${f}`);
+        if (url) screenshotUrls[f] = url;
+      });
+      await Promise.all(ssPromises);
+    }
+
+    // Attach follow-up to summary for rendering
+    if (summary && followUp) summary._followUp = followUp;
+
+    // Render everything
+    show('app');
+    renderVisitorCard(metadata, badgeUrl);
+    renderTimeline(clicks, transcript, metadata, screenshotUrls);
+    renderTranscript(transcript);
+    renderSummary(summary);
+    renderFollowUp(summary, followUp);
+
+  } catch (err) {
+    showError(`Failed to load session: ${err.message}`);
+  }
+}
+
+// ── Setup Form Handler ──────────────────────────────────────
+
+document.getElementById('setup-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const ak = document.getElementById('input-access-key').value.trim();
+  const sk = document.getElementById('input-secret-key').value.trim();
+  const region = document.getElementById('input-region').value.trim();
+  const bucket = document.getElementById('input-bucket').value.trim();
+  if (!ak || !sk) return;
+  saveCredentials(ak, sk, region, bucket);
+  loadSession();
+});
+
+// ── Boot ────────────────────────────────────────────────────
+
+loadSession();
+
+</script>
+</body>
+</html>
