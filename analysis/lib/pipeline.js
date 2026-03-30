@@ -27,6 +27,8 @@ async function triggerPipeline(sessionId, bucket) {
   return { sessionId, status: 'queued-stub' };
 }
 
+const PIPELINE_TIMEOUT_MS = 120_000;
+
 function runScript(script, args) {
   return new Promise((resolve, reject) => {
     const env = { ...process.env };
@@ -35,7 +37,20 @@ function runScript(script, args) {
       stdio: 'inherit',
     });
 
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        proc.kill('SIGTERM');
+        reject(new Error(`Pipeline timeout (${PIPELINE_TIMEOUT_MS}ms) for session ${args[0]}`));
+      }
+    }, PIPELINE_TIMEOUT_MS);
+
     proc.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (code === 0) {
         resolve({ sessionId: args[0], status: 'completed', exitCode: 0 });
       } else {
@@ -43,7 +58,12 @@ function runScript(script, args) {
       }
     });
 
-    proc.on('error', reject);
+    proc.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
