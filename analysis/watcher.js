@@ -15,7 +15,10 @@
 //
 // Environment variables:
 //   S3_BUCKET              (required) S3 bucket name
-//   AWS_REGION             (optional, default: us-east-1)
+//   AWS_REGION             (required) AWS region (e.g. us-east-1)
+//   AWS_ACCESS_KEY_ID      (required unless using instance role / AWS_PROFILE)
+//   USE_BEDROCK            (optional) set to 1 to route LLM calls through Bedrock
+//   ANALYSIS_MODEL         (required if USE_BEDROCK=1) Bedrock model ID
 //   POLL_INTERVAL_SECONDS  (optional, default: 30)
 
 'use strict';
@@ -116,11 +119,41 @@ function runTranscriber(sessionId) {
   });
 }
 
-async function run() {
-  if (!BUCKET) {
-    console.error('[watcher] ERROR: S3_BUCKET environment variable is required');
+function validateEnv() {
+  const errors = [];
+
+  if (!process.env.S3_BUCKET) {
+    errors.push('S3_BUCKET is required — set it to the S3 bucket name for session data');
+  }
+
+  if (!process.env.AWS_REGION) {
+    errors.push('AWS_REGION is required — set it to the AWS region (e.g. us-east-1)');
+  }
+
+  if (!process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_PROFILE && !process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI) {
+    errors.push(
+      'AWS credentials not found — set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, ' +
+      'AWS_PROFILE, or run on an EC2 instance / ECS task with an IAM role'
+    );
+  }
+
+  const useBedrock = (process.env.USE_BEDROCK || '').trim();
+  if (['1', 'true', 'yes'].includes(useBedrock) && !process.env.ANALYSIS_MODEL) {
+    errors.push(
+      'ANALYSIS_MODEL is required when USE_BEDROCK=1 — set it to a Bedrock model ID ' +
+      '(e.g. anthropic.claude-3-sonnet-20240229-v1:0)'
+    );
+  }
+
+  if (errors.length > 0) {
+    console.error('[watcher] Environment validation failed:');
+    errors.forEach((e) => console.error(`  - ${e}`));
     process.exit(1);
   }
+}
+
+async function run() {
+  validateEnv();
 
   log(`Starting — bucket=${BUCKET} poll_interval=${POLL_INTERVAL_MS / 1000}s`);
 
