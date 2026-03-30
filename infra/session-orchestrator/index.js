@@ -5,13 +5,15 @@
  * API:
  *   POST /sessions               — create session (Android app on badge scan)
  *   POST /sessions/:id/end       — end session (Android app or operator)
- *   GET  /sessions/:id           — get session state
+ *   GET  /sessions/:id           — get session metadata + command flags
+ *   GET  /sessions/:id/state     — get session lifecycle state + history
+ *   POST /sessions/:id/state     — transition session to a new state
  *   GET  /health                 — health check
  *
  * Deploy as Lambda (API Gateway HTTP API or Function URL) or run locally:
  *   node index.js
  */
-const { createSession, endSession, getSession } = require('./orchestrator');
+const { createSession, endSession, getSession, transitionState, getSessionState } = require('./orchestrator');
 
 // ── Route table ────────────────────────────────────────────────────────────
 
@@ -19,6 +21,8 @@ const ROUTES = [
   { method: 'GET',  pattern: /^\/health$/,                   handler: handleHealth },
   { method: 'POST', pattern: /^\/sessions$/,                 handler: handleCreateSession },
   { method: 'POST', pattern: /^\/sessions\/([^/]+)\/end$/,   handler: handleEndSession },
+  { method: 'GET',  pattern: /^\/sessions\/([^/]+)\/state$/, handler: handleGetState },
+  { method: 'POST', pattern: /^\/sessions\/([^/]+)\/state$/, handler: handleTransitionState },
   { method: 'GET',  pattern: /^\/sessions\/([^/]+)$/,        handler: handleGetSession },
 ];
 
@@ -38,6 +42,20 @@ async function handleEndSession(body, matches) {
 
 async function handleGetSession(_body, matches) {
   const result = await getSession(matches[1]);
+  return respond(200, result);
+}
+
+async function handleGetState(_body, matches) {
+  const result = await getSessionState(matches[1]);
+  return respond(200, result);
+}
+
+async function handleTransitionState(body, matches) {
+  const { state, context } = body;
+  if (!state) {
+    return respond(400, { error: 'Missing required field: state' });
+  }
+  const result = await transitionState(matches[1], state, context || {});
   return respond(200, result);
 }
 

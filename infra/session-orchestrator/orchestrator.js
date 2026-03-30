@@ -2,11 +2,17 @@
 /**
  * Session lifecycle orchestrator.
  *
- * Session states (stored in metadata.json):
- *   active     — session started, PC recording
- *   ended      — end signal sent, PC uploading
- *   analyzing  — set by ana-01 when analysis triggered
- *   complete   — set by ana-04 when report generated
+ * Session states (stored in metadata.json + state.json):
+ *   active      — session created, waiting for demo PC
+ *   recording   — audio capture started on demo PC
+ *   ended       — end signal sent, PC uploading
+ *   processing  — upload done, analysis pending
+ *   analyzed    — AI output ready
+ *   reviewed    — SE approved the summary
+ *   sent        — follow-up delivered to visitor
+ *
+ * State transitions are enforced — only valid edges allowed.
+ * Each transition writes sessions/<id>/state.json with full history.
  *
  * S3 command paths (polled by demo PCs):
  *   commands/<demo_pc>/start.json  — presence = start signal (PC polls every 1s)
@@ -14,6 +20,99 @@
  */
 const { putObject, getObject, objectExists, deleteObject } = require('./s3');
 const { claimTenant } = require('./tenant-pool');
+
+// ── State machine definition ───────────────────────────────────────────────
+
+const VALID_STATES = ['active', 'recording', 'ended', 'processing', 'analyzed', 'reviewed', 'sent'];
+
+const TRANSITIONS = {
+  active:     ['recording', 'ended'],   // can skip recording if audio not used
+  recording:  ['ended'],
+  ended:      ['processing'],
+  processing: ['analyzed'],
+  analyzed:   ['reviewed'],
+  reviewed:   ['sent'],
+  sent:       [],                        // terminal state
+};
+
+/**
+ * Transition a session to a new state. Validates the transition is allowed,
+ * updates metadata.json status, and writes state.json with full history.
+ *
+ * @param {string} session_id
+ * @param {string} target_state
+ * @param {object} [context]  — optional context stored with the transition
+ * @returns {{ session_id, previous_state, state, transitioned_at }}
+ */
+async function transitionState(session_id, target_state, context = {}) {
+  if (!VALID_STATES.includes(target_state)) {
+    throw Object.assign(
+      new Error(`Invalid state: ${target_state}. Valid: ${VALID_STATES.join(', ')}`),
+      { statusCode: 400 }
+    );
+  }
+
+  const metadata = await getSession(session_id);
+  const current = metadata.status;
+
+  const allowed = TRANSITIONS[current];
+  if (!allowed || !allowed.includes(target_state)) {
+    throw Object.assign(
+      new Error(`Cannot transition from '${current}' to '${target_state}'. Allowed: ${(allowed || []).join(', ') || 'none (terminal state)'}`),
+      { statusCode: 409 }
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  // Load existing state.json or initialize
+  let stateDoc;
+  try {
+    stateDoc = await getObject(`sessions/${session_id}/state.json`);
+  } catch (_) {
+    stateDoc = { session_id, current_state: current, history: [] };
+  }
+
+  // Append transition to history
+  stateDoc.history.push({
+    from: current,
+    to: target_state,
+    at: now,
+    context: Object.keys(context).length > 0 ? context : undefined,
+  });
+  stateDoc.current_state = target_state;
+  stateDoc.updated_at = now;
+
+  // Write state.json
+  await putObject(`sessions/${session_id}/state.json`, stateDoc);
+
+  // Update metadata.json status to stay in sync
+  const { commands, ...metaWithoutDerived } = metadata;
+  await putObject(`sessions/${session_id}/metadata.json`, {
+    ...metaWithoutDerived,
+    status: target_state,
+  });
+
+  return { session_id, previous_state: current, state: target_state, transitioned_at: now };
+}
+
+/**
+ * Get the full state document for a session (current state + transition history).
+ */
+async function getSessionState(session_id) {
+  // Verify session exists
+  const metadata = await getSession(session_id);
+
+  try {
+    return await getObject(`sessions/${session_id}/state.json`);
+  } catch (err) {
+    if (err.$metadata?.httpStatusCode === 404 || err.name === 'NoSuchKey') {
+      // No state.json yet — return current state from metadata
+      return { session_id, current_state: metadata.status, history: [] };
+    }
+    throw err;
+  }
+}
 
 function generateSessionId() {
   // 8-char alphanumeric per DATA-CONTRACT (6–10 chars)
@@ -50,6 +149,14 @@ async function createSession({ visitor_name, badge_photo, demo_pc, se_name, audi
     status: 'active',
   };
   await putObject(`sessions/${session_id}/metadata.json`, metadata);
+
+  // 1b. Write initial state.json
+  await putObject(`sessions/${session_id}/state.json`, {
+    session_id,
+    current_state: 'active',
+    updated_at: now,
+    history: [{ from: null, to: 'active', at: now }],
+  });
 
   // 2. Claim tenant and write tenant.json
   const tenant = await claimTenant(session_id);
@@ -92,7 +199,7 @@ async function createSession({ visitor_name, badge_photo, demo_pc, se_name, audi
 async function endSession(session_id, opts = {}) {
   const metadata = await getSession(session_id); // throws 404 if missing
 
-  if (metadata.status === 'ended' || metadata.status === 'complete') {
+  if (['ended', 'processing', 'analyzed', 'reviewed', 'sent'].includes(metadata.status)) {
     return { session_id, status: metadata.status, message: 'Session already ended' };
   }
 
@@ -106,13 +213,26 @@ async function endSession(session_id, opts = {}) {
     stop_audio: true,
   });
 
-  // Update metadata status
+  // Update metadata status (strip derived 'commands' field)
+  const { commands, ...metaClean } = metadata;
   await putObject(`sessions/${session_id}/metadata.json`, {
-    ...metadata,
+    ...metaClean,
     ended_at: now,
     status: 'ended',
     upload_complete: opts.upload_complete || false,
   });
+
+  // Write state.json transition
+  let stateDoc;
+  try {
+    stateDoc = await getObject(`sessions/${session_id}/state.json`);
+  } catch (_) {
+    stateDoc = { session_id, current_state: metadata.status, history: [] };
+  }
+  stateDoc.history.push({ from: metadata.status, to: 'ended', at: now });
+  stateDoc.current_state = 'ended';
+  stateDoc.updated_at = now;
+  await putObject(`sessions/${session_id}/state.json`, stateDoc);
 
   // Write end command for demo PC (presence = signal to stop + upload)
   await putObject(`commands/${demo_pc}/end.json`, {
@@ -150,4 +270,8 @@ async function getSession(session_id) {
   return { ...metadata, commands: { start_sent: startSent, end_sent: endSent } };
 }
 
-module.exports = { createSession, endSession, getSession };
+module.exports = {
+  createSession, endSession, getSession,
+  transitionState, getSessionState,
+  VALID_STATES, TRANSITIONS,
+};
