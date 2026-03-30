@@ -4,7 +4,7 @@
 set -euo pipefail
 
 BUCKET="s3://boothapp-sessions-752266476357"
-AWS="aws --profile hackathon --region us-east-2"
+AWS="aws --profile hackathon --region us-east-1"
 ID="DEMO-$(date +%s)"
 PREFIX="${BUCKET}/sessions/${ID}"
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -88,7 +88,7 @@ cat > "${TMP}/metadata-final.json" <<ENDJSON
   "demo_pc": "booth-pc-demo",
   "se_name": "Demo SE",
   "audio_consent": false,
-  "status": "ended",
+  "status": "completed",
   "upload_complete": true
 }
 ENDJSON
