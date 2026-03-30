@@ -139,10 +139,33 @@ async function streamToString(stream) {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
+// List objects under a prefix. Returns array of { Key, LastModified, Size }.
+async function listObjects(bucket, prefix) {
+  const client = getClient();
+  const results = [];
+  let continuationToken;
+
+  do {
+    const cmd = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    });
+    const resp = await client.send(cmd);
+    for (const obj of (resp.Contents || [])) {
+      results.push({ Key: obj.Key, LastModified: obj.LastModified, Size: obj.Size });
+    }
+    continuationToken = resp.IsTruncated ? resp.NextContinuationToken : null;
+  } while (continuationToken);
+
+  return results;
+}
+
 module.exports = {
   listSessions,
   isSessionComplete,
   isAlreadyClaimed,
   writeMarker,
   getJson,
+  listObjects,
 };

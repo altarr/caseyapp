@@ -28,6 +28,13 @@
       "status": "completed",
       "pr": null,
       "notes": "test/correlator-test.js -- all passing"
+    },
+    {
+      "id": "enrichment",
+      "title": "Add screenshot matching, engagement scoring, and topic detection",
+      "status": "completed",
+      "pr": null,
+      "notes": "Screenshot-to-click matching (2s window), 30s segment engagement scores (0-10), product topic detection (10 keywords). Pipeline updated to fetch screenshots from S3 and pass to correlator. 48 self-test assertions."
     }
   ],
   "depends_on": ["ana-01-session-watcher"],

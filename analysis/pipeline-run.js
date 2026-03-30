@@ -24,7 +24,7 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 
 const { correlate } = require('./lib/correlator');
-const { getJson } = require('./lib/s3');
+const { getJson, listObjects } = require('./lib/s3');
 const { sendNotification } = require('./lib/notify');
 const {
   S3Client,
@@ -113,10 +113,10 @@ async function run() {
   log('Starting analysis pipeline');
 
   // --- Step 1: Fetch session data from S3 ---
-  let metadata, clicks, transcript;
+  let metadata, clicks, transcript, screenshots;
   try {
     checkTimeout('fetch');
-    log('Fetching metadata, clicks, transcript from S3...');
+    log('Fetching metadata, clicks, transcript, screenshots from S3...');
     [metadata, clicks, transcript] = await withRetry('S3 fetch session data', () =>
       Promise.all([
         getJson(bucket, `sessions/${sessionId}/metadata.json`),
@@ -124,6 +124,18 @@ async function run() {
         getJson(bucket, `sessions/${sessionId}/transcript/transcript.json`),
       ])
     );
+    // List screenshot files (non-fatal if none exist)
+    try {
+      const ssPrefix = `sessions/${sessionId}/screenshots/`;
+      const ssObjects = await listObjects(bucket, ssPrefix);
+      screenshots = ssObjects
+        .filter(function(o) { return /\.(jpg|jpeg|png)$/i.test(o.Key); })
+        .map(function(o) { return { file: o.Key, timestamp: o.LastModified ? new Date(o.LastModified).toISOString() : null }; });
+      log(`Found ${screenshots.length} screenshots`);
+    } catch (ssErr) {
+      log(`WARNING: Could not list screenshots — ${ssErr.message}`);
+      screenshots = [];
+    }
     log(`Loaded: ${clicks.events?.length ?? 0} clicks, ${transcript.entries?.length ?? 0} transcript entries`);
   } catch (err) {
     errors.push({ step: 'fetch', error: err.message, timestamp: new Date().toISOString() });
@@ -137,8 +149,8 @@ async function run() {
   try {
     checkTimeout('correlate');
     log('Correlating timestamps...');
-    timeline = correlate(metadata, clicks, transcript);
-    log(`Timeline built: ${timeline.event_count} events (${timeline.click_count} clicks, ${timeline.speech_count} speech)`);
+    timeline = correlate(metadata, clicks, transcript, screenshots);
+    log(`Timeline built: ${timeline.event_count} events (${timeline.click_count} clicks, ${timeline.speech_count} speech), ${timeline.topics.length} topics, ${timeline.segments.length} segments`);
   } catch (err) {
     errors.push({ step: 'correlate', error: err.message, timestamp: new Date().toISOString() });
     log(`ERROR: Correlation failed — ${err.message}`);
