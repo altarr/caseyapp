@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Booth Session Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 18px;
+    line-height: 1.5;
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  h1 { font-size: 2rem; margin-bottom: 8px; }
+  h2 { font-size: 1.4rem; color: var(--accent); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+
+  /* -- Config bar -- */
+  .config-bar {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 24px;
+  }
+  .config-bar label { color: var(--text-muted); font-size: 0.9rem; }
+  .config-bar input {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 12px; font-size: 1rem; width: 260px;
+  }
+  .config-bar button {
+    background: var(--accent); color: #000; border: none; border-radius: 4px;
+    padding: 8px 20px; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .config-bar button:hover { opacity: 0.85; }
+
+  /* -- Status -- */
+  .status {
+    font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;
+  }
+  .status .ok { color: var(--green); }
+  .status .err { color: var(--red); }
+
+  /* -- Grid layout -- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .card.full { grid-column: 1 / -1; }
+
+  /* -- Visitor header -- */
+  .visitor-header { display: flex; align-items: center; gap: 20px; }
+  .visitor-header .name { font-size: 2rem; font-weight: 700; }
+  .visitor-header .company { font-size: 1.2rem; color: var(--text-muted); }
+  .visitor-header .duration {
+    margin-left: auto; font-size: 2.4rem; font-weight: 700; color: var(--green);
+  }
+  .visitor-header .duration small { font-size: 1rem; color: var(--text-muted); }
+
+  /* -- Score ring -- */
+  .score-wrap { text-align: center; }
+  .score-ring {
+    width: 140px; height: 140px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 3rem; font-weight: 800;
+    border: 6px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .score-label { font-size: 1rem; color: var(--text-muted); }
+
+  /* -- Timeline -- */
+  .timeline { list-style: none; position: relative; padding-left: 24px; }
+  .timeline::before {
+    content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+  }
+  .timeline li {
+    position: relative; margin-bottom: 16px; padding-left: 20px;
+  }
+  .timeline li::before {
+    content: ''; position: absolute; left: -20px; top: 6px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--surface);
+  }
+  .timeline .ts { color: var(--purple); font-family: monospace; margin-right: 8px; }
+
+  /* -- Products pills -- */
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .pill {
+    background: var(--accent); color: #000; font-weight: 600;
+    border-radius: 20px; padding: 4px 14px; font-size: 0.95rem;
+  }
+
+  /* -- Follow-up cards -- */
+  .follow-ups { display: flex; flex-wrap: wrap; gap: 12px; }
+  .follow-card {
+    flex: 1 1 260px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; font-size: 1rem;
+  }
+  .follow-card .num {
+    display: inline-block; width: 28px; height: 28px; line-height: 28px;
+    text-align: center; border-radius: 50%; background: var(--accent);
+    color: #000; font-weight: 700; margin-right: 8px; font-size: 0.9rem;
+  }
+
+  /* -- Interests -- */
+  .interest-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .interest-row:last-child { border-bottom: none; }
+  .confidence { font-size: 0.85rem; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
+  .confidence.high { background: var(--green); color: #000; }
+  .confidence.medium { background: var(--orange); color: #000; }
+  .confidence.low { background: var(--red); color: #fff; }
+  .evidence { font-size: 0.85rem; color: var(--text-muted); }
+
+  /* -- Empty state -- */
+  .empty { color: var(--text-muted); font-style: italic; text-align: center; padding: 40px 0; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+
+<!-- Config bar -->
+<div class="config-bar">
+  <div>
+    <label>S3 Bucket</label><br>
+    <input id="bucket" type="text" placeholder="my-booth-bucket" />
+  </div>
+  <div>
+    <label>Session ID</label><br>
+    <input id="session" type="text" placeholder="A726594" />
+  </div>
+  <div>
+    <label>Region (optional)</label><br>
+    <input id="region" type="text" placeholder="us-east-1" value="us-east-1" />
+  </div>
+  <button onclick="loadSession()">Load Session</button>
+</div>
+
+<div class="status" id="status">Enter bucket and session ID above, then click Load Session.</div>
+
+<!-- Dashboard content (hidden until data loads) -->
+<div id="dashboard" style="display:none">
+
+  <!-- Row 1: Visitor info + Score -->
+  <div class="grid">
+    <div class="card">
+      <h2>Visitor</h2>
+      <div class="visitor-header">
+        <div>
+          <div class="name" id="vName">--</div>
+          <div class="company" id="vCompany">--</div>
+        </div>
+        <div class="duration"><span id="vDuration">--</span><br><small>minutes</small></div>
+      </div>
+      <div style="margin-top:16px">
+        <h2>Products Shown</h2>
+        <div class="pills" id="vProducts"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Session Score</h2>
+      <div class="score-wrap">
+        <div class="score-ring" id="scoreRing">--</div>
+        <div class="score-label" id="scoreLabel">Engagement score (1-10)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Timeline + Interests -->
+  <div class="grid" style="margin-top:20px">
+    <div class="card">
+      <h2>Demo Timeline</h2>
+      <ul class="timeline" id="timeline"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Visitor Interests</h2>
+      <div id="interests"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Follow-ups -->
+  <div class="grid" style="margin-top:20px">
+    <div class="card full">
+      <h2>Follow-Up Recommendations</h2>
+      <div class="follow-ups" id="followUps"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var refreshTimer = null;
+
+function buildUrl() {
+  var bucket = document.getElementById('bucket').value.trim();
+  var session = document.getElementById('session').value.trim();
+  var region = document.getElementById('region').value.trim() || 'us-east-1';
+  if (!bucket || !session) return null;
+  return 'https://' + bucket + '.s3.' + region + '.amazonaws.com/sessions/' + session + '/output/summary.json';
+}
+
+function setStatus(msg, ok) {
+  var el = document.getElementById('status');
+  el.innerHTML = '<span class="' + (ok ? 'ok' : 'err') + '">' + msg + '</span>';
+}
+
+function computeScore(data) {
+  var score = 0;
+  // Duration: up to 3 points (15+ min = 3, 10+ = 2, 5+ = 1)
+  var dur = data.demo_duration_minutes || 0;
+  if (dur >= 15) score += 3;
+  else if (dur >= 10) score += 2;
+  else if (dur >= 5) score += 1;
+
+  // Products shown: up to 3 points (3+ = 3, 2 = 2, 1 = 1)
+  var prods = (data.products_shown || []).length;
+  if (prods >= 3) score += 3;
+  else score += prods;
+
+  // Interests with high confidence: up to 2 points
+  var highInterests = (data.visitor_interests || []).filter(function(i) { return i.confidence === 'high'; }).length;
+  if (highInterests >= 2) score += 2;
+  else score += highInterests;
+
+  // Key moments: up to 2 points
+  var moments = (data.key_moments || []).length;
+  if (moments >= 3) score += 2;
+  else if (moments >= 1) score += 1;
+
+  return Math.min(10, Math.max(1, score));
+}
+
+function scoreColor(s) {
+  if (s >= 8) return 'var(--green)';
+  if (s >= 5) return 'var(--orange)';
+  return 'var(--red)';
+}
+
+function esc(str) {
+  var d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function render(data) {
+  document.getElementById('dashboard').style.display = 'block';
+
+  // Visitor info
+  document.getElementById('vName').textContent = data.visitor_name || 'Unknown';
+  // Company from follow-up sdr_notes or tags
+  var company = '';
+  if (data.sdr_notes) {
+    var m = data.sdr_notes.match(/from\s+(\S+)/i);
+    if (m) company = m[1];
+  }
+  document.getElementById('vCompany').textContent = company || (data.tags || []).join(', ') || '';
+  document.getElementById('vDuration').textContent = data.demo_duration_minutes || '--';
+
+  // Products
+  var pills = document.getElementById('vProducts');
+  pills.innerHTML = '';
+  (data.products_shown || []).forEach(function(p) {
+    var span = document.createElement('span');
+    span.className = 'pill';
+    span.textContent = p;
+    pills.appendChild(span);
+  });
+
+  // Score
+  var score = computeScore(data);
+  var ring = document.getElementById('scoreRing');
+  ring.textContent = score;
+  ring.style.borderColor = scoreColor(score);
+  ring.style.color = scoreColor(score);
+  document.getElementById('scoreLabel').textContent =
+    score >= 8 ? 'High engagement' : score >= 5 ? 'Moderate engagement' : 'Low engagement';
+
+  // Timeline (key_moments + products_shown as fallback)
+  var tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  var moments = data.key_moments || [];
+  if (moments.length === 0 && data.products_shown) {
+    moments = data.products_shown.map(function(p, i) {
+      return { timestamp: '--:--', description: 'Demonstrated ' + p };
+    });
+  }
+  moments.forEach(function(m) {
+    var li = document.createElement('li');
+    li.innerHTML = '<span class="ts">' + esc(m.timestamp || '') + '</span> ' + esc(m.description || '');
+    tl.appendChild(li);
+  });
+
+  // Interests
+  var intEl = document.getElementById('interests');
+  intEl.innerHTML = '';
+  (data.visitor_interests || []).forEach(function(vi) {
+    var row = document.createElement('div');
+    row.className = 'interest-row';
+    row.innerHTML =
+      '<div><strong>' + esc(vi.topic) + '</strong><br><span class="evidence">' + esc(vi.evidence || '') + '</span></div>' +
+      '<span class="confidence ' + esc(vi.confidence || 'medium') + '">' + esc(vi.confidence || '?') + '</span>';
+    intEl.appendChild(row);
+  });
+
+  // Follow-ups
+  var fu = document.getElementById('followUps');
+  fu.innerHTML = '';
+  (data.recommended_follow_up || []).forEach(function(text, i) {
+    var card = document.createElement('div');
+    card.className = 'follow-card';
+    card.innerHTML = '<span class="num">' + (i + 1) + '</span>' + esc(text);
+    fu.appendChild(card);
+  });
+}
+
+function loadSession() {
+  var url = buildUrl();
+  if (!url) { setStatus('Please enter bucket and session ID.', false); return; }
+
+  setStatus('Fetching ' + url + ' ...', true);
+
+  fetch(url, { mode: 'cors' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      var now = new Date().toLocaleTimeString();
+      setStatus('Loaded at ' + now + ' | Next refresh in 30s', true);
+      render(data);
+      startAutoRefresh();
+    })
+    .catch(function(err) {
+      setStatus('Error: ' + err.message + '. Check bucket permissions (CORS) and session ID.', false);
+    });
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(function() {
+    var url = buildUrl();
+    if (!url) return;
+    fetch(url, { mode: 'cors' })
+      .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+      .then(function(data) {
+        var now = new Date().toLocaleTimeString();
+        setStatus('Refreshed at ' + now + ' | Next refresh in 30s', true);
+        render(data);
+      })
+      .catch(function(err) {
+        setStatus('Refresh failed: ' + err + ' | Retrying in 30s', false);
+      });
+  }, 30000);
+}
+
+// Allow Enter key to trigger load
+document.getElementById('session').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') loadSession();
+});
+</script>
+</body>
+</html>
