@@ -74,7 +74,7 @@
     .status-dot.active {
       background: #34d399;
       box-shadow: 0 0 6px #34d39966;
-      animation: pulse 1.5s ease-in-out infinite;
+      animation: pulse-dot 1.5s ease-in-out infinite;
     }
 
     .status-dot.warning {
@@ -82,9 +82,91 @@
       box-shadow: 0 0 6px #fbbf2466;
     }
 
-    @keyframes pulse {
+    @keyframes pulse-dot {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.4); opacity: 0.7; }
+    }
+
+    /* ── Large Session Indicator ── */
+
+    .session-hero {
+      text-align: center;
+      padding: 20px 20px 16px;
+    }
+
+    .session-indicator {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      background: #2a2a3a;
+      transition: all 0.3s ease;
+    }
+
+    .session-indicator.active {
+      background: #34d399;
+      box-shadow: 0 0 24px #34d39955, 0 0 48px #34d39922;
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 24px #34d39955, 0 0 48px #34d39922; }
+      50% { box-shadow: 0 0 32px #34d39977, 0 0 64px #34d39933; }
+    }
+
+    .session-hero-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #6b7280;
+    }
+
+    .session-hero-label.active {
+      color: #34d399;
+    }
+
+    .session-hero-visitor {
+      font-size: 13px;
+      color: #a78bfa;
+      font-weight: 600;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .session-hero-visitor.visible {
+      display: block;
+    }
+
+    /* ── Stats Row ── */
+
+    .stats-row {
+      display: flex;
+      gap: 8px;
+      margin: 0 20px 14px;
+    }
+
+    .stat-box {
+      flex: 1;
+      background: #12121c;
+      border: 1px solid #1e1e30;
+      border-radius: 8px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #a78bfa;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #6b7280;
+      margin-top: 4px;
     }
 
     .status-text {
@@ -245,29 +327,6 @@
       transform: translateY(0);
     }
 
-    /* ── Tool Count ── */
-
-    .tool-count {
-      background: #1a1a2e;
-      border: 1px solid #2a2a4a;
-      border-radius: 8px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .tool-count-label {
-      font-size: 13px;
-      color: #9ca3af;
-    }
-
-    .tool-count-value {
-      font-size: 22px;
-      font-weight: 700;
-      color: #a78bfa;
-    }
-
     /* ── S3 Config ── */
 
     .s3-section {
@@ -402,17 +461,34 @@
     </div>
   </div>
 
-  <!-- Connection Status -->
+  <!-- S3 Connection Status -->
   <div class="status-bar">
     <span class="status-label">S3</span>
     <div class="status-dot" id="s3PollDot"></div>
     <span class="status-text" id="s3PollText">Not configured</span>
   </div>
 
-  <div class="status-bar">
-    <span class="status-label">Session</span>
-    <div class="status-dot" id="sessionDot"></div>
-    <span class="status-text" id="sessionText">No Active Session</span>
+  <!-- Large Session Indicator -->
+  <div class="session-hero">
+    <div class="session-indicator" id="sessionIndicator"></div>
+    <div class="session-hero-label" id="sessionLabel">No Active Session</div>
+    <div class="session-hero-visitor" id="heroVisitor"></div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-value" id="statClicks">0</div>
+      <div class="stat-label">Clicks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value" id="statScreenshots">0</div>
+      <div class="stat-label">Shots</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value" id="statDuration">--</div>
+      <div class="stat-label">Duration</div>
+    </div>
   </div>
 
   <div class="content">
@@ -434,10 +510,6 @@
         <span class="session-key">Started</span>
         <span class="session-val muted" id="infoStartTime">--</span>
       </div>
-      <div class="session-row">
-        <span class="session-key">Clicks</span>
-        <span class="session-val highlight" id="infoClickCount">0</span>
-      </div>
     </div>
 
     <!-- Last Click -->
@@ -445,13 +517,6 @@
     <div class="last-click-box">
       <div class="last-click-path empty" id="lastClickPath">No clicks recorded</div>
       <div class="last-click-time" id="lastClickTime"></div>
-    </div>
-
-    <!-- MCP Tools -->
-    <div class="section-title">MCP Tools</div>
-    <div class="tool-count">
-      <span class="tool-count-label">Available tools</span>
-      <span class="tool-count-value" id="toolCount">--</span>
     </div>
 
     <!-- S3 Config (collapsible) -->

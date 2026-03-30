@@ -1,10 +1,8 @@
-// ─── MCP Status (placeholder) ────────────────────────────────────────────────
-
-document.getElementById('toolCount').textContent = '30';
-
 // ─── Status Polling ──────────────────────────────────────────────────────────
 
 let currentSessionActive = false;
+let sessionStartIso = null;
+let durationTimer = null;
 
 function formatTime(isoString) {
   if (!isoString) return '--';
@@ -16,9 +14,24 @@ function formatTime(isoString) {
   }
 }
 
+function formatDuration(startIso) {
+  if (!startIso) return '--';
+  const ms = Date.now() - new Date(startIso).getTime();
+  if (ms < 0) return '--';
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return min + ':' + (sec < 10 ? '0' : '') + sec;
+  return sec + 's';
+}
+
 function truncateId(id) {
   if (!id) return '--';
   return id.length > 16 ? id.slice(0, 16) + '...' : id;
+}
+
+function updateDuration() {
+  document.getElementById('statDuration').textContent = formatDuration(sessionStartIso);
 }
 
 function refreshStatus() {
@@ -38,27 +51,55 @@ function refreshStatus() {
       s3Text.classList.remove('active');
     }
 
-    // Session status bar
-    const sessionDot = document.getElementById('sessionDot');
-    const sessionText = document.getElementById('sessionText');
+    // Large session indicator
+    const indicator = document.getElementById('sessionIndicator');
+    const label = document.getElementById('sessionLabel');
+    const heroVisitor = document.getElementById('heroVisitor');
     const sessionCard = document.getElementById('sessionCard');
 
     currentSessionActive = response.session_active;
 
     if (response.session_active) {
-      sessionDot.classList.add('active');
-      sessionText.textContent = 'Recording';
-      sessionText.classList.add('active');
+      indicator.classList.add('active');
+      label.textContent = 'Recording';
+      label.classList.add('active');
       sessionCard.classList.add('active');
+
+      if (response.visitor_name) {
+        heroVisitor.textContent = response.visitor_name;
+        heroVisitor.classList.add('visible');
+      } else {
+        heroVisitor.classList.remove('visible');
+      }
+
+      // Start duration timer
+      sessionStartIso = response.start_time || null;
+      if (!durationTimer && sessionStartIso) {
+        durationTimer = setInterval(updateDuration, 1000);
+        updateDuration();
+      }
     } else {
-      sessionDot.classList.remove('active');
-      sessionText.textContent = 'No Active Session';
-      sessionText.classList.remove('active');
+      indicator.classList.remove('active');
+      label.textContent = 'No Active Session';
+      label.classList.remove('active');
+      heroVisitor.classList.remove('visible');
       sessionCard.classList.remove('active');
+
+      // Stop duration timer
+      if (durationTimer) {
+        clearInterval(durationTimer);
+        durationTimer = null;
+      }
+      sessionStartIso = null;
+      document.getElementById('statDuration').textContent = '--';
     }
 
     // Session button
     updateSessionButton(response.session_active);
+
+    // Stats row
+    document.getElementById('statClicks').textContent = response.click_count || '0';
+    document.getElementById('statScreenshots').textContent = response.screenshot_count || '0';
 
     // Session info card
     document.getElementById('infoSessionId').textContent = truncateId(response.session_id);
@@ -69,8 +110,6 @@ function refreshStatus() {
 
     document.getElementById('infoStartTime').textContent = formatTime(response.start_time);
     document.getElementById('infoStartTime').classList.toggle('muted', !response.start_time);
-
-    document.getElementById('infoClickCount').textContent = response.click_count || '0';
 
     // Last click
     const pathEl = document.getElementById('lastClickPath');

@@ -497,6 +497,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const s3Configured = !!(store.s3Bucket && store.awsAccessKeyId);
         const lastEvent = clicks.events.length > 0 ? clicks.events[clicks.events.length - 1] : null;
 
+        // Count screenshots in IndexedDB
+        let screenshotCount = 0;
+        try {
+          const db = await openScreenshotDB();
+          screenshotCount = await new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).count();
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+          });
+        } catch (_) {}
+
         sendResponse({
           status: 'ok',
           session_active: !!session.active,
@@ -504,6 +516,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           visitor_name: session.visitor_name || '',
           start_time: session.start_time || '',
           click_count: clicks.events.length,
+          screenshot_count: screenshotCount,
           last_click_path: lastEvent ? lastEvent.dom_path : '',
           last_click_time: lastEvent ? lastEvent.timestamp : '',
           s3_polling: s3Configured,
