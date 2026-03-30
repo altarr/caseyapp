@@ -18,6 +18,8 @@ Rules:
 - Visitor interests must cite specific evidence from the session (transcript quotes, pages visited)
 - SDR notes should be concise and include key facts: visitor role, company size if known, specific concerns raised, competing products mentioned
 - Confidence levels: "high" = visitor explicitly asked about topic or spent significant time on it; "medium" = indirect signals; "low" = brief mention only
+- session_score (1-10): 1-3 = passive/minimal engagement, 4-6 = moderate interest with some interaction, 7-8 = strong engagement with questions and deep exploration, 9-10 = exceptional — multiple product areas explored deeply, strong buying signals, specific use-case discussions
+- executive_summary must be exactly 2 sentences suitable for a sales manager email — lead with the most important takeaway
 - The output must be valid JSON with no trailing commas or comments"""
 
 FACTUAL_EXTRACTION_PROMPT = """Analyze this Vision One demo session and extract factual information.
@@ -38,8 +40,8 @@ Return a JSON object with exactly these fields:
     {{"question": "paraphrased question", "timestamp_rel": "MM:SS", "speaker_text": "exact quote from transcript"}}
   ],
   "key_moments": [
-    {{"timestamp_rel": "MM:SS", "screenshot_file": "filename or null", "description": "what happened"}}
-  ],
+    {{"timestamp_rel": "MM:SS", "screenshot_file": "filename or null", "description": "what happened", "impact": "why this moment mattered for the visitor"}}
+  ]  (select the top 3 most impactful demo moments — prioritize visitor reactions, deep-dive requests, and aha-moments),
   "session_stats": {{
     "duration_seconds": 0,
     "click_count": 0,
@@ -57,6 +59,8 @@ Factual analysis from Pass 1:
 
 Return a JSON object with exactly these fields:
 {{
+  "session_score": 7,
+  "executive_summary": "Two sentences for a sales manager. Lead with the key takeaway, then the recommended action.",
   "visitor_interests": [
     {{"topic": "specific topic", "confidence": "high|medium|low", "evidence": "specific quote or action from session"}}
   ],

@@ -104,6 +104,8 @@ function renderHtml(summary, followUp) {
   const {
     visitor_name = 'Unknown Visitor',
     demo_duration_minutes = 0,
+    session_score = 0,
+    executive_summary = '',
     products_shown = [],
     visitor_interests = [],
     recommended_follow_up = [],
@@ -146,6 +148,7 @@ function renderHtml(summary, followUp) {
           <div style="padding-top:6px;padding-bottom:8px">
             <div style="font-size:12px;color:#475569;margin-bottom:4px;font-family:monospace">${escapeHtml(m.timestamp)}</div>
             <div style="color:#e2e8f0">${escapeHtml(m.description)}</div>
+            ${m.impact ? `<div style="color:#94a3b8;font-size:13px;margin-top:4px;font-style:italic">${escapeHtml(m.impact)}</div>` : ''}
           </div>
         </div>`).join('')
     : '<p style="color:#64748b;font-style:italic">No key moments recorded</p>';
@@ -246,6 +249,7 @@ function renderHtml(summary, followUp) {
       ${visitor_email ? `<div class="header-meta">${escapeHtml(visitor_email)}</div>` : ''}
       <div class="badge-row">
         ${priorityBadge(priority)}
+        ${session_score ? `<div class="stat-chip"><strong>${escapeHtml(String(session_score))}</strong>/10 session score</div>` : ''}
         ${demo_duration_minutes ? `<div class="stat-chip"><strong>${escapeHtml(String(demo_duration_minutes))}</strong> min demo</div>` : ''}
         ${tags.map(t => `<div class="stat-chip">${escapeHtml(t)}</div>`).join('')}
       </div>
@@ -255,6 +259,15 @@ function renderHtml(summary, followUp) {
 
   <div class="main">
     <div class="container">
+
+      <!-- Executive Summary -->
+      ${executive_summary ? `
+      <div class="section">
+        <div class="section-title">Executive Summary</div>
+        <div class="section-body">
+          <div style="font-size:15px;line-height:1.7;color:#e2e8f0">${escapeHtml(executive_summary)}</div>
+        </div>
+      </div>` : ''}
 
       <!-- Products Demonstrated -->
       <div class="section">

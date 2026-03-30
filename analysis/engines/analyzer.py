@@ -255,6 +255,8 @@ class SessionAnalyzer:
             "session_id": session_id,
             "visitor_name": visitor_name,
             "demo_duration_minutes": duration_minutes,
+            "session_score": recommendations.get("session_score", 0),
+            "executive_summary": recommendations.get("executive_summary", ""),
             "products_shown": factual.get("products_shown", []),
             "visitor_interests": recommendations.get("visitor_interests", []),
             "recommended_follow_up": recommendations.get("recommended_follow_up", []),
@@ -263,8 +265,9 @@ class SessionAnalyzer:
                     "timestamp": m.get("timestamp_rel", ""),
                     "screenshot": m.get("screenshot_file", ""),
                     "description": m.get("description", ""),
+                    "impact": m.get("impact", ""),
                 }
-                for m in factual.get("key_moments", [])
+                for m in factual.get("key_moments", [])[:3]
             ],
             "v1_tenant_link": tenant_url,
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

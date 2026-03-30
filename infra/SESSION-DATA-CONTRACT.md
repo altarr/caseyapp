@@ -219,6 +219,8 @@ Fields:
 | `session_id` | string | Matches parent session |
 | `visitor_name` | string | From metadata |
 | `demo_duration_minutes` | number | Calculated from `started_at` / `ended_at` |
+| `session_score` | number | 1-10 engagement score based on demo depth, visitor engagement, product coverage |
+| `executive_summary` | string | 2-sentence summary suitable for a sales manager email |
 | `products_shown` | string[] | V1 product areas demonstrated |
 | `visitor_interests` | array | Topics the visitor showed interest in |
 | `visitor_interests[].topic` | string | Interest area |
@@ -229,6 +231,7 @@ Fields:
 | `key_moments[].timestamp` | string | `"HH:MM:SS"` offset |
 | `key_moments[].screenshot` | string | Screenshot filename, e.g. `click-012.jpg` |
 | `key_moments[].description` | string | What happened at this moment |
+| `key_moments[].impact` | string | Why this moment mattered for the visitor |
 | `v1_tenant_link` | string | URL to the visitor's preserved V1 tenant |
 | `generated_at` | string | ISO-8601 UTC timestamp |
 
