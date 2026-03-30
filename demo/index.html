@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoothApp - AI Demo Capture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #14141f;
+      --surface-alt: #1a1a2e;
+      --border: #2a2a3e;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #00d4aa;
+      --accent-glow: rgba(0, 212, 170, 0.15);
+      --idle: #555570;
+      --idle-glow: rgba(85, 85, 112, 0.15);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 640px;
+      width: 100%;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    header .team {
+      font-size: 0.85rem;
+      font-weight: 300;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Status Card ────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--idle);
+      box-shadow: 0 0 8px var(--idle-glow);
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .status-dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow), 0 0 24px var(--accent-glow);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.7; }
+    }
+
+    .status-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .status-label.idle { color: var(--idle); }
+    .status-label.active { color: var(--accent); }
+
+    /* ── Metric Grid ────────────────────────────────────── */
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+
+    .metric .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .metric .value.accent { color: var(--accent); }
+
+    /* ── Visitor Card ───────────────────────────────────── */
+    .visitor-card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    .visitor-card.visible { display: block; }
+
+    .visitor-card .visitor-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.35rem;
+    }
+
+    .visitor-card .visitor-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    footer .poll-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--idle);
+      margin-right: 4px;
+      vertical-align: middle;
+      transition: background 0.2s;
+    }
+
+    footer .poll-indicator.ok { background: var(--accent); }
+    footer .poll-indicator.err { background: #ff4466; }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 480px) {
+      body { padding: 1rem 0.75rem; }
+      header h1 { font-size: 1.4rem; }
+      .card { padding: 1.25rem; }
+      .metric .value { font-size: 1.3rem; }
+      .metrics { gap: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>BoothApp &mdash; AI Demo Capture</h1>
+    <div class="team">Smells Like Machine Learning</div>
+  </header>
+
+  <!-- Status -->
+  <div class="card">
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-label idle" id="statusLabel">Idle</div>
+    </div>
+  </div>
+
+  <!-- Visitor -->
+  <div class="visitor-card" id="visitorCard">
+    <div class="visitor-label">Current Visitor</div>
+    <div class="visitor-name" id="visitorName">--</div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="label">Duration</div>
+      <div class="value" id="duration">--:--</div>
+    </div>
+    <div class="metric">
+      <div class="label">Clicks</div>
+      <div class="value accent" id="clickCount">0</div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="poll-indicator" id="pollDot"></span>
+    Polling S3 every 3s
+  </footer>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURATION -- set your S3 endpoint here
+// The URL should point to the bucket root (public or CORS-enabled).
+// Examples:
+//   https://my-bucket.s3.us-east-1.amazonaws.com
+//   https://my-bucket.s3.amazonaws.com
+// =====================================================================
+var S3_ENDPOINT = 'https://YOUR-BUCKET.s3.us-east-1.amazonaws.com';
+
+// Poll interval in milliseconds
+var POLL_INTERVAL = 3000;
+
+// =====================================================================
+// STATE
+// =====================================================================
+var state = {
+  active: false,
+  sessionId: null,
+  visitorName: null,
+  startedAt: null,
+  clickCount: 0,
+  durationTimer: null,
+};
+
+// =====================================================================
+// DOM REFS
+// =====================================================================
+var dom = {
+  statusDot: document.getElementById('statusDot'),
+  statusLabel: document.getElementById('statusLabel'),
+  visitorCard: document.getElementById('visitorCard'),
+  visitorName: document.getElementById('visitorName'),
+  duration: document.getElementById('duration'),
+  clickCount: document.getElementById('clickCount'),
+  pollDot: document.getElementById('pollDot'),
+};
+
+// =====================================================================
+// HELPERS
+// =====================================================================
+function formatDuration(startIso) {
+  var start = new Date(startIso).getTime();
+  var now = Date.now();
+  var diff = Math.max(0, Math.floor((now - start) / 1000));
+  var h = Math.floor(diff / 3600);
+  var m = Math.floor((diff % 3600) / 60);
+  var s = diff % 60;
+  var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+  return h > 0 ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+}
+
+function fetchJson(url) {
+  return fetch(url, { mode: 'cors', cache: 'no-store' })
+    .then(function(res) {
+      if (!res.ok) return null;
+      return res.json();
+    })
+    .catch(function() { return null; });
+}
+
+// =====================================================================
+// RENDER
+// =====================================================================
+function render() {
+  if (state.active) {
+    dom.statusDot.classList.add('active');
+    dom.statusLabel.textContent = 'Session Active';
+    dom.statusLabel.className = 'status-label active';
+    dom.visitorCard.classList.add('visible');
+    dom.visitorName.textContent = state.visitorName || 'Unknown';
+    dom.clickCount.textContent = state.clickCount;
+  } else {
+    dom.statusDot.classList.remove('active');
+    dom.statusLabel.textContent = 'Idle';
+    dom.statusLabel.className = 'status-label idle';
+    dom.visitorCard.classList.remove('visible');
+    dom.visitorName.textContent = '--';
+    dom.duration.textContent = '--:--';
+    dom.clickCount.textContent = '0';
+  }
+}
+
+function tickDuration() {
+  if (state.active && state.startedAt) {
+    dom.duration.textContent = formatDuration(state.startedAt);
+  }
+}
+
+// =====================================================================
+// POLLING
+// =====================================================================
+function poll() {
+  var sessionUrl = S3_ENDPOINT.replace(/\/+$/, '') + '/active-session.json';
+
+  fetchJson(sessionUrl).then(function(data) {
+    // Flash poll indicator
+    dom.pollDot.className = 'poll-indicator ' + (data !== null ? 'ok' : 'err');
+    setTimeout(function() { dom.pollDot.className = 'poll-indicator'; }, 600);
+
+    if (data && data.active === true) {
+      var isNew = !state.active || state.sessionId !== data.session_id;
+      state.active = true;
+      state.sessionId = data.session_id;
+      state.visitorName = data.visitor_name || 'Unknown';
+      state.startedAt = data.started_at;
+
+      if (isNew) {
+        state.clickCount = 0;
+        // Start duration ticker
+        if (state.durationTimer) clearInterval(state.durationTimer);
+        state.durationTimer = setInterval(tickDuration, 1000);
+      }
+
+      // Fetch click count from session clicks.json
+      var clicksUrl = S3_ENDPOINT.replace(/\/+$/, '') +
+        '/sessions/' + data.session_id + '/clicks/clicks.json';
+      fetchJson(clicksUrl).then(function(clicks) {
+        if (clicks && clicks.events && Array.isArray(clicks.events)) {
+          state.clickCount = clicks.events.length;
+        }
+        render();
+      });
+    } else {
+      if (state.active) {
+        // Session just ended
+        if (state.durationTimer) {
+          clearInterval(state.durationTimer);
+          state.durationTimer = null;
+        }
+      }
+      state.active = false;
+      state.sessionId = null;
+      state.visitorName = null;
+      state.startedAt = null;
+      state.clickCount = 0;
+      render();
+    }
+  });
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+render();
+tickDuration();
+poll();
+setInterval(poll, POLL_INTERVAL);
+</script>
+
+</body>
+</html>
