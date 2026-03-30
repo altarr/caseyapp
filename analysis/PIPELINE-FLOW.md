@@ -1,0 +1,51 @@
+# Analysis Pipeline Flow
+
+Step-by-step walkthrough of how a booth session moves from "ended" to a
+finished summary report.
+
+## Pipeline Stages
+
+### 1. Poll for Ended Sessions
+
+`watcher.js` polls S3 every 30 seconds looking for sessions whose
+`status` field is `ended`.  It scans the configured bucket prefix and
+filters on the session metadata file.
+
+### 2. Claim the Session
+
+Once an ended session is found, the watcher **claims** it by writing a
+`claimed.json` marker into the session's S3 prefix.  This prevents other
+watcher instances from picking up the same session.
+
+### 3. Correlate Clicks + Transcript
+
+The correlator merges two data sources:
+
+* **Click events** -- captured by the Chrome extension during the demo.
+* **Transcript segments** -- produced by the audio transcription service.
+
+The output is a unified `timeline.json` that interleaves UI actions and
+spoken words in chronological order.
+
+### 4. Analyze with Bedrock Claude
+
+`analyze.py` sends the correlated timeline to **Amazon Bedrock** (Claude
+model) and asks for a structured summary of the demo session -- key
+topics discussed, features shown, prospect questions, and next steps.
+
+### 5. Write Output Artifacts
+
+Two files are written back to S3 under the session's `output/` prefix:
+
+| File | Format | Purpose |
+|------|--------|---------|
+| `output/summary.json` | JSON | Machine-readable summary for downstream integrations |
+| `output/summary.html` | HTML | Human-readable report rendered by `render-report.js` |
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `USE_BEDROCK` | Yes | Set to `true` to route LLM calls through Amazon Bedrock |
+| `ANALYSIS_MODEL` | Yes | Bedrock model ID to use (e.g. `anthropic.claude-3-sonnet-20240229-v1:0`) |
+| `AWS_REGION` | Yes | AWS region for Bedrock API calls (e.g. `us-east-1`) |
