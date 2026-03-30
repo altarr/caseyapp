@@ -108,12 +108,12 @@ Resources:
                 "s3:prefix":
                   - "sessions/*"
 
-  # Audio: writes audio/ and transcript/ — reads all session files
+  # Audio: writes audio/ and transcript/, runs Transcribe — reads all session files
   AudioPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: boothapp-audio-policy
-      Description: Audio workstream — write audio/ and transcript/, read all session files
+      Description: Audio workstream — write audio/ and transcript/, run Transcribe, read all session files
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -121,6 +121,7 @@ Resources:
             Effect: Allow
             Action:
               - s3:PutObject
+              - s3:DeleteObject
             Resource:
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/audio/*"
               - !Sub "arn:aws:s3:::${SessionBucket}/sessions/*/transcript/*"
@@ -140,6 +141,14 @@ Resources:
               StringLike:
                 "s3:prefix":
                   - "sessions/*"
+          - Sid: TranscribeJobs
+            Effect: Allow
+            Action:
+              - transcribe:StartTranscriptionJob
+              - transcribe:GetTranscriptionJob
+              - transcribe:DeleteTranscriptionJob
+            Resource:
+              - !Sub "arn:aws:transcribe:${AWS::Region}:${AWS::AccountId}:transcription-job/boothapp-*"
 
   # Analysis: writes output/ — reads all session files
   AnalysisPolicy:
