@@ -69,6 +69,22 @@
   var resultCard = document.getElementById('result-card');
   var currentFields = [];
   var currentFile = null;
+  var activeEventId = null;
+
+  // Get active event (or create a default one)
+  fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    if (cfg.active_event) { activeEventId = cfg.active_event.id; return; }
+    // No active event — create one and activate it
+    fetch('/api/events', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Default Event' })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.event) {
+        activeEventId = d.event.id;
+        fetch('/api/events/' + d.event.id + '/activate', { method: 'POST' });
+      }
+    });
+  });
 
   uploadZone.addEventListener('click', function() { fileInput.click(); });
   uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.classList.add('dragover'); });
@@ -151,8 +167,13 @@
     fetch('/api/badges/train', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: 1, name: name, field_mappings: mappings, sample_corrections: corrections })
-    }).then(function(r) { return r.json(); }).then(function() { loadProfiles(); alert('Profile saved!'); });
+      body: JSON.stringify({ event_id: activeEventId, name: name, field_mappings: mappings, sample_corrections: corrections })
+    }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { alert('Error saving profile: ' + (res.data.error || 'unknown')); return; }
+      loadProfiles();
+      alert('Profile saved!');
+    });
   });
 
   document.getElementById('clear-btn').addEventListener('click', function() {

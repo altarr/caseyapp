@@ -49,7 +49,7 @@ function initSchema() {
 
     CREATE TABLE IF NOT EXISTS badge_profiles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_id INTEGER REFERENCES events(id),
+      event_id INTEGER,
       name TEXT NOT NULL,
       field_mappings TEXT DEFAULT '[]',
       extraction_prompt TEXT DEFAULT '',
