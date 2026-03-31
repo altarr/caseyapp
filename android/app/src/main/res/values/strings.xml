@@ -22,4 +22,16 @@
     <string name="session_ended">Session ended</string>
     <string name="error_no_url">Set orchestrator URL in settings first</string>
     <string name="error_session">Error: %s</string>
+    <string name="back">Back</string>
+    <string name="orchestrator_url_hint">Lambda Function URL (e.g. https://xxx.lambda-url.us-east-1.on.aws)</string>
+    <string name="default_demo_pc">Default Demo PC</string>
+    <string name="default_se_name">Default SE Name</string>
+    <string name="aws_access_key">AWS Access Key ID</string>
+    <string name="aws_secret_key">AWS Secret Access Key</string>
+    <string name="aws_key_hint">For S3 badge photo upload</string>
+    <string name="error_invalid_url">URL must start with https://</string>
+    <string name="end_session_confirm_title">End Session?</string>
+    <string name="end_session_confirm_message">This will stop recording on the demo PC. The session data will be sent for AI analysis.</string>
+    <string name="confirm">Confirm</string>
+    <string name="cancel">Cancel</string>
 </resources>
