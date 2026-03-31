@@ -604,6 +604,65 @@
       color: var(--text-dim);
     }
 
+    /* ── Speed Controls ─────────────────────────────────── */
+    .speed-controls {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .speed-btn {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 0.2rem 0.55rem;
+      border-radius: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .speed-btn:hover {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+
+    .speed-btn.active {
+      background: var(--accent-glow-strong);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Analysis Reveal ────────────────────────────────── */
+    .summary-bar.deferred {
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .summary-bar.revealed {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .analysis-pending {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .analysis-pending.hidden { display: none; }
+
     /* ── Responsive ─────────────────────────────────────── */
     @media (max-width: 900px) {
       .main { flex-direction: column; }
@@ -658,6 +717,11 @@
     <span class="timeline-current" id="currentTime">00:00</span>
     <div style="flex:1"></div>
     <button id="playBtn" style="background:var(--accent);color:#0a0a0f;border:none;padding:0.3rem 0.8rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:inherit;">PLAY</button>
+    <div class="speed-controls">
+      <button class="speed-btn active" data-speed="1">1x</button>
+      <button class="speed-btn" data-speed="2">2x</button>
+      <button class="speed-btn" data-speed="4">4x</button>
+    </div>
     <span style="font-size:0.6rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">SPACE play/pause &middot; &larr;&rarr; skip 5s</span>
   </div>
   <div class="timeline-bar" id="timelineBar">
@@ -691,8 +755,9 @@
   </div>
 </div>
 
-<!-- Bottom: Summary -->
-<div class="summary-bar">
+<!-- Bottom: Analysis (revealed at end of playback) -->
+<div class="analysis-pending" id="analysisPending">[ AI analysis will appear when playback reaches the end ]</div>
+<div class="summary-bar deferred" id="summaryBar">
   <div class="summary-cards" id="summaryCards"></div>
 </div>
 
@@ -724,6 +789,8 @@ var playTimer = null;
 var isDragging = false;
 var useRealScreenshots = false;
 var sessionBaseUrl = '';
+var playbackSpeed = 1;
+var analysisRevealed = false;
 
 // =====================================================================
 // DATA LOADING
@@ -759,14 +826,20 @@ function loadSessionData(sessionId) {
     fetchJson(base + '/metadata.json'),
     fetchJson(base + '/clicks/clicks.json'),
     fetchJson(base + '/transcript/transcript.json'),
-    fetchJson(base + '/output/summary.json')
+    fetchJson(base + '/output/summary.json'),
+    fetchJson(base + '/output/timeline.json')
   ]).then(function(results) {
     sessionData.metadata = results[0] || SAMPLE_METADATA;
     sessionData.clicks = results[1] || SAMPLE_CLICKS;
     sessionData.transcript = results[2] || SAMPLE_TRANSCRIPT;
     sessionData.summary = results[3] || SAMPLE_SUMMARY;
+    sessionData.timeline = results[4] || null;
     // Fall back to mock frames if S3 fetch failed
     if (!results[0] && !results[1]) useRealScreenshots = false;
+    // If timeline.json exists, merge its events into clicks/transcript
+    if (sessionData.timeline) {
+      mergeTimelineData(sessionData.timeline);
+    }
     initReplay();
   });
 }
@@ -793,6 +866,60 @@ function formatTime(seconds) {
   var m = Math.floor(seconds / 60);
   var s = Math.floor(seconds % 60);
   return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// =====================================================================
+// TIMELINE.JSON MERGE
+// When timeline.json is available, it provides a unified event stream.
+// We use it to enrich or replace the separate clicks/transcript data.
+// =====================================================================
+function mergeTimelineData(timeline) {
+  if (!timeline || !timeline.events) return;
+
+  // If we have no clicks data from S3, build it from timeline click events
+  var clickEvents = timeline.events.filter(function(e) { return e.type === 'click'; });
+  var speechEvents = timeline.events.filter(function(e) { return e.type === 'speech'; });
+
+  if (clickEvents.length > 0 && (!sessionData.clicks || !sessionData.clicks.events || sessionData.clicks.events.length === 0)) {
+    sessionData.clicks = {
+      session_id: timeline.session_id,
+      events: clickEvents.map(function(e, i) {
+        return {
+          index: i + 1,
+          timestamp: e.timestamp,
+          type: 'click',
+          element: { text: e.description.replace(/^Clicked:\s*/, '') },
+          page_title: e.v1_feature || '',
+          screenshot_file: 'screenshots/click-' + String(i + 1).padStart(3, '0') + '.jpg'
+        };
+      })
+    };
+  }
+
+  if (speechEvents.length > 0 && (!sessionData.transcript || !sessionData.transcript.entries || sessionData.transcript.entries.length === 0)) {
+    var startMs = sessionData.metadata.started_at ? new Date(sessionData.metadata.started_at).getTime() : new Date(speechEvents[0].timestamp).getTime();
+    sessionData.transcript = {
+      session_id: timeline.session_id,
+      entries: speechEvents.map(function(e) {
+        var evtMs = new Date(e.timestamp).getTime();
+        var offsetSec = Math.max(0, (evtMs - startMs) / 1000);
+        var h = Math.floor(offsetSec / 3600);
+        var m = Math.floor((offsetSec % 3600) / 60);
+        var s = Math.floor(offsetSec % 60);
+        var ts = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.000';
+        var desc = e.description;
+        var speaker = 'SE';
+        var text = desc;
+        // Parse "Speaker: text" format from timeline_builder
+        var colonIdx = desc.indexOf(': ');
+        if (colonIdx > 0 && colonIdx < 20) {
+          speaker = desc.substring(0, colonIdx);
+          text = desc.substring(colonIdx + 2);
+        }
+        return { timestamp: ts, speaker: speaker, text: text };
+      })
+    };
+  }
 }
 
 // =====================================================================
@@ -1050,9 +1177,17 @@ function updateTranscript(seconds) {
   entries.forEach(function(el, i) {
     var t = parseFloat(el.dataset.seconds);
     el.classList.remove('past', 'active', 'future');
-    if (i < activeIndex) el.classList.add('past');
-    else if (i === activeIndex) el.classList.add('active');
-    else el.classList.add('future');
+    if (t > seconds) {
+      // Progressive reveal: future entries are hidden during playback
+      el.classList.add('future');
+      el.style.display = 'none';
+    } else if (i < activeIndex) {
+      el.classList.add('past');
+      el.style.display = '';
+    } else if (i === activeIndex) {
+      el.classList.add('active');
+      el.style.display = '';
+    }
   });
 
   // Auto-scroll to active entry
@@ -1063,6 +1198,19 @@ function updateTranscript(seconds) {
     var containerH = container.clientHeight;
     container.scrollTop = elTop - containerH / 3;
   }
+
+  // Reveal analysis when playback reaches the end (within 2 seconds)
+  if (seconds >= totalSeconds - 2 && !analysisRevealed) {
+    revealAnalysis();
+  }
+}
+
+function revealAnalysis() {
+  analysisRevealed = true;
+  var pending = document.getElementById('analysisPending');
+  var bar = document.getElementById('summaryBar');
+  if (pending) pending.classList.add('hidden');
+  if (bar) bar.classList.add('revealed');
 }
 
 // =====================================================================
@@ -1126,18 +1274,28 @@ playBtn.addEventListener('click', function() {
 });
 
 function startPlayback() {
-  if (currentSeconds >= totalSeconds) currentSeconds = 0;
+  if (currentSeconds >= totalSeconds) {
+    currentSeconds = 0;
+    analysisRevealed = false;
+    var bar = document.getElementById('summaryBar');
+    var pending = document.getElementById('analysisPending');
+    if (bar) bar.classList.remove('revealed');
+    if (pending) pending.classList.remove('hidden');
+  }
   isPlaying = true;
   playBtn.textContent = 'PAUSE';
   playBtn.style.background = 'var(--warning)';
+  var tickMs = 100; // tick every 100ms for smooth playback
   playTimer = setInterval(function() {
-    currentSeconds += 0.5;
+    currentSeconds += (tickMs / 1000) * playbackSpeed;
     if (currentSeconds >= totalSeconds) {
+      currentSeconds = totalSeconds;
+      updateView(currentSeconds);
       stopPlayback();
       return;
     }
     updateView(currentSeconds);
-  }, 500);
+  }, tickMs);
 }
 
 function stopPlayback() {
@@ -1165,6 +1323,25 @@ document.addEventListener('keydown', function(e) {
     updateView(currentSeconds - 5);
   }
 });
+
+// =====================================================================
+// SPEED CONTROLS
+// =====================================================================
+(function() {
+  var speedBtns = document.querySelectorAll('.speed-btn');
+  speedBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      playbackSpeed = parseFloat(btn.dataset.speed);
+      speedBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      // If currently playing, restart the timer with new speed
+      if (isPlaying) {
+        stopPlayback();
+        startPlayback();
+      }
+    });
+  });
+})();
 
 // =====================================================================
 // INIT
