@@ -273,3 +273,40 @@ document.getElementById('s3DemoBtn').addEventListener('click', function() {
   document.getElementById('presignEndpoint').focus();
   document.getElementById('presignEndpoint').setAttribute('placeholder', 'Paste Lambda Function URL here');
 });
+
+// ─── QR Code Pairing ─────────────────────────────────────────────────────────
+
+document.getElementById('pairBtn').addEventListener('click', function() {
+  chrome.storage.local.get(S3_KEYS, function(config) {
+    // Build pairing payload with current S3 config
+    var payload = {
+      type: 'boothapp-pair',
+      v: 1,
+      s3Bucket: config.s3Bucket || '',
+      s3Region: config.s3Region || '',
+      presignEndpoint: config.presignEndpoint || '',
+      awsAccessKeyId: config.awsAccessKeyId || '',
+      awsSecretAccessKey: config.awsSecretAccessKey || '',
+      awsSessionToken: config.awsSessionToken || '',
+    };
+
+    var json = JSON.stringify(payload);
+    var dataUrl = QRCode.toDataURL(json, 280);
+
+    if (dataUrl) {
+      document.getElementById('qrImage').src = dataUrl;
+      document.getElementById('qrOverlay').classList.add('visible');
+    }
+  });
+});
+
+document.getElementById('qrCloseBtn').addEventListener('click', function() {
+  document.getElementById('qrOverlay').classList.remove('visible');
+});
+
+// Hide QR overlay when clicking outside the container
+document.getElementById('qrOverlay').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.classList.remove('visible');
+  }
+});
