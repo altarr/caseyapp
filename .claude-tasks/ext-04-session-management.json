@@ -2,12 +2,14 @@
   "id": "ext-04-session-management",
   "workstream": "extension",
   "title": "Add session start/stop via S3 polling + batch upload",
-  "description": "Extension polls S3 for session commands. On session start: begin click tracking + screenshots. On session end: batch upload clicks.json + all screenshots to S3 session folder. Add 'Session tracked' banner at top of page when active. Banner text: 'This session is tracked — you will receive a summary'. Must handle 'stop audio' flag (audio stops but click tracking continues). Upload must complete within 30s of session end.",
+  "description": "Extension polls S3 for session commands. On session start: begin click tracking + screenshots. On session end: batch upload clicks.json + all screenshots to S3 session folder. Add 'Session tracked' banner at top of page when active. Banner text: 'This session is tracked \u2014 you will receive a summary'. Must handle 'stop audio' flag (audio stops but click tracking continues). Upload must complete within 30s of session end.",
   "priority": 4,
-  "status": "pending",
+  "status": "completed",
   "assigned_worker": null,
   "substeps": [],
-  "depends_on": ["ext-03-silent-screenshot"],
+  "depends_on": [
+    "ext-03-silent-screenshot"
+  ],
   "tests": [
     "Create session in S3 -> extension detects within 2 seconds, banner appears",
     "End session in S3 -> extension stops tracking, banner disappears, upload starts",
@@ -15,5 +17,7 @@
     "Banner is visible but not intrusive (small bar at top, can be dismissed)",
     "No tracking occurs when no active session exists",
     "Extension survives page navigation during active session"
-  ]
+  ],
+  "notes": "S3 polling of active-session.json every 2s, auto start/stop, click+screenshot upload on session end",
+  "completed_at": "2026-03-30T20:00:00Z"
 }
