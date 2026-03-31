@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Session Viewer</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="auth.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #f78166;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Loading / Error ─────────────────────────────────── */
+  #loading, #error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 16px;
+    padding: 24px;
+  }
+  #loading .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #error { color: var(--red); }
+  #error .msg { max-width: 500px; text-align: center; color: var(--text2); }
+
+  .hidden { display: none !important; }
+
+  /* ── Top bar ───────────────────────────────────────────── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .topbar-left a {
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .topbar-left a:hover { color: var(--accent); }
+  .topbar-left .sep { color: var(--text3); }
+  .topbar-left .session-id {
+    font-family: monospace;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text3);
+  }
+  .topbar-right a {
+    color: var(--text3);
+    text-decoration: none;
+  }
+  .topbar-right a:hover { color: var(--accent); }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .layout {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 20px;
+  }
+
+  /* ── Card ──────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-header .icon { font-size: 15px; }
+  .card-body { padding: 20px; }
+
+  /* ── Visitor Card (spans full width) ───────────────────── */
+  .visitor-card { grid-column: 1 / -1; }
+  .visitor-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .visitor-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .visitor-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .visitor-details h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .visitor-details .subtitle {
+    font-size: 14px;
+    color: var(--text2);
+  }
+  .visitor-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .chip.accent { background: #1f6feb33; border-color: var(--accent-dim); color: var(--accent); }
+  .chip.green  { background: #23863633; border-color: #238636; color: var(--green); }
+  .chip.yellow { background: #d2992233; border-color: #d29922; color: var(--yellow); }
+  .chip.red    { background: #f8514933; border-color: #f85149; color: var(--red); }
+  .chip.purple { background: #bc8cff22; border-color: #8b5cf6; color: var(--purple); }
+
+  /* ── Score Badge ───────────────────────────────────────── */
+  .score-badge {
+    margin-left: auto;
+    text-align: center;
+    padding: 0 16px;
+  }
+  .score-badge .score-value {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: monospace;
+    line-height: 1;
+  }
+  .score-badge .score-label {
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
+
+  /* ── Timeline ──────────────────────────────────────────── */
+  .timeline-card { grid-column: 1; grid-row: 2 / 4; }
+  .timeline-scroll {
+    max-height: 700px;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  .timeline-scroll::-webkit-scrollbar { width: 6px; }
+  .timeline-scroll::-webkit-scrollbar-track { background: transparent; }
+  .timeline-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .tl-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #21262d;
+    position: relative;
+  }
+  .tl-item:last-child { border-bottom: none; }
+
+  .tl-time {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text3);
+    min-width: 50px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .tl-body { flex: 1; min-width: 0; }
+  .tl-desc {
+    font-size: 14px;
+    color: var(--text);
+    word-wrap: break-word;
+  }
+  .tl-page {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tl-thumb {
+    width: 120px;
+    height: 68px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--surface2);
+    cursor: pointer;
+  }
+  .tl-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* ── Transcript ────────────────────────────────────────── */
+  .transcript-card { grid-column: 2; grid-row: 2; }
+  .transcript-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  .transcript-scroll::-webkit-scrollbar { width: 6px; }
+  .transcript-scroll::-webkit-scrollbar-track { background: transparent; }
+  .transcript-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .t-entry {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .t-ts {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text3);
+    min-width: 65px;
+    flex-shrink: 0;
+    padding-top: 3px;
+  }
+  .t-speaker {
+    font-weight: 700;
+    min-width: 55px;
+    flex-shrink: 0;
+  }
+  .t-speaker.se { color: var(--accent); }
+  .t-speaker.visitor { color: var(--green); }
+  .t-text { color: var(--text); }
+
+  /* ── Analysis Summary ──────────────────────────────────── */
+  .analysis-card { grid-column: 2; grid-row: 3; }
+  .analysis-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  .analysis-scroll::-webkit-scrollbar { width: 6px; }
+  .analysis-scroll::-webkit-scrollbar-track { background: transparent; }
+  .analysis-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .summary-text {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text3);
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* products list */
+  .products-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  /* interests table */
+  .interests-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .interests-tbl th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text3);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .interests-tbl td {
+    padding: 8px;
+    border-bottom: 1px solid #21262d;
+    vertical-align: top;
+  }
+  .confidence-high   { color: var(--green); }
+  .confidence-medium { color: var(--yellow); }
+  .confidence-low    { color: var(--text3); }
+
+  /* follow-up actions */
+  .actions-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .actions-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .actions-list li:last-child { border-bottom: none; }
+  .actions-list .arrow {
+    color: var(--accent);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* key moments */
+  .moment-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: flex-start;
+  }
+  .moment-ts {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text3);
+    min-width: 60px;
+    flex-shrink: 0;
+  }
+  .moment-desc {
+    font-size: 13px;
+    color: var(--text);
+  }
+  .moment-impact {
+    font-size: 12px;
+    color: var(--yellow);
+    margin-top: 2px;
+  }
+
+  /* ── Lightbox ──────────────────────────────────────────── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  /* ── Empty state ───────────────────────────────────────── */
+  .empty {
+    color: var(--text3);
+    font-style: italic;
+    font-size: 14px;
+    padding: 12px 0;
+  }
+
+  /* ── Responsive ────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+      padding: 16px;
+    }
+    .timeline-card { grid-column: 1; grid-row: auto; }
+    .transcript-card { grid-column: 1; grid-row: auto; }
+    .analysis-card { grid-column: 1; grid-row: auto; }
+    .timeline-scroll, .transcript-scroll, .analysis-scroll { max-height: 500px; }
+    .visitor-info { flex-wrap: wrap; }
+    .score-badge { margin-left: 0; margin-top: 12px; }
+  }
+  @media (max-width: 480px) {
+    .topbar { padding: 10px 12px; flex-wrap: wrap; }
+    .layout { padding: 10px; gap: 12px; }
+    .tl-thumb { width: 80px; height: 45px; }
+    .visitor-avatar { width: 56px; height: 56px; font-size: 22px; }
+    .visitor-details h2 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<script>
+if (!BoothAuth.requireAwsCreds()) {
+  window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href);
+} else if (!BoothAuth.requireLogin()) { /* redirects */ }
+</script>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text2)">Loading session data...</div>
+</div>
+
+<!-- Error -->
+<div id="error" class="hidden">
+  <div style="font-size:18px;font-weight:600">Failed to load session</div>
+  <div class="msg" id="error-msg"></div>
+  <a href="sessions.html" style="color:var(--accent);margin-top:12px">Back to Sessions</a>
+</div>
+
+<!-- Main Content -->
+<div id="app" class="hidden">
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="sessions.html">Sessions</a>
+      <span class="sep">/</span>
+      <span class="session-id" id="topbar-sid"></span>
+    </div>
+    <div class="topbar-right">
+      <a href="timeline.html" id="link-timeline">Timeline</a>
+      <a href="session.html" id="link-live">Live View</a>
+      <span id="auth-user" style="font-family:monospace"></span>
+      <a href="#" id="logout-link">logout</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Visitor Info Card -->
+    <div class="card visitor-card">
+      <div class="card-header"><span class="icon">[i]</span> Visitor</div>
+      <div class="card-body">
+        <div class="visitor-info" id="visitor-info">
+          <div class="visitor-avatar" id="visitor-avatar">?</div>
+          <div class="visitor-details">
+            <h2 id="v-name">--</h2>
+            <div class="subtitle" id="v-subtitle"></div>
+            <div class="visitor-meta" id="v-meta"></div>
+          </div>
+          <div class="score-badge" id="score-badge" class="hidden">
+            <div class="score-value" id="score-value">--</div>
+            <div class="score-label">Engagement</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card timeline-card">
+      <div class="card-header"><span class="icon">[~]</span> Session Timeline</div>
+      <div class="timeline-scroll" id="timeline"></div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="card transcript-card">
+      <div class="card-header"><span class="icon">["]</span> Transcript</div>
+      <div class="transcript-scroll" id="transcript"></div>
+    </div>
+
+    <!-- Analysis Summary + Products + Follow-up -->
+    <div class="card analysis-card">
+      <div class="card-header"><span class="icon">[*]</span> Analysis</div>
+      <div class="analysis-scroll" id="analysis"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ── Config ──────────────────────────────────────────────────────
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+
+  var ak = localStorage.getItem("boothapp_aws_ak");
+  var sk = localStorage.getItem("boothapp_aws_sk");
+  if (ak && sk) {
+    AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+  }
+  var s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+
+  // ── URL Params ──────────────────────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  var sessionId = params.get("session") || "";
+
+  if (!sessionId) {
+    showError("No session ID provided. Add ?session=<id> to the URL.");
+    return;
+  }
+
+  // ── Elements ────────────────────────────────────────────────────
+  var loadingEl = document.getElementById("loading");
+  var errorEl   = document.getElementById("error");
+  var appEl     = document.getElementById("app");
+
+  document.getElementById("topbar-sid").textContent = sessionId;
+  document.getElementById("link-timeline").href = "timeline.html?session=" + encodeURIComponent(sessionId);
+  document.getElementById("link-live").href = "session.html?session=" + encodeURIComponent(sessionId);
+  document.getElementById("auth-user").textContent = BoothAuth.currentUser() || "";
+  document.getElementById("logout-link").addEventListener("click", function (e) {
+    e.preventDefault();
+    BoothAuth.logout();
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────────
+  function esc(str) {
+    if (str == null) return "";
+    var d = document.createElement("div");
+    d.textContent = String(str);
+    return d.innerHTML;
+  }
+
+  function show(screen) {
+    loadingEl.style.display = screen === "loading" ? "flex" : "none";
+    errorEl.style.display   = screen === "error"   ? "flex" : "none";
+    appEl.style.display     = screen === "app"     ? "block" : "none";
+  }
+
+  function showError(msg) {
+    document.getElementById("error-msg").textContent = msg;
+    show("error");
+  }
+
+  function fetchS3Json(key) {
+    return new Promise(function (resolve, reject) {
+      s3.getObject({ Key: key }, function (err, data) {
+        if (err) { reject(err); return; }
+        try { resolve(JSON.parse(data.Body.toString())); }
+        catch (e) { reject(e); }
+      });
+    });
+  }
+
+  function fetchS3ImageUrl(key) {
+    return new Promise(function (resolve) {
+      s3.getObject({ Key: key }, function (err, data) {
+        if (err) { resolve(null); return; }
+        try {
+          var blob = new Blob([data.Body], { type: "image/jpeg" });
+          resolve(URL.createObjectURL(blob));
+        } catch (e) { resolve(null); }
+      });
+    });
+  }
+
+  function formatRelTime(isoStr, startIso) {
+    var start = new Date(startIso).getTime();
+    var t = new Date(isoStr).getTime();
+    var diff = Math.max(0, Math.floor((t - start) / 1000));
+    var m = Math.floor(diff / 60);
+    var ss = diff % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss;
+  }
+
+  function formatDuration(startIso, endIso) {
+    if (!startIso) return "--";
+    var end = endIso || new Date().toISOString();
+    var ms = new Date(end).getTime() - new Date(startIso).getTime();
+    var mins = Math.round(ms / 60000);
+    return mins + " min";
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "--";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "--";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+      " " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  // ── Lightbox ────────────────────────────────────────────────────
+  function openLightbox(src) {
+    var lb = document.createElement("div");
+    lb.className = "lightbox";
+    var img = document.createElement("img");
+    img.src = src;
+    img.alt = "Screenshot";
+    lb.appendChild(img);
+    lb.addEventListener("click", function () { document.body.removeChild(lb); });
+    document.body.appendChild(lb);
+  }
+  window.openLightbox = openLightbox;
+
+  // ── Load All Data ───────────────────────────────────────────────
+  var prefix = "sessions/" + sessionId + "/";
+
+  var metadataP   = fetchS3Json(prefix + "metadata.json").catch(function () { return null; });
+  var clicksP     = fetchS3Json(prefix + "clicks/clicks.json").catch(function () { return null; });
+  var transcriptP = fetchS3Json(prefix + "transcript/transcript.json").catch(function () { return null; });
+  var summaryP    = fetchS3Json(prefix + "output/summary.json").catch(function () { return null; });
+  var followUpP   = fetchS3Json(prefix + "output/follow-up.json").catch(function () { return null; });
+
+  Promise.all([metadataP, clicksP, transcriptP, summaryP, followUpP])
+    .then(function (results) {
+      var metadata   = results[0];
+      var clicks     = results[1];
+      var transcript = results[2];
+      var summary    = results[3];
+      var followUp   = results[4];
+
+      if (!metadata) {
+        showError("Session not found: " + sessionId);
+        return;
+      }
+
+      show("app");
+      renderVisitorCard(metadata, summary);
+      renderTimeline(clicks, metadata);
+      renderTranscript(transcript);
+      renderAnalysis(summary, followUp);
+    })
+    .catch(function (err) {
+      showError("Error loading session data: " + (err.message || err));
+    });
+
+  // ── Render: Visitor Card ────────────────────────────────────────
+  function renderVisitorCard(meta, summary) {
+    var nameEl = document.getElementById("v-name");
+    var subEl  = document.getElementById("v-subtitle");
+    var metaEl = document.getElementById("v-meta");
+    var avatarEl = document.getElementById("visitor-avatar");
+
+    nameEl.textContent = meta.visitor_name || "Unknown Visitor";
+
+    // Build subtitle from company + title
+    var parts = [];
+    if (meta.visitor_title) parts.push(meta.visitor_title);
+    if (meta.visitor_company) parts.push(meta.visitor_company);
+    subEl.textContent = parts.join(" at ") || "";
+
+    // Avatar initials
+    var initials = (meta.visitor_name || "?").split(" ").map(function (w) { return w[0]; }).join("").substring(0, 2).toUpperCase();
+    avatarEl.textContent = initials;
+
+    // Try loading badge photo
+    fetchS3ImageUrl(prefix + "badge.jpg").then(function (url) {
+      if (url) {
+        avatarEl.textContent = "";
+        var img = document.createElement("img");
+        img.src = url;
+        img.alt = "Badge";
+        avatarEl.appendChild(img);
+      }
+    });
+
+    // Meta chips
+    var chips = [];
+    chips.push('<span class="chip accent">' + esc(formatDuration(meta.started_at, meta.ended_at)) + '</span>');
+    chips.push('<span class="chip">' + esc(formatDate(meta.started_at)) + '</span>');
+    if (meta.se_name) chips.push('<span class="chip">SE: ' + esc(meta.se_name) + '</span>');
+    if (meta.demo_pc) chips.push('<span class="chip">' + esc(meta.demo_pc) + '</span>');
+    if (meta.status) {
+      var st = meta.status.toLowerCase();
+      var cls = "chip";
+      if (st === "completed" || st === "analyzed" || st === "ended") cls = "chip green";
+      else if (st === "recording" || st === "active") cls = "chip red";
+      else if (st === "processing") cls = "chip yellow";
+      chips.push('<span class="' + cls + '">' + esc(meta.status) + '</span>');
+    }
+    metaEl.innerHTML = chips.join("");
+
+    // Score badge
+    if (summary && summary.session_score != null) {
+      var scoreEl = document.getElementById("score-value");
+      scoreEl.textContent = summary.session_score;
+      var scoreNum = Number(summary.session_score);
+      if (scoreNum >= 7) scoreEl.style.color = "var(--green)";
+      else if (scoreNum >= 4) scoreEl.style.color = "var(--yellow)";
+      else scoreEl.style.color = "var(--red)";
+    }
+  }
+
+  // ── Render: Timeline ────────────────────────────────────────────
+  function renderTimeline(clicks, meta) {
+    var container = document.getElementById("timeline");
+    var events = (clicks && clicks.events) ? clicks.events : [];
+
+    if (events.length === 0) {
+      container.innerHTML = '<div class="empty">No click events recorded</div>';
+      return;
+    }
+
+    var startIso = meta.started_at || "";
+
+    // First pass: render with placeholder thumbnails, then load images async
+    var html = "";
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var relTime = startIso ? formatRelTime(ev.timestamp, startIso) : "#" + ev.index;
+      var desc = ev.element ? (ev.element.text || ev.dom_path || "Click") : "Click";
+      var pageInfo = ev.page_title || ev.page_url || "";
+
+      html += '<div class="tl-item">' +
+        '<div class="tl-time">' + esc(relTime) + '</div>' +
+        '<div class="tl-body">' +
+          '<div class="tl-desc">' + esc(desc) + '</div>' +
+          (pageInfo ? '<div class="tl-page">' + esc(pageInfo) + '</div>' : '') +
+        '</div>';
+
+      if (ev.screenshot_file) {
+        var ssFile = ev.screenshot_file.replace(/^screenshots\//, "");
+        html += '<div class="tl-thumb" data-ss="' + esc(ssFile) + '" id="thumb-' + i + '">' +
+          '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:11px;color:var(--text3)">...</div>' +
+          '</div>';
+      }
+
+      html += '</div>';
+    }
+    container.innerHTML = html;
+
+    // Async load screenshot thumbnails
+    for (var j = 0; j < events.length; j++) {
+      if (events[j].screenshot_file) {
+        (function (idx) {
+          var ssFile = events[idx].screenshot_file.replace(/^screenshots\//, "");
+          var key = prefix + "screenshots/" + ssFile;
+          fetchS3ImageUrl(key).then(function (url) {
+            if (!url) return;
+            var thumbEl = document.getElementById("thumb-" + idx);
+            if (!thumbEl) return;
+            thumbEl.innerHTML = "";
+            var img = document.createElement("img");
+            img.src = url;
+            img.alt = "Screenshot";
+            img.loading = "lazy";
+            thumbEl.appendChild(img);
+            thumbEl.addEventListener("click", function () { openLightbox(url); });
+          });
+        })(j);
+      }
+    }
+  }
+
+  // ── Render: Transcript ──────────────────────────────────────────
+  function renderTranscript(transcript) {
+    var container = document.getElementById("transcript");
+
+    if (!transcript || !transcript.entries || transcript.entries.length === 0) {
+      container.innerHTML = '<div class="empty" style="padding:16px 20px">No transcript available</div>';
+      return;
+    }
+
+    var html = "";
+    for (var i = 0; i < transcript.entries.length; i++) {
+      var entry = transcript.entries[i];
+      var speakerCls = (entry.speaker || "").toLowerCase() === "se" ? "se" : "visitor";
+      html += '<div class="t-entry">' +
+        '<span class="t-ts">' + esc(entry.timestamp) + '</span>' +
+        '<span class="t-speaker ' + speakerCls + '">' + esc(entry.speaker) + '</span>' +
+        '<span class="t-text">' + esc(entry.text) + '</span>' +
+        '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  // ── Render: Analysis (summary + products + follow-up) ───────────
+  function renderAnalysis(summary, followUp) {
+    var container = document.getElementById("analysis");
+
+    if (!summary && !followUp) {
+      container.innerHTML = '<div class="empty" style="padding:16px 20px">Analysis not yet available</div>';
+      return;
+    }
+
+    var html = "";
+
+    // Executive summary
+    if (summary && summary.executive_summary) {
+      html += '<div class="summary-text">' + esc(summary.executive_summary) + '</div>';
+    }
+
+    // Products demonstrated
+    if (summary && summary.products_demonstrated && summary.products_demonstrated.length) {
+      html += '<div class="section-label">Products Demonstrated</div>';
+      html += '<div class="products-list">';
+      for (var i = 0; i < summary.products_demonstrated.length; i++) {
+        html += '<span class="chip purple">' + esc(summary.products_demonstrated[i]) + '</span>';
+      }
+      html += '</div>';
+    }
+
+    // Key interests
+    if (summary && summary.key_interests && summary.key_interests.length) {
+      html += '<div class="section-label">Visitor Interests</div>';
+      html += '<table class="interests-tbl"><thead><tr><th>Topic</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody>';
+      for (var k = 0; k < summary.key_interests.length; k++) {
+        var interest = summary.key_interests[k];
+        var confCls = "confidence-" + (interest.confidence || "low").toLowerCase();
+        html += '<tr>' +
+          '<td style="font-weight:500;color:var(--text)">' + esc(interest.topic) + '</td>' +
+          '<td><span class="' + confCls + '" style="font-size:12px;text-transform:uppercase;letter-spacing:0.05em">' + esc(interest.confidence) + '</span></td>' +
+          '<td style="color:var(--text2);font-size:13px">' + esc(interest.evidence) + '</td>' +
+          '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+
+    // Key moments
+    if (summary && summary.key_moments && summary.key_moments.length) {
+      html += '<div class="section-label">Key Moments</div>';
+      for (var m = 0; m < summary.key_moments.length; m++) {
+        var moment = summary.key_moments[m];
+        html += '<div class="moment-item">' +
+          '<span class="moment-ts">' + esc(moment.timestamp) + '</span>' +
+          '<div>' +
+            '<div class="moment-desc">' + esc(moment.description) + '</div>' +
+            (moment.impact ? '<div class="moment-impact">' + esc(moment.impact) + '</div>' : '') +
+          '</div>' +
+          '</div>';
+      }
+    }
+
+    // Follow-up actions
+    var actions = (summary && summary.follow_up_actions) ? summary.follow_up_actions : [];
+    if (actions.length > 0) {
+      html += '<div class="section-label">Follow-up Actions</div>';
+      html += '<ul class="actions-list">';
+      for (var a = 0; a < actions.length; a++) {
+        html += '<li><span class="arrow">></span><span>' + esc(actions[a]) + '</span></li>';
+      }
+      html += '</ul>';
+    }
+
+    // Follow-up metadata (priority, tags)
+    if (followUp) {
+      if (followUp.priority) {
+        var pColor = { high: "var(--red)", medium: "var(--yellow)", low: "var(--text3)" };
+        var pc = pColor[(followUp.priority || "").toLowerCase()] || pColor.medium;
+        html += '<div style="margin-top:16px;display:flex;gap:10px;align-items:center">' +
+          '<span class="section-label" style="margin:0">Priority</span>' +
+          '<span style="color:' + pc + ';font-weight:700;text-transform:uppercase;font-size:13px">' + esc(followUp.priority) + '</span>' +
+          '</div>';
+      }
+      if (followUp.tags && followUp.tags.length) {
+        html += '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+        for (var t = 0; t < followUp.tags.length; t++) {
+          html += '<span class="chip">' + esc(followUp.tags[t]) + '</span>';
+        }
+        html += '</div>';
+      }
+      if (followUp.sdr_notes) {
+        html += '<div class="section-label">SDR Notes</div>' +
+          '<div style="font-size:13px;color:var(--text2);background:var(--surface2);padding:12px;border-radius:8px;border:1px solid var(--border)">' +
+          esc(followUp.sdr_notes) + '</div>';
+      }
+    }
+
+    container.innerHTML = html || '<div class="empty">No analysis data</div>';
+  }
+
+})();
+</script>
+</body>
+</html>
