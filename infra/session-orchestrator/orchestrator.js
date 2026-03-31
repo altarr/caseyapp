@@ -214,6 +214,39 @@ async function createSession({ visitor_name, badge_photo, demo_pc, se_name, audi
 }
 
 /**
+ * Stop audio recording while keeping the session active (screenshots continue).
+ * Called by Android app or demo PC operator mid-demo.
+ *
+ * @param {string} session_id
+ * @param {object} [opts]
+ * @returns {{ session_id, audio_stopped, message? }}
+ */
+async function stopAudio(session_id, opts = {}) {
+  validateSessionId(session_id);
+  const metadata = await getSession(session_id);
+
+  // Only allow stop-audio on active or recording sessions
+  if (!['active', 'recording'].includes(metadata.status)) {
+    return { session_id, audio_stopped: false, message: 'Session not active' };
+  }
+
+  // Write stop-audio command (presence-based signal)
+  await putObject(`sessions/${session_id}/commands/stop-audio`, {
+    session_id,
+    stopped_at: new Date().toISOString(),
+  });
+
+  // Update active-session.json to signal extension/packager
+  await putObject('active-session.json', {
+    session_id,
+    active: true,
+    stop_audio: true,
+  });
+
+  return { session_id, audio_stopped: true };
+}
+
+/**
  * End an active session. Called by Android app or demo PC operator.
  *
  * @param {string} session_id
@@ -335,7 +368,7 @@ async function listSessions() {
 }
 
 module.exports = {
-  createSession, endSession, getSession, listSessions,
+  createSession, endSession, stopAudio, getSession, listSessions,
   transitionState, getSessionState,
   validateSessionId, validateDemoPc,
   VALID_STATES, TRANSITIONS,

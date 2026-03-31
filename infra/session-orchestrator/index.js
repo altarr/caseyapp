@@ -5,8 +5,9 @@
  * API:
  *   GET  /sessions               — list all sessions with metadata + analysis status
  *   POST /sessions               — create session (Android app on badge scan)
- *   POST /sessions/:id/end       — end session (Android app or operator)
- *   GET  /sessions/:id           — get session metadata + command flags
+ *   POST /sessions/:id/end        — end session (Android app or operator)
+ *   POST /sessions/:id/stop-audio — stop audio recording, keep screenshots
+ *   GET  /sessions/:id            — get session metadata + command flags
  *   GET  /sessions/:id/state     — get session lifecycle state + history
  *   POST /sessions/:id/state     — transition session to a new state
  *   GET  /health                 — health check
@@ -14,7 +15,7 @@
  * Deploy as Lambda (API Gateway HTTP API or Function URL) or run locally:
  *   node index.js
  */
-const { createSession, endSession, getSession, listSessions, transitionState, getSessionState } = require('./orchestrator');
+const { createSession, endSession, stopAudio, getSession, listSessions, transitionState, getSessionState } = require('./orchestrator');
 
 // ── Route table ────────────────────────────────────────────────────────────
 
@@ -22,7 +23,8 @@ const ROUTES = [
   { method: 'GET',  pattern: /^\/health$/,                   handler: handleHealth },
   { method: 'GET',  pattern: /^\/sessions$/,                 handler: handleListSessions },
   { method: 'POST', pattern: /^\/sessions$/,                 handler: handleCreateSession },
-  { method: 'POST', pattern: /^\/sessions\/([^/]+)\/end$/,   handler: handleEndSession },
+  { method: 'POST', pattern: /^\/sessions\/([^/]+)\/end$/,        handler: handleEndSession },
+  { method: 'POST', pattern: /^\/sessions\/([^/]+)\/stop-audio$/, handler: handleStopAudio },
   { method: 'GET',  pattern: /^\/sessions\/([^/]+)\/state$/, handler: handleGetState },
   { method: 'POST', pattern: /^\/sessions\/([^/]+)\/state$/, handler: handleTransitionState },
   { method: 'GET',  pattern: /^\/sessions\/([^/]+)$/,        handler: handleGetSession },
@@ -44,6 +46,11 @@ async function handleCreateSession(body, _matches, origin) {
 
 async function handleEndSession(body, matches, origin) {
   const result = await endSession(matches[1], body);
+  return respond(200, result, origin);
+}
+
+async function handleStopAudio(body, matches, origin) {
+  const result = await stopAudio(matches[1], body);
   return respond(200, result, origin);
 }
 
