@@ -16,12 +16,13 @@ SUMMARY_SCHEMA = {
         "key_moments",
         "generated_at",
     ],
+    "additionalProperties": True,
     "properties": {
-        "session_id": {"type": "string"},
-        "visitor_name": {"type": "string"},
+        "session_id": {"type": "string", "minLength": 1},
+        "visitor_name": {"type": "string", "minLength": 1},
         "products_demonstrated": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {"type": "string", "minLength": 1},
         },
         "key_interests": {
             "type": "array",
@@ -29,19 +30,20 @@ SUMMARY_SCHEMA = {
                 "type": "object",
                 "required": ["topic", "confidence", "evidence"],
                 "properties": {
-                    "topic": {"type": "string"},
+                    "topic": {"type": "string", "minLength": 1},
                     "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-                    "evidence": {"type": "string"},
+                    "evidence": {"type": "string", "minLength": 1},
                 },
             },
         },
         "follow_up_actions": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {"type": "string", "minLength": 1},
+            "minItems": 1,
         },
         "demo_duration_seconds": {"type": "integer", "minimum": 0},
         "session_score": {"type": "integer", "minimum": 0, "maximum": 10},
-        "executive_summary": {"type": "string"},
+        "executive_summary": {"type": "string", "minLength": 1},
         "key_moments": {
             "type": "array",
             "items": {
@@ -50,13 +52,13 @@ SUMMARY_SCHEMA = {
                 "properties": {
                     "timestamp": {"type": "string"},
                     "screenshot": {"type": ["string", "null"]},
-                    "description": {"type": "string"},
-                    "impact": {"type": "string"},
+                    "description": {"type": "string", "minLength": 1},
+                    "impact": {"type": "string", "minLength": 1},
                 },
             },
         },
         "v1_tenant_link": {"type": "string"},
-        "generated_at": {"type": "string"},
+        "generated_at": {"type": "string", "minLength": 1},
     },
 }
 
@@ -104,6 +106,8 @@ def _validate_object(data, schema, path, errors):
         if not isinstance(data, list):
             errors.append(f"{path}: expected array, got {type(data).__name__}")
             return
+        if "minItems" in schema and len(data) < schema["minItems"]:
+            errors.append(f"{path}: array has {len(data)} items, minimum is {schema['minItems']}")
         item_schema = schema.get("items")
         if item_schema:
             for i, item in enumerate(data):
@@ -112,6 +116,9 @@ def _validate_object(data, schema, path, errors):
     elif expected_type == "string":
         if not isinstance(data, str):
             errors.append(f"{path}: expected string, got {type(data).__name__}")
+            return
+        if "minLength" in schema and len(data) < schema["minLength"]:
+            errors.append(f"{path}: string length {len(data)} < minLength {schema['minLength']}")
         enum_values = schema.get("enum")
         if enum_values and data not in enum_values:
             errors.append(f"{path}: '{data}' not in {enum_values}")

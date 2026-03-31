@@ -194,6 +194,38 @@ class TestValidator(unittest.TestCase):
     def test_validate_or_raise_passes(self):
         validate_summary_or_raise(self._valid_summary())
 
+    def test_empty_visitor_name_rejected(self):
+        summary = self._valid_summary()
+        summary["visitor_name"] = ""
+        errors = validate_summary(summary)
+        self.assertTrue(any("minLength" in e for e in errors))
+
+    def test_empty_follow_up_actions_rejected(self):
+        summary = self._valid_summary()
+        summary["follow_up_actions"] = []
+        errors = validate_summary(summary)
+        self.assertTrue(any("minItems" in e or "minimum" in e for e in errors))
+
+    def test_empty_executive_summary_rejected(self):
+        summary = self._valid_summary()
+        summary["executive_summary"] = ""
+        errors = validate_summary(summary)
+        self.assertTrue(any("minLength" in e for e in errors))
+
+    def test_empty_string_in_products_rejected(self):
+        summary = self._valid_summary()
+        summary["products_demonstrated"] = ["XDR", ""]
+        errors = validate_summary(summary)
+        self.assertTrue(any("minLength" in e for e in errors))
+
+    def test_schema_exported_in_prompts(self):
+        from analysis.engines.prompts import SUMMARY_JSON_SCHEMA
+        import json
+        schema = json.loads(SUMMARY_JSON_SCHEMA)
+        self.assertIn("visitor_name", schema["properties"])
+        self.assertIn("follow_up_actions", schema["properties"])
+        self.assertIn("demo_duration_seconds", schema["properties"])
+
 
 if __name__ == "__main__":
     unittest.main()

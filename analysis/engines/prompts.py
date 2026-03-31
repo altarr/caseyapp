@@ -1,3 +1,25 @@
+SUMMARY_JSON_SCHEMA = """{
+  "type": "object",
+  "required": ["session_id", "visitor_name", "products_demonstrated", "key_interests",
+                "follow_up_actions", "demo_duration_seconds", "session_score",
+                "executive_summary", "key_moments", "generated_at"],
+  "properties": {
+    "visitor_name":           {"type": "string", "minLength": 1},
+    "products_demonstrated":  {"type": "array", "items": {"type": "string"}},
+    "key_interests":          {"type": "array", "items": {
+      "type": "object", "required": ["topic", "confidence", "evidence"],
+      "properties": {
+        "topic":      {"type": "string"},
+        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+        "evidence":   {"type": "string"}
+      }
+    }},
+    "follow_up_actions":      {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "demo_duration_seconds":  {"type": "integer", "minimum": 0},
+    "session_score":          {"type": "integer", "minimum": 0, "maximum": 10}
+  }
+}"""
+
 SYSTEM_FACTUAL = """You are analyzing a recorded product demo session for Trend Micro Vision One.
 
 Your job is to extract ONLY what is directly evidenced by the transcript, click events, and screenshots provided.
@@ -7,11 +29,15 @@ Rules:
 - The "products_demonstrated" list must ONLY include products actually demonstrated (not just mentioned in passing)
 - Cite specific timestamps or click events as evidence
 - If something is unclear or ambiguous, omit it rather than guess
-- The output must be valid JSON with no trailing commas or comments"""
+- The output must be valid JSON with no trailing commas or comments
+- Every field name must match exactly as specified — no aliases or synonyms"""
 
 SYSTEM_RECOMMENDATIONS = """You are a senior sales analyst helping the SDR team follow up after a Trend Micro Vision One product demo.
 
 Based on the factual extraction from Pass 1, generate personalized follow-up recommendations.
+
+The final summary.json conforms to this JSON Schema:
+""" + SUMMARY_JSON_SCHEMA + """
 
 Rules:
 - Recommendations must be specific and actionable — not generic ("send a follow-up email" is not acceptable)
@@ -20,7 +46,8 @@ Rules:
 - Confidence levels: "high" = visitor explicitly asked about topic or spent significant time on it; "medium" = indirect signals; "low" = brief mention only
 - session_score (1-10): 1-3 = passive/minimal engagement, 4-6 = moderate interest with some interaction, 7-8 = strong engagement with questions and deep exploration, 9-10 = exceptional — multiple product areas explored deeply, strong buying signals, specific use-case discussions
 - executive_summary must be exactly 2 sentences suitable for a sales manager email — lead with the most important takeaway
-- The output must be valid JSON with no trailing commas or comments"""
+- The output must be valid JSON with no trailing commas or comments
+- Use EXACTLY these field names: "key_interests" (not "visitor_interests"), "follow_up_actions" (not "recommended_follow_up")"""
 
 FACTUAL_EXTRACTION_PROMPT = """Analyze this Vision One demo session and extract factual information.
 

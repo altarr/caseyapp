@@ -100,22 +100,39 @@ def print_summary(results: dict):
         results: Analysis results dict containing ``summary`` and ``follow_up`` keys.
     """
     summary = results["summary"]
-    print(f"\nSession: {summary.get('session_id')} -- {summary.get('visitor_name')}")
+    sep = "-" * 60
+
+    print(f"\n{sep}")
+    print(f"  Session:  {summary.get('session_id')}")
+    print(f"  Visitor:  {summary.get('visitor_name')}")
     duration_s = summary.get("demo_duration_seconds", 0)
-    print(f"Duration: {duration_s // 60}m {duration_s % 60}s ({duration_s}s)")
+    print(f"  Duration: {duration_s // 60}m {duration_s % 60}s ({duration_s}s)")
+    score = summary.get("session_score", 0)
+    print(f"  Score:    {score}/10")
+    print(sep)
+
     products = summary.get("products_demonstrated", [])
-    print(f"Products demonstrated: {', '.join(products) if products else 'none detected'}")
+    print(f"\nProducts demonstrated: {', '.join(products) if products else 'none detected'}")
+
+    exec_summary = summary.get("executive_summary", "")
+    if exec_summary:
+        print(f"\nExecutive summary:\n  {exec_summary}")
+
     interests = summary.get("key_interests", [])
     if interests:
-        print(f"Key interests ({len(interests)}):")
-        for i in interests[:3]:
-            print(f"  [{i.get('confidence','?')}] {i.get('topic')}")
+        print(f"\nKey interests ({len(interests)}):")
+        for i in interests:
+            print(f"  [{i.get('confidence','?'):6s}] {i.get('topic')}")
+
     follow_up = summary.get("follow_up_actions", [])
     if follow_up:
-        print(f"Follow-up actions ({len(follow_up)}):")
-        for action in follow_up[:3]:
-            print(f"  - {action}")
-    print(f"Follow-up priority: {results['follow_up'].get('priority', 'medium')}")
+        print(f"\nFollow-up actions ({len(follow_up)}):")
+        for idx, action in enumerate(follow_up, 1):
+            print(f"  {idx}. {action}")
+
+    priority = results["follow_up"].get("priority", "medium")
+    print(f"\nFollow-up priority: {priority}")
+    print(sep)
 
 
 def main():
