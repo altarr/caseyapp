@@ -1,0 +1,40 @@
+{
+  "description": "CaseyApp demo environment resources — created 2026-03-31",
+  "cleanup_tag": "boothapp-cleanup=demo-2026-04-01",
+  "aws_account": "752266476357",
+  "region": "us-east-1",
+  "resources": {
+    "ec2_instance": {
+      "id": "i-0b01d5bd6209e19d4",
+      "type": "t3.medium",
+      "name": "CaseyApp-Demo-PC",
+      "public_ip": "44.220.43.218",
+      "ami": "ami-05856bd26dd466893",
+      "os": "Windows Server 2022"
+    },
+    "security_group": {
+      "id": "sg-0a2d74c0aec3543b2",
+      "name": "caseyapp-demo-rdp",
+      "ports": [3389, 3000, 9222]
+    },
+    "key_pair": {
+      "name": "caseyapp-demo-key",
+      "local_path": "~/.ssh/caseyapp-demo-key.pem"
+    },
+    "s3_objects": [
+      "demo-setup/caseyapp-demo.zip"
+    ]
+  },
+  "rdp_access": {
+    "host": "44.220.43.218",
+    "port": 3389,
+    "username": "Administrator",
+    "password": "CaseyApp-Demo-2026!"
+  },
+  "cleanup_commands": [
+    "aws ec2 terminate-instances --instance-ids i-0b01d5bd6209e19d4 --region us-east-1",
+    "aws ec2 delete-security-group --group-id sg-0a2d74c0aec3543b2 --region us-east-1",
+    "aws ec2 delete-key-pair --key-name caseyapp-demo-key --region us-east-1",
+    "aws s3 rm s3://boothapp-sessions-752266476357/demo-setup/ --recursive --region us-east-1"
+  ]
+}

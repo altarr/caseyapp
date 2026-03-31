@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Download</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000;
+    color: #e5e5e5;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .card {
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 16px;
+    padding: 2.5rem;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #d71920, #ff9500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  p { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  #qr-canvas {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    display: inline-block;
+    margin-bottom: 1.5rem;
+  }
+  .btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #d71920, #ff9500);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .note { color: #666; font-size: 0.75rem; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>CaseyApp</h1>
+  <p>Scan the QR code or tap the button to download the Android app.</p>
+  <div id="qr-canvas"></div>
+  <br>
+  <a class="btn" id="download-btn" href="#">Download APK</a>
+  <div class="note">Android 8.0+ required. Enable "Install from unknown sources" in Settings.</div>
+</div>
+
+<script src="/brand/digital/qrcode.min.js"></script>
+<script>
+(function() {
+  // APK download URL (presigned, valid 7 days)
+  var APK_URL = 'https://boothapp-sessions-752266476357.s3.us-east-1.amazonaws.com/demo-setup/CaseyApp.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA26JUTPNC44I34IOO%2F20260331%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260331T195313Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=363f859e79eb962b2cd0f0f02e02d74023f6ec5865550021aca9e19d0788a1c8';
+
+  document.getElementById('download-btn').href = APK_URL;
+
+  // Generate QR code
+  var container = document.getElementById('qr-canvas');
+  new QRCode(container, {
+    text: APK_URL,
+    width: 256,
+    height: 256,
+    colorDark: '#d71920',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+})();
+</script>
+</body>
+</html>

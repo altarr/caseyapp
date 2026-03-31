@@ -25,6 +25,11 @@
     <color name="tm_green">#22C55E</color>
     <color name="tm_error">#FF6B6F</color>
 
+    <!-- Legacy aliases (referenced by layouts) -->
+    <color name="tm_gray_light">#888888</color>
+    <color name="tm_dark">@color/tm_bg</color>
+    <color name="tm_dark_card">@color/tm_card</color>
+
     <!-- Theme aliases -->
     <color name="colorPrimary">@color/tm_red</color>
     <color name="colorPrimaryDark">@color/tm_red_dark</color>
