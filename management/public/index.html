@@ -61,6 +61,26 @@
     </div>
   </div>
 
+  <!-- Demo PC Pairing -->
+  <div class="card">
+    <h2>Register a Demo PC</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem">Generate a pairing code for the installer. The demo PC enters this code during setup.</p>
+    <div class="form-row" style="max-width:500px">
+      <div class="form-group">
+        <label class="field-label">Demo PC Name</label>
+        <input type="text" class="input" id="pair-pc-name" placeholder="e.g. booth-pc-1">
+      </div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:1.25rem">
+        <button class="btn btn-primary btn-sm" id="pair-btn">Generate Code</button>
+      </div>
+    </div>
+    <div id="pair-result" style="display:none;margin-top:1rem;padding:1rem;background:var(--input-bg);border:1px solid var(--green);border-radius:10px">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted)">Pairing Code</div>
+      <div id="pair-code" style="font-family:monospace;font-size:2.5rem;font-weight:700;color:var(--green);letter-spacing:0.2em"></div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem">Valid for 1 hour. Enter this in the installer on the demo PC.</div>
+    </div>
+  </div>
+
   <!-- Stats -->
   <div class="stats" id="stats">
     <div class="stat-card"><div class="stat-value" id="stat-sessions">-</div><div class="stat-label">Sessions</div></div>
@@ -143,6 +163,20 @@
     api('POST', '/events/' + id + '/activate').then(function() {
       activeEventId = id;
       loadEvents();
+    });
+  });
+
+  // Pairing code
+  document.getElementById('pair-btn').addEventListener('click', function() {
+    var eid = activeEventId || document.getElementById('event-select').value;
+    var pcName = document.getElementById('pair-pc-name').value.trim();
+    if (!eid) { alert('Select or create an event first'); return; }
+    if (!pcName) { alert('Enter a demo PC name'); return; }
+
+    api('POST', '/demo-pcs/pairing-code', { event_id: parseInt(eid), demo_pc_name: pcName }).then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      document.getElementById('pair-result').style.display = 'block';
+      document.getElementById('pair-code').textContent = data.code;
     });
   });
 

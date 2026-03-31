@@ -439,6 +439,91 @@ app.post('/api/demo-pcs/register', (req, res) => {
   res.json({ demo_pc: pc });
 });
 
+// Generate a pairing code for a demo PC to register with
+app.post('/api/demo-pcs/pairing-code', requireAdmin, (req, res) => {
+  const { event_id, demo_pc_name } = req.body;
+  if (!event_id || !demo_pc_name) return res.status(400).json({ error: 'event_id and demo_pc_name required' });
+
+  // 6-char uppercase code, valid 1 hour
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  // Store in DB
+  db.getDb().prepare(`
+    CREATE TABLE IF NOT EXISTS pairing_codes (
+      code TEXT PRIMARY KEY, event_id INTEGER, demo_pc_name TEXT,
+      expires_at TEXT, used INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+    )
+  `).run();
+  db.getDb().prepare(
+    'INSERT OR REPLACE INTO pairing_codes (code, event_id, demo_pc_name, expires_at) VALUES (?, ?, ?, ?)'
+  ).run(code, event_id, demo_pc_name, expiresAt);
+
+  res.json({ code, expires_at: expiresAt, demo_pc_name, event_id });
+});
+
+// Demo PC calls this with the pairing code to register and get AWS credentials
+app.post('/api/demo-pcs/activate', (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Pairing code required' });
+
+  db.getDb().prepare(`
+    CREATE TABLE IF NOT EXISTS pairing_codes (
+      code TEXT PRIMARY KEY, event_id INTEGER, demo_pc_name TEXT,
+      expires_at TEXT, used INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+    )
+  `).run();
+
+  const pairing = db.getDb().prepare(
+    "SELECT * FROM pairing_codes WHERE code = ? AND used = 0 AND expires_at > datetime('now')"
+  ).get(code.toUpperCase());
+
+  if (!pairing) return res.status(404).json({ error: 'Invalid or expired pairing code' });
+
+  // Mark as used
+  db.getDb().prepare('UPDATE pairing_codes SET used = 1 WHERE code = ?').run(pairing.code);
+
+  // Register demo PC
+  const pc = db.registerDemoPc(pairing.event_id, pairing.demo_pc_name);
+
+  // Get event config
+  const event = db.getEvent(pairing.event_id);
+  let badgeFields = ['name', 'company'];
+  if (event && event.badge_profile_id) {
+    const profile = db.getProfile(event.badge_profile_id);
+    if (profile) {
+      const mappings = typeof profile.field_mappings === 'string'
+        ? JSON.parse(profile.field_mappings) : profile.field_mappings;
+      badgeFields = mappings.map(m => m.field_type);
+    }
+  }
+
+  // Generate temporary AWS credentials for the demo PC via STS
+  let s3Config = { bucket: S3_BUCKET, region: process.env.AWS_REGION || 'us-east-1' };
+  try {
+    const { STSClient, GetSessionTokenCommand } = require('@aws-sdk/client-sts');
+    const sts = new STSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+    const creds = await sts.send(new GetSessionTokenCommand({ DurationSeconds: 43200 })); // 12 hours
+    s3Config.access_key_id = creds.Credentials.AccessKeyId;
+    s3Config.secret_access_key = creds.Credentials.SecretAccessKey;
+    s3Config.session_token = creds.Credentials.SessionToken;
+    s3Config.expires = creds.Credentials.Expiration.toISOString();
+  } catch (err) {
+    console.error('[pairing] STS error, falling back to env vars:', err.message);
+    s3Config.access_key_id = process.env.AWS_ACCESS_KEY_ID || '';
+    s3Config.secret_access_key = process.env.AWS_SECRET_ACCESS_KEY || '';
+  }
+
+  res.json({
+    activated: true,
+    demo_pc: pc,
+    event: event,
+    badge_fields: badgeFields,
+    management_url: process.env.MANAGEMENT_URL || `${req.protocol}://${req.get('host')}`,
+    s3_config: s3Config,
+  });
+});
+
 app.get('/api/demo-pcs/:id/qr-payload', (req, res) => {
   const pc = db.getDemoPc(req.params.id);
   if (!pc) return res.status(404).json({ error: 'Demo PC not found' });
