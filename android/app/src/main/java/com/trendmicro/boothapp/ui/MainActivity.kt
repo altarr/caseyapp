@@ -183,8 +183,9 @@ class MainActivity : AppCompatActivity() {
                 activeSessionId = response.sessionId
                 activeDemoPc = demoPc
 
-                // Upload badge photo to S3
+                // Upload badge photo and metadata to S3
                 uploadBadgePhoto(response.sessionId)
+                uploadMetadata(response.sessionId, visitorName, visitorCompany, demoPc, seName)
 
                 // Update UI to active session state
                 binding.tvStatus.text = getString(R.string.session_active)
@@ -237,6 +238,37 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "S3 uploader init failed", e)
+            }
+        }
+    }
+
+    private fun uploadMetadata(
+        sessionId: String,
+        visitorName: String,
+        visitorCompany: String?,
+        demoPc: String,
+        seName: String?
+    ) {
+        if (!prefs.hasAwsCredentials()) return
+
+        lifecycleScope.launch {
+            try {
+                val uploader = S3Uploader(
+                    accessKeyId = prefs.awsAccessKeyId,
+                    secretAccessKey = prefs.awsSecretAccessKey
+                )
+                val result = uploader.uploadMetadata(
+                    sessionId = sessionId,
+                    visitorName = visitorName,
+                    visitorCompany = visitorCompany,
+                    demoPc = demoPc,
+                    seName = seName,
+                    audioConsent = true
+                )
+                result.onSuccess { Log.d(TAG, "Metadata uploaded: $it") }
+                result.onFailure { e -> Log.e(TAG, "Metadata upload failed", e) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Metadata upload init failed", e)
             }
         }
     }

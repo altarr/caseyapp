@@ -14,5 +14,9 @@ Build an Android app that captures visitor badge photos via camera, runs OCR to 
 - [x] Settings screen for orchestrator URL, AWS credentials, defaults
 - [x] Encrypted storage for AWS credentials
 
+- [x] metadata.json uploaded to S3 on session start (from closed PR #210)
+- [x] Round launcher icon configured (from closed PR #210)
+- [x] Use Gson for metadata JSON serialization instead of string concatenation
+
 ## Status
-Complete. PR #203 open at https://github.com/altarr/boothapp/pull/203
+PR #203 merged. Polish improvements applied in new PR.
