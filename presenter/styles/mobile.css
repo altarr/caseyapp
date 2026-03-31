@@ -66,10 +66,12 @@
     font-size: 0.85rem !important;
   }
 
-  /* Hide non-essential columns: Engagement/Score (5th col) */
-  /* Sessions list: hide Engagement column */
+  /* Hide non-essential columns on mobile */
+  /* Sessions list: hide Tags (5th) and Quality (7th) columns */
   #session-table thead th:nth-child(5),
-  #session-table tbody td:nth-child(5) {
+  #session-table tbody td:nth-child(5),
+  #session-table thead th:nth-child(7),
+  #session-table tbody td:nth-child(7) {
     display: none;
   }
 
