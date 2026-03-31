@@ -48,6 +48,24 @@ class AppPreferences(context: Context) {
         get() = securePrefs.getString(KEY_AWS_SECRET_KEY, "") ?: ""
         set(value) = securePrefs.edit().putString(KEY_AWS_SECRET_KEY, value).apply()
 
+    var managementUrl: String
+        get() = prefs.getString(KEY_MANAGEMENT_URL, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_MANAGEMENT_URL, value.trimEnd('/')).apply()
+
+    var eventId: Int
+        get() = prefs.getInt(KEY_EVENT_ID, 0)
+        set(value) = prefs.edit().putInt(KEY_EVENT_ID, value).apply()
+
+    var badgeFields: String
+        get() = prefs.getString(KEY_BADGE_FIELDS, "[\"name\",\"company\"]") ?: "[\"name\",\"company\"]"
+        set(value) = prefs.edit().putString(KEY_BADGE_FIELDS, value).apply()
+
+    var eventName: String
+        get() = prefs.getString(KEY_EVENT_NAME, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_EVENT_NAME, value).apply()
+
+    fun hasManagement(): Boolean = managementUrl.isNotBlank() && eventId > 0
+
     fun hasAwsCredentials(): Boolean =
         awsAccessKeyId.isNotBlank() && awsSecretAccessKey.isNotBlank()
 
@@ -57,5 +75,9 @@ class AppPreferences(context: Context) {
         private const val KEY_SE_NAME = "default_se_name"
         private const val KEY_AWS_ACCESS_KEY = "aws_access_key_id"
         private const val KEY_AWS_SECRET_KEY = "aws_secret_access_key"
+        private const val KEY_MANAGEMENT_URL = "management_url"
+        private const val KEY_EVENT_ID = "event_id"
+        private const val KEY_BADGE_FIELDS = "badge_fields"
+        private const val KEY_EVENT_NAME = "event_name"
     }
 }

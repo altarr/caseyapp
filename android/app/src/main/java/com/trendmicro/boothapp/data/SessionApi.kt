@@ -7,15 +7,19 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Client for the session orchestrator Lambda.
- * POST /sessions      -> create session
- * POST /sessions/:id/end -> end session
+ * Client for session orchestrator (legacy) or management server (v2).
+ * When using management server, all endpoints are prefixed with /api/.
  */
-class SessionApi(private val baseUrl: String) {
+class SessionApi(private val baseUrl: String, private val useManagement: Boolean = false) {
+
+    private val apiPrefix: String get() = if (useManagement) "/api" else ""
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -28,9 +32,13 @@ class SessionApi(private val baseUrl: String) {
     data class CreateSessionRequest(
         @SerializedName("visitor_name") val visitorName: String,
         @SerializedName("visitor_company") val visitorCompany: String?,
-        @SerializedName("badge_photo") val badgePhoto: String?,
+        @SerializedName("visitor_title") val visitorTitle: String? = null,
+        @SerializedName("visitor_email") val visitorEmail: String? = null,
+        @SerializedName("visitor_phone") val visitorPhone: String? = null,
+        @SerializedName("badge_photo") val badgePhoto: String? = null,
         @SerializedName("demo_pc") val demoPc: String,
         @SerializedName("se_name") val seName: String?,
+        @SerializedName("event_id") val eventId: Int? = null,
         @SerializedName("audio_consent") val audioConsent: Boolean = true
     )
 
@@ -51,8 +59,9 @@ class SessionApi(private val baseUrl: String) {
         withContext(Dispatchers.IO) {
             try {
                 val body = gson.toJson(request).toRequestBody(jsonType)
+                val endpoint = if (useManagement) "$baseUrl$apiPrefix/sessions/create" else "$baseUrl/sessions"
                 val httpRequest = Request.Builder()
-                    .url("$baseUrl/sessions")
+                    .url(endpoint)
                     .post(body)
                     .build()
 
@@ -77,7 +86,7 @@ class SessionApi(private val baseUrl: String) {
                 val body = gson.toJson(bodyMap).toRequestBody(jsonType)
 
                 val httpRequest = Request.Builder()
-                    .url("$baseUrl/sessions/$sessionId/end")
+                    .url("$baseUrl$apiPrefix/sessions/$sessionId/end")
                     .post(body)
                     .build()
 
@@ -103,7 +112,7 @@ class SessionApi(private val baseUrl: String) {
                 val body = gson.toJson(bodyMap).toRequestBody(jsonType)
 
                 val httpRequest = Request.Builder()
-                    .url("$baseUrl/sessions/$sessionId/stop-audio")
+                    .url("$baseUrl$apiPrefix/sessions/$sessionId/stop-audio")
                     .post(body)
                     .build()
 
@@ -113,6 +122,41 @@ class SessionApi(private val baseUrl: String) {
                 if (response.isSuccessful) {
                     val map = gson.fromJson(responseBody, Map::class.java) as Map<String, Any>
                     Result.success(map)
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    @Suppress("UNCHECKED_CAST")
+    suspend fun scanBadge(imageFile: File, eventId: Int): Result<Map<String, String>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("event_id", eventId.toString())
+                    .addFormDataPart(
+                        "badge", imageFile.name,
+                        imageFile.asRequestBody("image/jpeg".toMediaType())
+                    )
+                    .build()
+
+                val httpRequest = Request.Builder()
+                    .url("$baseUrl$apiPrefix/badges/scan")
+                    .post(requestBody)
+                    .build()
+
+                val response = client.newCall(httpRequest).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                if (response.isSuccessful) {
+                    val parsed = gson.fromJson(responseBody, Map::class.java) as Map<String, Any>
+                    val fields = (parsed["fields"] as? Map<String, Any>)
+                        ?.mapValues { it.value?.toString() ?: "" }
+                        ?: emptyMap()
+                    Result.success(fields)
                 } else {
                     Result.failure(Exception("HTTP ${response.code}: $responseBody"))
                 }

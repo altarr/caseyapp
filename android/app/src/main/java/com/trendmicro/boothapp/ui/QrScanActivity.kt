@@ -131,35 +131,47 @@ class QrScanActivity : AppCompatActivity() {
             val gson = Gson()
             val json = gson.fromJson(raw, JsonObject::class.java)
 
-            if (json.get("type")?.asString != "boothapp-pair") return false
+            val pairType = json.get("type")?.asString ?: ""
+            if (pairType != "boothapp-pair" && pairType != "caseyapp-pair") return false
 
-            val bucket = json.get("s3Bucket")?.asString ?: ""
-            val region = json.get("s3Region")?.asString ?: ""
-            val presign = json.get("presignEndpoint")?.asString ?: ""
-            val accessKey = json.get("awsAccessKeyId")?.asString ?: ""
-            val secretKey = json.get("awsSecretAccessKey")?.asString ?: ""
+            val version = json.get("v")?.asInt ?: 1
 
-            val demoPcId = json.get("demoPcId")?.asString ?: ""
+            if (version >= 2) {
+                // v2: management-centric pairing
+                val managementUrl = json.get("managementUrl")?.asString ?: ""
+                val eventId = json.get("eventId")?.asInt ?: 0
+                val demoPcId = json.get("demoPcId")?.asString ?: ""
+                val badgeFields = json.get("badgeFields")?.toString() ?: "[\"name\",\"company\"]"
+                val eventName = json.get("eventName")?.asString ?: ""
 
-            // Save to preferences
-            prefs.awsAccessKeyId = accessKey
-            prefs.awsSecretAccessKey = secretKey
-            // presignEndpoint acts as the orchestrator URL for the app
-            if (presign.isNotBlank()) {
-                prefs.orchestratorUrl = presign
+                prefs.managementUrl = managementUrl
+                prefs.eventId = eventId
+                prefs.badgeFields = badgeFields
+                prefs.eventName = eventName
+                if (demoPcId.isNotBlank()) prefs.defaultDemoPc = demoPcId
+                // Use management URL as the API base for session calls
+                if (managementUrl.isNotBlank()) prefs.orchestratorUrl = managementUrl
+
+                Log.d(TAG, "QR v2 pairing: management=$managementUrl event=$eventId pc=$demoPcId")
+            } else {
+                // v1: legacy S3-direct pairing
+                val presign = json.get("presignEndpoint")?.asString ?: ""
+                val accessKey = json.get("awsAccessKeyId")?.asString ?: ""
+                val secretKey = json.get("awsSecretAccessKey")?.asString ?: ""
+                val demoPcId = json.get("demoPcId")?.asString ?: ""
+
+                prefs.awsAccessKeyId = accessKey
+                prefs.awsSecretAccessKey = secretKey
+                if (presign.isNotBlank()) prefs.orchestratorUrl = presign
+                if (demoPcId.isNotBlank()) prefs.defaultDemoPc = demoPcId
+
+                Log.d(TAG, "QR v1 pairing: presign=$presign")
             }
-            if (demoPcId.isNotBlank()) {
-                prefs.defaultDemoPc = demoPcId
-            }
-
-            Log.d(TAG, "QR pairing successful: bucket=$bucket region=$region")
 
             runOnUiThread {
                 Toast.makeText(this, "Paired successfully!", Toast.LENGTH_SHORT).show()
                 val resultIntent = Intent()
                 resultIntent.putExtra(EXTRA_PAIRED, true)
-                resultIntent.putExtra(EXTRA_BUCKET, bucket)
-                resultIntent.putExtra(EXTRA_REGION, region)
                 setResult(RESULT_OK, resultIntent)
                 finish()
             }
