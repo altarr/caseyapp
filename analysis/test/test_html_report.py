@@ -156,6 +156,13 @@ class TestBuildFollowupCards(unittest.TestCase):
         self.assertIn("Do X", html)
         self.assertIn("p-high", html)
 
+    def test_renders_dict_actions(self):
+        actions = [{"action": "Send guide", "owner": "SE", "deadline": "48h"}]
+        html = _build_followup_cards(actions, "high")
+        self.assertIn("Send guide", html)
+        self.assertIn("[SE]", html)
+        self.assertIn("48h", html)
+
     def test_priority_on_first_only(self):
         html = _build_followup_cards(["A", "B"], "high")
         self.assertEqual(html.count("fu-priority"), 1)

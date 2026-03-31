@@ -107,19 +107,19 @@ sessions/<session-id>/
 {
   "session_id": "A726594",
   "visitor_name": "Joel Ginsberg",
-  "demo_duration_minutes": 15,
-  "session_score": 8,
-  "executive_summary": "Visitor showed strong interest in endpoint policy management and XDR detection rules, asking detailed questions about BYOD scenarios. Recommend scheduling a deep-dive on custom detection rules within the next week.",
-  "products_shown": ["Endpoint Security", "XDR", "Risk Insights"],
-  "visitor_interests": [
+  "products_demonstrated": ["Endpoint Security", "XDR", "Risk Insights"],
+  "key_interests": [
     {"topic": "Endpoint policy management", "confidence": "high", "evidence": "Asked 3 questions about policy config"},
     {"topic": "XDR detection rules", "confidence": "medium", "evidence": "Spent 2 min on detection rules page"}
   ],
-  "recommended_follow_up": [
+  "follow_up_actions": [
     "Send EP policy best practices guide",
     "Schedule deep-dive on XDR custom detection rules",
     "Share V1 tenant link for self-guided exploration"
   ],
+  "demo_duration_seconds": 900,
+  "session_score": 8,
+  "executive_summary": "Visitor showed strong interest in endpoint policy management and XDR detection rules, asking detailed questions about BYOD scenarios. Recommend scheduling a deep-dive on custom detection rules within the next week.",
   "key_moments": [
     {"timestamp": "00:05:30", "screenshot": "click-012.jpg", "description": "Visitor asked about BYOD policy", "impact": "Indicates real-world deployment concern — strong buying signal"}
   ],

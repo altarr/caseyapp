@@ -32,13 +32,13 @@ function setupSession(dir, summaryOverrides, followUpOverrides, timelineOverride
     visitor_name: 'Test Visitor',
     visitor_company: 'Test Corp',
     se_name: 'Test SE',
-    demo_duration_minutes: 12,
-    products_shown: ['XDR', 'Endpoint Security'],
-    visitor_interests: [
+    demo_duration_seconds: 720,
+    products_demonstrated: ['XDR', 'Endpoint Security'],
+    key_interests: [
       { topic: 'Detection Rules', confidence: 'high', evidence: 'Asked 3 questions about rules' },
       { topic: 'Cloud Posture', confidence: 'medium', evidence: 'Mentioned AWS accounts' },
     ],
-    recommended_follow_up: [
+    follow_up_actions: [
       'Schedule deep-dive on detection rules',
       'Share cloud security whitepaper',
     ],
@@ -147,9 +147,9 @@ console.log('\nTest 4: Empty arrays — shows empty state gracefully');
 {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-test-'));
   setupSession(dir, {
-    products_shown: [],
-    visitor_interests: [],
-    recommended_follow_up: [],
+    products_demonstrated: [],
+    key_interests: [],
+    follow_up_actions: [],
     key_moments: [],
   }, {}, { events: [] });
   const html = runRenderer(dir);
@@ -168,8 +168,8 @@ console.log('\nTest 5: HTML escaping — XSS prevention');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-test-'));
   setupSession(dir, {
     visitor_name: '<script>alert("xss")</script>',
-    products_shown: ['<img onerror=alert(1)>'],
-    visitor_interests: [{
+    products_demonstrated: ['<img onerror=alert(1)>'],
+    key_interests: [{
       topic: '"><script>alert(1)</script>',
       confidence: 'high',
       evidence: 'O\'Reilly & Associates',
@@ -240,7 +240,7 @@ console.log('\nTest 9: Metadata fallback — se_name and duration from metadata.
 {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-test-'));
   // Setup session WITHOUT se_name or demo_duration in summary.json
-  setupSession(dir, { se_name: undefined, demo_duration_minutes: undefined });
+  setupSession(dir, { se_name: undefined, demo_duration_seconds: undefined });
 
   // Write metadata.json at session root (like S3 layout)
   fs.writeFileSync(path.join(dir, 'metadata.json'), JSON.stringify({

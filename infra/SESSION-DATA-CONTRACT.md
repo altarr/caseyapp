@@ -218,15 +218,15 @@ Fields:
 |-------|------|-------------|
 | `session_id` | string | Matches parent session |
 | `visitor_name` | string | From metadata |
-| `demo_duration_minutes` | number | Calculated from `started_at` / `ended_at` |
+| `products_demonstrated` | string[] | V1 product areas actually demonstrated |
+| `key_interests` | array | Topics the visitor showed interest in |
+| `key_interests[].topic` | string | Interest area |
+| `key_interests[].confidence` | string | `"high"`, `"medium"`, `"low"` |
+| `key_interests[].evidence` | string | What indicates this interest |
+| `follow_up_actions` | string[] | Suggested next actions for SDR |
+| `demo_duration_seconds` | number | Calculated from `started_at` / `ended_at` |
 | `session_score` | number | 1-10 engagement score based on demo depth, visitor engagement, product coverage |
 | `executive_summary` | string | 2-sentence summary suitable for a sales manager email |
-| `products_shown` | string[] | V1 product areas demonstrated |
-| `visitor_interests` | array | Topics the visitor showed interest in |
-| `visitor_interests[].topic` | string | Interest area |
-| `visitor_interests[].confidence` | string | `"high"`, `"medium"`, `"low"` |
-| `visitor_interests[].evidence` | string | What indicates this interest |
-| `recommended_follow_up` | string[] | Suggested next actions for SDR |
 | `key_moments` | array | Notable moments during the demo |
 | `key_moments[].timestamp` | string | `"HH:MM:SS"` offset |
 | `key_moments[].screenshot` | string | Screenshot filename, e.g. `click-012.jpg` |

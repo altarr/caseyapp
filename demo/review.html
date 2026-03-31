@@ -528,16 +528,16 @@ function scoreColor(s) {
 function computeScore(data) {
   if (data.session_score) return data.session_score;
   var score = 0;
-  var dur = data.demo_duration_minutes || 0;
+  var dur = Math.round((data.demo_duration_seconds || 0) / 60) || 0;
   if (dur >= 15) score += 3;
   else if (dur >= 10) score += 2;
   else if (dur >= 5) score += 1;
 
-  var prods = (data.products_shown || []).length;
+  var prods = (data.products_demonstrated || []).length;
   if (prods >= 3) score += 3;
   else score += prods;
 
-  var highInterests = (data.visitor_interests || []).filter(function(i) { return i.confidence === 'high'; }).length;
+  var highInterests = (data.key_interests || []).filter(function(i) { return i.confidence === 'high'; }).length;
   if (highInterests >= 2) score += 2;
   else score += highInterests;
 
@@ -557,7 +557,7 @@ function renderMetrics(data) {
   ring.style.borderColor = scoreColor(score);
   ring.style.color = scoreColor(score);
 
-  document.getElementById('scoreDuration').textContent = (data.demo_duration_minutes || '--') + ' min';
+  document.getElementById('scoreDuration').textContent = (Math.round((data.demo_duration_seconds || 0) / 60) || '--') + ' min';
   document.getElementById('scoreLabel').textContent =
     score >= 8 ? 'High engagement' : score >= 5 ? 'Moderate engagement' : 'Low engagement';
 
@@ -570,7 +570,7 @@ function renderMetrics(data) {
   // Products
   var pc = document.getElementById('productsContainer');
   pc.innerHTML = '';
-  var products = data.products_shown || [];
+  var products = data.products_demonstrated || [];
   if (products.length === 0) {
     pc.innerHTML = '<span style="color:var(--text-muted); font-style:italic; font-size:13px">None detected</span>';
   } else {
@@ -585,7 +585,7 @@ function renderMetrics(data) {
   // Interests
   var ic = document.getElementById('interestsContainer');
   ic.innerHTML = '';
-  var interests = data.visitor_interests || [];
+  var interests = data.key_interests || [];
   if (interests.length === 0) {
     ic.innerHTML = '<span style="color:var(--text-muted); font-style:italic; font-size:13px">None detected</span>';
   } else {
@@ -606,7 +606,7 @@ function renderMetrics(data) {
   // Follow-ups
   var fc = document.getElementById('followupsContainer');
   fc.innerHTML = '';
-  var followups = data.recommended_follow_up || [];
+  var followups = data.follow_up_actions || [];
   if (followups.length === 0) {
     fc.innerHTML = '<span style="color:var(--text-muted); font-style:italic; font-size:13px">None suggested</span>';
   } else {

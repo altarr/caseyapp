@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * End-to-end orchestrator test.
+ * End-to-end Lambda handler test.
  *
- * Exercises the full Lambda lifecycle against real S3:
- *   1. createSession  -> metadata.json exists, commands/start.json written
- *   2. endSession     -> commands/end.json written, metadata status = ended
+ * Invokes the Lambda handler (index.js) with simulated API Gateway events
+ * and verifies S3 state after each call. This tests the full path:
+ *   HTTP event -> handler routing -> orchestrator logic -> S3 writes
+ *
+ * Steps:
+ *   1. POST /sessions           -> createSession, verify metadata.json + commands/start.json
+ *   2. GET  /sessions/:id       -> verify session readable via API
+ *   3. POST /sessions/:id/end   -> endSession, verify commands/end.json + status=ended
  *
  * Usage:
  *   S3_BUCKET=boothapp-sessions-752266476357 AWS_PROFILE=hackathon node test-orchestrator.js
@@ -13,11 +18,11 @@
  * Exit 0 on all pass, non-zero on any failure.
  */
 var { S3Client, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
-var { createSession, endSession } = require('./orchestrator');
+var { handler } = require('./index');
 
 var BUCKET = process.env.S3_BUCKET;
 var REGION = process.env.AWS_REGION || 'us-east-1';
-var DEMO_PC = 'e2e-test-pc-' + Date.now();
+var DEMO_PC = 'e2epc' + Date.now();
 
 if (!BUCKET) {
   console.error('ERROR: S3_BUCKET env var required');
@@ -39,6 +44,14 @@ async function check(desc, fn) {
   }
 }
 
+function lambdaEvent(method, path, body) {
+  return {
+    httpMethod: method,
+    path: path,
+    body: body ? JSON.stringify(body) : null,
+  };
+}
+
 async function s3Exists(key) {
   try {
     await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
@@ -54,24 +67,30 @@ async function s3Get(key) {
 }
 
 (async function main() {
-  console.log('\n=== Session Orchestrator E2E Test ===');
+  console.log('\n=== Session Orchestrator Lambda E2E Test ===');
   console.log('Bucket: ' + BUCKET);
   console.log('Demo PC: ' + DEMO_PC);
 
-  // ── Step 1: createSession ─────────────────────────────────────────────────
+  // -- Step 1: POST /sessions (createSession) --------------------------------
 
-  console.log('\n-- createSession --');
-  var result = await createSession({
+  console.log('\n-- POST /sessions (createSession) --');
+  var createResp = await handler(lambdaEvent('POST', '/sessions', {
     visitor_name: 'E2E Test Visitor',
     demo_pc: DEMO_PC,
     se_name: 'E2E Tester',
     audio_consent: true,
+  }));
+  var createBody = JSON.parse(createResp.body);
+  var sid = createBody.session_id;
+  console.log('  HTTP ' + createResp.statusCode + ', session_id: ' + sid);
+
+  await check('createSession returns 201', function() {
+    if (createResp.statusCode !== 201)
+      throw new Error('expected 201, got ' + createResp.statusCode);
   });
-  var sid = result.session_id;
-  console.log('  session_id: ' + sid);
 
   await check('createSession returns session_id', function() {
-    if (!sid) throw new Error('missing session_id');
+    if (!sid) throw new Error('missing session_id in response body');
   });
 
   await check('metadata.json exists in S3', async function() {
@@ -96,14 +115,44 @@ async function s3Get(key) {
       throw new Error('expected ' + sid + ', got ' + cmd.session_id);
   });
 
-  // ── Step 2: endSession ────────────────────────────────────────────────────
+  // -- Step 2: GET /sessions/:id (getSession) --------------------------------
 
-  console.log('\n-- endSession --');
-  var endResult = await endSession(sid, { demo_pc: DEMO_PC });
+  console.log('\n-- GET /sessions/:id (getSession) --');
+  var getResp = await handler(lambdaEvent('GET', '/sessions/' + sid));
+  var getBody = JSON.parse(getResp.body);
+
+  await check('getSession returns 200', function() {
+    if (getResp.statusCode !== 200)
+      throw new Error('expected 200, got ' + getResp.statusCode);
+  });
+
+  await check('getSession returns correct session_id', function() {
+    if (getBody.session_id !== sid)
+      throw new Error('expected ' + sid + ', got ' + getBody.session_id);
+  });
+
+  await check('getSession shows start command sent', function() {
+    if (!getBody.commands || !getBody.commands.start_sent)
+      throw new Error('commands.start_sent is false or missing');
+  });
+
+  // -- Step 3: POST /sessions/:id/end (endSession) ---------------------------
+
+  console.log('\n-- POST /sessions/:id/end (endSession) --');
+  var endResp = await handler(lambdaEvent('POST', '/sessions/' + sid + '/end', {
+    demo_pc: DEMO_PC,
+  }));
+  var endBody = JSON.parse(endResp.body);
+  console.log('  HTTP ' + endResp.statusCode + ', status: ' + endBody.status);
+
+  await check('endSession returns 200', function() {
+    if (endResp.statusCode !== 200)
+      throw new Error('expected 200, got ' + endResp.statusCode);
+  });
 
   await check('endSession returns status ended', function() {
-    if (endResult.status !== 'ended')
-      throw new Error('expected ended, got ' + endResult.status);
+    if (endBody.status !== 'ended')
+      throw new Error('expected ended, got ' + endBody.status);
   });
 
   await check('commands/end.json written for demo PC', async function() {
@@ -129,7 +178,35 @@ async function s3Get(key) {
       throw new Error('ended_at is null/missing');
   });
 
-  // ── Summary ───────────────────────────────────────────────────────────────
+  // -- Step 4: Verify idempotent re-end ---------------------------------------
+
+  console.log('\n-- POST /sessions/:id/end (re-end, idempotent) --');
+  var reEndResp = await handler(lambdaEvent('POST', '/sessions/' + sid + '/end', {
+    demo_pc: DEMO_PC,
+  }));
+  var reEndBody = JSON.parse(reEndResp.body);
+
+  await check('re-ending returns 200 (idempotent)', function() {
+    if (reEndResp.statusCode !== 200)
+      throw new Error('expected 200, got ' + reEndResp.statusCode);
+  });
+
+  await check('re-ending returns already-ended message', function() {
+    if (!reEndBody.message || !reEndBody.message.includes('already'))
+      throw new Error('expected already-ended message, got: ' + JSON.stringify(reEndBody));
+  });
+
+  // -- Step 5: GET /health ----------------------------------------------------
+
+  console.log('\n-- GET /health --');
+  var healthResp = await handler(lambdaEvent('GET', '/health'));
+
+  await check('health returns 200', function() {
+    if (healthResp.statusCode !== 200)
+      throw new Error('expected 200, got ' + healthResp.statusCode);
+  });
+
+  // -- Summary ----------------------------------------------------------------
 
   console.log('\n---------------------------------');
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed');

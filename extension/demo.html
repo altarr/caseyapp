@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoothApp Demo Status</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #141419;
+      --surface-alt: #1c1c24;
+      --border: #2a2a38;
+      --text: #e8e8f0;
+      --text-dim: #78788a;
+      --accent: #D32F2F;
+      --accent-light: #EF5350;
+      --accent-glow: rgba(211, 47, 47, 0.2);
+      --green: #4caf50;
+      --green-glow: rgba(76, 175, 80, 0.2);
+      --amber: #ff9800;
+      --amber-glow: rgba(255, 152, 0, 0.2);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 3rem 1rem;
+    }
+
+    .container {
+      max-width: 560px;
+      width: 100%;
+    }
+
+    /* -- Header -- */
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .header h1 span {
+      color: var(--accent);
+    }
+
+    .header .sub {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-top: 0.25rem;
+    }
+
+    /* -- S3 Config Bar -- */
+    .config-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+
+    .config-bar input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text);
+      font-family: 'SF Mono', 'Consolas', monospace;
+      outline: none;
+    }
+
+    .config-bar input:focus {
+      border-color: var(--accent);
+    }
+
+    .config-bar input::placeholder {
+      color: #3a3a4a;
+    }
+
+    .poll-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3a3a4a;
+      flex-shrink: 0;
+    }
+
+    .poll-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+    .poll-dot.err { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+
+    /* -- Status Badge -- */
+    .status-section {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.6rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .status-badge .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3a3a4a;
+    }
+
+    .status-badge.waiting .dot { background: var(--text-dim); }
+    .status-badge.recording .dot {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .status-badge.processing .dot {
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber-glow);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .status-badge.complete .dot {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green-glow);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.6; }
+    }
+
+    /* -- Visitor Card -- */
+    .visitor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .visitor-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .visitor-name {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .visitor-name .label {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 0.2rem;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .metric {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .metric .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent-light);
+      line-height: 1;
+      margin-bottom: 0.3rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric .label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* -- Processing Spinner -- */
+    .processing-section {
+      text-align: center;
+      padding: 2rem;
+      display: none;
+    }
+
+    .processing-section.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .processing-section .text {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+    }
+
+    /* -- Summary Card -- */
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--green);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: none;
+    }
+
+    .summary-card.visible {
+      display: block;
+    }
+
+    .summary-card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: var(--green);
+    }
+
+    .summary-executive {
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+
+    .summary-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .summary-meta .chip {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.35rem 0.7rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .summary-meta .chip strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .interests {
+      margin-top: 1rem;
+    }
+
+    .interests h4 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+
+    .interest-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0;
+      font-size: 0.8rem;
+    }
+
+    .interest-item .conf {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .conf.high { background: rgba(76,175,80,0.15); color: var(--green); }
+    .conf.medium { background: rgba(255,152,0,0.15); color: var(--amber); }
+    .conf.low { background: rgba(211,47,47,0.15); color: var(--accent-light); }
+
+    /* -- Footer -- */
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.7rem;
+      color: #3a3a4a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Booth<span>App</span> Demo</h1>
+      <div class="sub">AI-Powered Demo Capture</div>
+    </div>
+
+    <!-- S3 Endpoint Config -->
+    <div class="config-bar">
+      <span class="poll-dot" id="pollDot"></span>
+      <input type="text" id="s3Input" placeholder="https://BUCKET.s3.us-east-1.amazonaws.com" />
+    </div>
+
+    <!-- Status Badge -->
+    <div class="status-section">
+      <div class="status-badge waiting" id="statusBadge">
+        <span class="dot"></span>
+        <span id="statusText">Waiting for Session</span>
+      </div>
+    </div>
+
+    <!-- Visitor Card (shown during recording/processing/complete) -->
+    <div class="visitor-card" id="visitorCard">
+      <div class="visitor-name">
+        <span class="label">Visitor</span>
+        <span id="visitorName">--</span>
+      </div>
+      <div class="metrics">
+        <div class="metric">
+          <div class="value" id="clickCount">0</div>
+          <div class="label">Clicks</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="duration">00:00</div>
+          <div class="label">Duration</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Processing Spinner -->
+    <div class="processing-section" id="processingSection">
+      <div class="spinner"></div>
+      <div class="text">Analyzing session with AI...</div>
+    </div>
+
+    <!-- Summary Card (shown when complete) -->
+    <div class="summary-card" id="summaryCard">
+      <h3>Session Summary</h3>
+      <div class="summary-executive" id="summaryText">--</div>
+      <div class="summary-meta" id="summaryMeta"></div>
+      <div class="interests" id="interestsSection">
+        <h4>Visitor Interests</h4>
+        <div id="interestsList"></div>
+      </div>
+    </div>
+
+    <div class="footer">Powered by TrendAI &mdash; Smells Like Machine Learning</div>
+  </div>
+
+  <script>
+    // ================================================================
+    // CONFIG
+    // ================================================================
+    var POLL_MS = 3000;
+    var s3Input = document.getElementById('s3Input');
+
+    // Persist S3 endpoint in localStorage
+    var saved = localStorage.getItem('demo_s3_endpoint');
+    if (saved) s3Input.value = saved;
+
+    s3Input.addEventListener('change', function() {
+      localStorage.setItem('demo_s3_endpoint', s3Input.value.trim());
+    });
+
+    function getEndpoint() {
+      return (s3Input.value || '').trim().replace(/\/+$/, '');
+    }
+
+    // ================================================================
+    // STATE
+    // ================================================================
+    var state = {
+      phase: 'waiting',   // waiting | recording | processing | complete
+      sessionId: null,
+      visitorName: null,
+      startedAt: null,
+      clickCount: 0,
+      summary: null,
+      durationTimer: null
+    };
+
+    // ================================================================
+    // DOM REFS
+    // ================================================================
+    var dom = {
+      pollDot:           document.getElementById('pollDot'),
+      statusBadge:       document.getElementById('statusBadge'),
+      statusText:        document.getElementById('statusText'),
+      visitorCard:       document.getElementById('visitorCard'),
+      visitorName:       document.getElementById('visitorName'),
+      clickCount:        document.getElementById('clickCount'),
+      duration:          document.getElementById('duration'),
+      processingSection: document.getElementById('processingSection'),
+      summaryCard:       document.getElementById('summaryCard'),
+      summaryText:       document.getElementById('summaryText'),
+      summaryMeta:       document.getElementById('summaryMeta'),
+      interestsList:     document.getElementById('interestsList')
+    };
+
+    // ================================================================
+    // HELPERS
+    // ================================================================
+    function formatDuration(startIso) {
+      var start = new Date(startIso).getTime();
+      var diff = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      var h = Math.floor(diff / 3600);
+      var m = Math.floor((diff % 3600) / 60);
+      var s = diff % 60;
+      var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+      return h > 0 ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+    }
+
+    function fetchJson(url) {
+      return fetch(url, { mode: 'cors', cache: 'no-store' })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .catch(function() { return null; });
+    }
+
+    function flashPoll(ok) {
+      dom.pollDot.className = 'poll-dot ' + (ok ? 'ok' : 'err');
+      setTimeout(function() { dom.pollDot.className = 'poll-dot'; }, 600);
+    }
+
+    // ================================================================
+    // RENDER
+    // ================================================================
+    function setPhase(phase) {
+      state.phase = phase;
+      dom.statusBadge.className = 'status-badge ' + phase;
+
+      var labels = {
+        waiting: 'Waiting for Session',
+        recording: 'Recording',
+        processing: 'Processing',
+        complete: 'Complete'
+      };
+      dom.statusText.textContent = labels[phase] || phase;
+
+      // Visitor card visible during recording, processing, complete
+      if (phase === 'waiting') {
+        dom.visitorCard.classList.remove('visible');
+      } else {
+        dom.visitorCard.classList.add('visible');
+      }
+
+      // Processing spinner
+      dom.processingSection.className = phase === 'processing'
+        ? 'processing-section visible' : 'processing-section';
+
+      // Summary card
+      dom.summaryCard.className = phase === 'complete'
+        ? 'summary-card visible' : 'summary-card';
+    }
+
+    function render() {
+      dom.visitorName.textContent = state.visitorName || '--';
+      dom.clickCount.textContent = state.clickCount;
+    }
+
+    function renderSummary(data) {
+      dom.summaryText.textContent = data.executive_summary || 'No summary available.';
+
+      // Meta chips
+      var chips = '';
+      if (data.demo_duration_minutes) {
+        chips += '<span class="chip"><strong>' + data.demo_duration_minutes + ' min</strong> demo</span>';
+      }
+      if (data.session_score) {
+        chips += '<span class="chip">Score: <strong>' + data.session_score + '/10</strong></span>';
+      }
+      if (data.products_shown && data.products_shown.length) {
+        chips += '<span class="chip"><strong>' + data.products_shown.length + '</strong> products shown</span>';
+      }
+      dom.summaryMeta.innerHTML = chips;
+
+      // Interests
+      var items = '';
+      if (data.visitor_interests && data.visitor_interests.length) {
+        data.visitor_interests.forEach(function(interest) {
+          var conf = (interest.confidence || 'medium').toLowerCase();
+          items += '<div class="interest-item">' +
+            '<span class="conf ' + conf + '">' + conf + '</span>' +
+            '<span>' + (interest.topic || '') + '</span>' +
+            '</div>';
+        });
+      }
+      dom.interestsList.innerHTML = items || '<div class="interest-item" style="color:var(--text-dim)">None detected</div>';
+    }
+
+    function tickDuration() {
+      if (state.startedAt && (state.phase === 'recording' || state.phase === 'processing')) {
+        dom.duration.textContent = formatDuration(state.startedAt);
+      }
+    }
+
+    // ================================================================
+    // POLLING
+    // ================================================================
+    function poll() {
+      var endpoint = getEndpoint();
+      if (!endpoint) {
+        flashPoll(false);
+        return;
+      }
+
+      var sessionUrl = endpoint + '/active-session.json';
+
+      fetchJson(sessionUrl).then(function(data) {
+        flashPoll(data !== null);
+
+        if (data && data.active === true) {
+          // Active session detected
+          var isNew = state.sessionId !== data.session_id;
+          state.sessionId = data.session_id;
+          state.visitorName = data.visitor_name || 'Unknown';
+          state.startedAt = data.started_at;
+
+          if (isNew) {
+            state.clickCount = 0;
+            state.summary = null;
+            setPhase('recording');
+            if (state.durationTimer) clearInterval(state.durationTimer);
+            state.durationTimer = setInterval(tickDuration, 1000);
+          }
+
+          // Fetch click count
+          var clicksUrl = endpoint + '/sessions/' + data.session_id + '/clicks/clicks.json';
+          fetchJson(clicksUrl).then(function(clicks) {
+            if (clicks && clicks.events && Array.isArray(clicks.events)) {
+              state.clickCount = clicks.events.length;
+            }
+            render();
+          });
+
+        } else if (state.sessionId && state.phase === 'recording') {
+          // Session just ended -- active-session.json removed
+          // Transition to processing
+          setPhase('processing');
+          if (state.durationTimer) {
+            clearInterval(state.durationTimer);
+            state.durationTimer = null;
+          }
+          render();
+          pollForSummary();
+
+        } else if (state.phase === 'processing') {
+          // Still processing, keep checking for summary
+          pollForSummary();
+
+        } else if (state.phase !== 'complete') {
+          // No session, idle
+          state.sessionId = null;
+          state.visitorName = null;
+          state.startedAt = null;
+          state.clickCount = 0;
+          setPhase('waiting');
+          render();
+        }
+      });
+    }
+
+    function pollForSummary() {
+      if (!state.sessionId) return;
+      var endpoint = getEndpoint();
+      var summaryUrl = endpoint + '/sessions/' + state.sessionId + '/output/summary.json';
+
+      fetchJson(summaryUrl).then(function(summary) {
+        if (summary && summary.executive_summary) {
+          state.summary = summary;
+          setPhase('complete');
+          renderSummary(summary);
+          render();
+        }
+      });
+    }
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    setPhase('waiting');
+    setInterval(poll, POLL_MS);
+    poll();
+  </script>
+</body>
+</html>

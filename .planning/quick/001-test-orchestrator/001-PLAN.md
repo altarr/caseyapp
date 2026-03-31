@@ -1,13 +1,14 @@
-# Test Orchestrator E2E
+# Plan: Improve test-orchestrator.js to test Lambda E2E
 
 ## Goal
-Create `infra/session-orchestrator/test-orchestrator.js` that tests Lambda end-to-end against real S3.
+Rewrite test-orchestrator.js to invoke the Lambda handler (index.js) rather than calling orchestrator functions directly. This tests the full HTTP routing + JSON parsing + orchestrator + S3 path.
 
 ## Success Criteria
-1. createSession called, verify S3 `sessions/<id>/metadata.json` exists
-2. Verify `commands/<demo_pc>/start.json` written
-3. endSession called, verify `commands/<demo_pc>/end.json` written
-4. Verify `status=ended` in metadata after end
-5. AWS SDK v3 used for S3 verification
-6. Exit 0 on pass, non-zero on fail
-7. Branch created, committed, pushed, PR to main
+1. Test calls Lambda handler with HTTP events (POST /sessions, POST /sessions/:id/end, GET /sessions/:id)
+2. Verifies S3 metadata.json exists after createSession
+3. Verifies commands/start.json written after createSession
+4. Verifies commands/end.json written after endSession
+5. Verifies metadata status=ended after endSession
+6. Uses AWS SDK v3 for S3 verification
+7. Exit 0 on pass, non-zero on fail
+8. Branch, commit, push, PR to main
