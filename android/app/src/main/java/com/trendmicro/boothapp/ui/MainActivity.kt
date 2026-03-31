@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val visitorName = binding.etVisitorName.text?.toString()?.trim() ?: ""
+        val visitorCompany = binding.etVisitorCompany.text?.toString()?.trim()
         val demoPc = binding.etDemoPc.text?.toString()?.trim() ?: "booth-pc-1"
         val seName = binding.etSeName.text?.toString()?.trim()
 
@@ -169,6 +170,7 @@ class MainActivity : AppCompatActivity() {
             val api = SessionApi(url)
             val request = SessionApi.CreateSessionRequest(
                 visitorName = visitorName,
+                visitorCompany = visitorCompany,
                 badgePhoto = "badge.jpg",
                 demoPc = demoPc,
                 seName = seName,
@@ -189,7 +191,8 @@ class MainActivity : AppCompatActivity() {
                 binding.tvStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.tm_green))
                 binding.tvSessionId.text = "Session: ${response.sessionId}"
                 binding.tvSessionId.visibility = View.VISIBLE
-                binding.tvVisitorInfo.text = "$visitorName"
+                val displayInfo = if (!visitorCompany.isNullOrBlank()) "$visitorName - $visitorCompany" else visitorName
+                binding.tvVisitorInfo.text = displayInfo
                 binding.tvVisitorInfo.visibility = View.VISIBLE
 
                 // Swap buttons

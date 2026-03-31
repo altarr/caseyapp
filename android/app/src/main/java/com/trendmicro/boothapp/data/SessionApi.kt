@@ -27,6 +27,7 @@ class SessionApi(private val baseUrl: String) {
 
     data class CreateSessionRequest(
         @SerializedName("visitor_name") val visitorName: String,
+        @SerializedName("visitor_company") val visitorCompany: String?,
         @SerializedName("badge_photo") val badgePhoto: String?,
         @SerializedName("demo_pc") val demoPc: String,
         @SerializedName("se_name") val seName: String?,

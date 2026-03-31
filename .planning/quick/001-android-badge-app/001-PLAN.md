@@ -1,0 +1,18 @@
+# Android Badge Capture App
+
+## Goal
+Build an Android app that captures visitor badge photos via camera, runs OCR to extract visitor name and company, creates a session via the Lambda orchestrator, and uploads badge photo and metadata to S3.
+
+## Success Criteria
+- [x] Android app targets API 33+
+- [x] CameraX for camera preview and badge photo capture
+- [x] ML Kit OCR extracts visitor name and company from badge
+- [x] Creates session via Lambda orchestrator POST /sessions
+- [x] Uploads badge photo to S3 bucket boothapp-sessions-752266476357
+- [x] Start Session and End Session buttons
+- [x] Trend Micro brand colors and dark theme
+- [x] Settings screen for orchestrator URL, AWS credentials, defaults
+- [x] Encrypted storage for AWS credentials
+
+## Status
+Complete. PR #203 open at https://github.com/altarr/boothapp/pull/203

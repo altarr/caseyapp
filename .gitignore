@@ -10,3 +10,12 @@ __pycache__/
 Thumbs.db
 coverage/
 .tmp/
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.apk
+*.aab
+*.hprof
