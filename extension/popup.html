@@ -709,6 +709,10 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="s3-status" title="Management server">
+        <div class="s3-dot" id="mgmtPollDot"></div>
+        <span class="s3-status-text" id="mgmtPollText">MGT</span>
+      </div>
       <div class="s3-status">
         <div class="s3-dot" id="s3PollDot"></div>
         <span class="s3-status-text" id="s3PollText">S3</span>
@@ -788,9 +792,43 @@
     </div>
   </div>
 
+  <!-- Management Config (hidden by default, toggled by gear) -->
+  <div class="s3-section" id="mgmtSection">
+    <div class="s3-section-title">Management Server</div>
+    <div class="s3-body">
+      <div class="s3-field">
+        <label class="s3-label" for="managementUrl">Management URL</label>
+        <input class="s3-input" id="managementUrl" type="url" placeholder="https://caseyapp.trendcyberrange.com" />
+      </div>
+      <div class="s3-field">
+        <label class="s3-label" for="managementToken">Auth Token</label>
+        <input class="s3-input" id="managementToken" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" />
+      </div>
+      <div class="s3-field">
+        <label class="s3-label" for="mgmtEvent">Event</label>
+        <select class="s3-input" id="mgmtEvent" style="cursor:pointer;">
+          <option value="">-- connect to load events --</option>
+        </select>
+      </div>
+      <div class="s3-field">
+        <label class="s3-label" for="demoPcName">Demo PC Name</label>
+        <input class="s3-input" id="demoPcName" type="text" placeholder="booth-pc-1" />
+      </div>
+      <div class="s3-field">
+        <div class="mgmt-status-row" style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          <div class="s3-dot" id="mgmtStatusDot"></div>
+          <span style="font-size:11px;color:#757575;" id="mgmtStatusText">Not connected</span>
+        </div>
+      </div>
+      <div class="s3-actions">
+        <button class="s3-btn s3-btn-save" id="mgmtConnectBtn" style="background:linear-gradient(135deg,#42a5f5 0%,#1e88e5 100%);">Connect</button>
+      </div>
+    </div>
+  </div>
+
   <!-- S3 Config (hidden by default, toggled by gear) -->
   <div class="s3-section" id="s3Section">
-    <div class="s3-section-title">S3 Configuration</div>
+    <div class="s3-section-title">S3 Configuration (Fallback)</div>
     <div class="s3-body">
       <div class="s3-field">
         <label class="s3-label" for="s3Bucket">S3 Bucket</label>

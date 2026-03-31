@@ -2,6 +2,33 @@
 // Captures timed screenshots and POSTs them to the local packager service.
 // Polls S3 for session lifecycle via SigV4 signed requests.
 
+// ─── Management Server Polling ───────────────────────────────────────────────
+// Primary session source — falls back to S3 if not configured.
+// The extension sends an auth token via X-Auth-Token header.
+
+async function pollManagementSession() {
+  const { managementUrl, demoPcId, managementToken } = await chrome.storage.local.get([
+    'managementUrl', 'demoPcId', 'managementToken'
+  ]);
+  if (!managementUrl || !demoPcId) return false; // fallback to S3 polling
+
+  try {
+    const headers = {};
+    if (managementToken) {
+      headers['X-Auth-Token'] = managementToken;
+    }
+    const response = await fetch(
+      `${managementUrl}/api/sessions/active?demo_pc=${encodeURIComponent(demoPcId)}`,
+      { headers, cache: 'no-store' }
+    );
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data; // { active, session_id, visitor_name, stop_audio }
+  } catch (_) {
+    return false;
+  }
+}
+
 // ─── Screenshot Quality Settings ──────────────────────────────────────────────
 
 const QUALITY_PRESETS = {
@@ -229,7 +256,99 @@ let pollingSessionId = null;
 let lastError = '';
 let lastErrorTime = 0;
 
+async function handleSessionData(data) {
+  if (data && data.active === true) {
+    if (!pollingSessionId) {
+      pollingSessionId = data.session_id;
+      sessionStartEpoch = Date.now();
+      screenshotCount = 0;
+
+      // Notify content scripts
+      chrome.tabs.query({}, (tabs) => {
+        for (const tab of tabs) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'session_state_changed',
+            active: true,
+            session_id: data.session_id,
+            stop_audio: data.stop_audio || false,
+          }).catch(() => {});
+        }
+      });
+
+      chrome.storage.local.set({
+        v1helper_session: {
+          active: true,
+          session_id: data.session_id,
+          visitor_name: data.visitor_name || '',
+          start_time: new Date().toISOString(),
+          stop_audio: data.stop_audio || false,
+        }
+      });
+
+      // Start timed screenshots
+      startTimedScreenshots();
+    } else if (data.stop_audio !== undefined) {
+      const { v1helper_session } = await chrome.storage.local.get(['v1helper_session']);
+      if (v1helper_session && v1helper_session.active) {
+        chrome.storage.local.set({
+          v1helper_session: { ...v1helper_session, stop_audio: data.stop_audio }
+        });
+      }
+    }
+  } else {
+    if (pollingSessionId) {
+      const endedSessionId = pollingSessionId;
+      pollingSessionId = null;
+
+      // Stop screenshots
+      stopTimedScreenshots();
+
+      // Notify content scripts
+      chrome.tabs.query({}, (tabs) => {
+        for (const tab of tabs) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'session_state_changed',
+            active: false,
+            session_id: endedSessionId,
+          }).catch(() => {});
+        }
+      });
+
+      chrome.storage.local.set({ v1helper_session: { active: false } });
+
+      // POST clicks to packager and signal end
+      try {
+        const { v1helper_clicks } = await chrome.storage.local.get(['v1helper_clicks']);
+        if (v1helper_clicks) {
+          await postToPackager('/clicks', JSON.stringify(v1helper_clicks), 'application/json');
+        }
+        await postToPackager('/session/end', '{}', 'application/json');
+      } catch (err) {
+        console.warn('CaseyApp: packager end signal failed:', err.message);
+      }
+
+      // Clear local data
+      await chrome.storage.local.remove(['v1helper_clicks']);
+      sessionStartEpoch = 0;
+      screenshotCount = 0;
+    }
+  }
+}
+
 async function pollActiveSession() {
+  // Try management server first (primary)
+  const mgmtData = await pollManagementSession();
+  if (mgmtData !== false) {
+    try {
+      await handleSessionData(mgmtData);
+    } catch (_err) {
+      lastError = 'Management Poll Failed';
+      lastErrorTime = Date.now();
+    }
+    return;
+  }
+
+  // Fallback: S3 polling
   const config = await chrome.storage.local.get([
     's3Bucket', 's3Region', 'awsAccessKeyId', 'awsSecretAccessKey', 'awsSessionToken'
   ]);
@@ -240,83 +359,7 @@ async function pollActiveSession() {
 
   try {
     const data = await s3GetJson(s3Bucket, 'active-session.json', s3Region, credentials);
-
-    if (data && data.active === true) {
-      if (!pollingSessionId) {
-        pollingSessionId = data.session_id;
-        sessionStartEpoch = Date.now();
-        screenshotCount = 0;
-
-        // Notify content scripts
-        chrome.tabs.query({}, (tabs) => {
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: 'session_state_changed',
-              active: true,
-              session_id: data.session_id,
-              stop_audio: data.stop_audio || false,
-            }).catch(() => {});
-          }
-        });
-
-        chrome.storage.local.set({
-          v1helper_session: {
-            active: true,
-            session_id: data.session_id,
-            visitor_name: data.visitor_name || '',
-            start_time: new Date().toISOString(),
-            stop_audio: data.stop_audio || false,
-          }
-        });
-
-        // Start timed screenshots
-        startTimedScreenshots();
-      } else if (data.stop_audio !== undefined) {
-        const { v1helper_session } = await chrome.storage.local.get(['v1helper_session']);
-        if (v1helper_session && v1helper_session.active) {
-          chrome.storage.local.set({
-            v1helper_session: { ...v1helper_session, stop_audio: data.stop_audio }
-          });
-        }
-      }
-    } else {
-      if (pollingSessionId) {
-        const endedSessionId = pollingSessionId;
-        pollingSessionId = null;
-
-        // Stop screenshots
-        stopTimedScreenshots();
-
-        // Notify content scripts
-        chrome.tabs.query({}, (tabs) => {
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: 'session_state_changed',
-              active: false,
-              session_id: endedSessionId,
-            }).catch(() => {});
-          }
-        });
-
-        chrome.storage.local.set({ v1helper_session: { active: false } });
-
-        // POST clicks to packager and signal end
-        try {
-          const { v1helper_clicks } = await chrome.storage.local.get(['v1helper_clicks']);
-          if (v1helper_clicks) {
-            await postToPackager('/clicks', JSON.stringify(v1helper_clicks), 'application/json');
-          }
-          await postToPackager('/session/end', '{}', 'application/json');
-        } catch (err) {
-          console.warn('CaseyApp: packager end signal failed:', err.message);
-        }
-
-        // Clear local data
-        await chrome.storage.local.remove(['v1helper_clicks']);
-        sessionStartEpoch = 0;
-        screenshotCount = 0;
-      }
-    }
+    await handleSessionData(data);
   } catch (_err) {
     lastError = 'S3 Poll Failed';
     lastErrorTime = Date.now();
@@ -415,6 +458,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'test_management_connection') {
+    (async () => {
+      try {
+        const { managementUrl, managementToken } = await chrome.storage.local.get([
+          'managementUrl', 'managementToken'
+        ]);
+        if (!managementUrl) {
+          sendResponse({ connected: false, error: 'Not configured' });
+          return;
+        }
+        const headers = {};
+        if (managementToken) headers['X-Auth-Token'] = managementToken;
+        const response = await fetch(`${managementUrl}/api/events`, { headers, cache: 'no-store' });
+        sendResponse({ connected: response.ok });
+      } catch (err) {
+        sendResponse({ connected: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
   if (message.type === 'test_s3_connection') {
     (async () => {
       try {
@@ -440,10 +504,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'get_popup_status') {
     (async () => {
       try {
-        const store = await chrome.storage.local.get(['v1helper_session', 'v1helper_clicks', 's3Bucket', 'awsAccessKeyId']);
+        const store = await chrome.storage.local.get([
+          'v1helper_session', 'v1helper_clicks', 's3Bucket', 'awsAccessKeyId',
+          'managementUrl', 'demoPcId'
+        ]);
         const session = store.v1helper_session || { active: false };
         const clicks = store.v1helper_clicks || { session_id: '', events: [] };
         const s3Configured = !!(store.s3Bucket && store.awsAccessKeyId);
+        const mgmtConfigured = !!(store.managementUrl && store.demoPcId);
         const lastEvent = clicks.events.length > 0 ? clicks.events[clicks.events.length - 1] : null;
 
         const packagerStatus = await checkPackagerStatus();
@@ -462,6 +530,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           last_click_path: lastEvent ? lastEvent.dom_path : '',
           last_click_time: lastEvent ? lastEvent.timestamp : '',
           s3_polling: s3Configured,
+          mgmt_polling: mgmtConfigured,
           polling_session_id: pollingSessionId || '',
           error_message: errorMessage,
           packager_connected: !!packagerStatus,

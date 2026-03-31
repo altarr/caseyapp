@@ -80,9 +80,11 @@ function setRingState(state) {
 
 // ─── Button Visibility ──────────────────────────────────────────────────────
 
+var mgmtConfigured = false;
+
 function updateButtonVisibility() {
   var wrap = document.getElementById('btnWrap');
-  if (s3Configured) {
+  if (s3Configured || mgmtConfigured) {
     wrap.classList.remove('hidden');
   } else {
     wrap.classList.add('hidden');
@@ -94,6 +96,18 @@ function updateButtonVisibility() {
 function refreshStatus() {
   chrome.runtime.sendMessage({ type: 'get_popup_status' }, function(response) {
     if (chrome.runtime.lastError || !response || response.status !== 'ok') return;
+
+    // Management connection indicator
+    var mgmtDot = document.getElementById('mgmtPollDot');
+    var mgmtText = document.getElementById('mgmtPollText');
+    mgmtConfigured = !!response.mgmt_polling;
+    if (mgmtConfigured) {
+      mgmtDot.classList.add('active');
+      mgmtText.classList.add('active');
+    } else {
+      mgmtDot.classList.remove('active');
+      mgmtText.classList.remove('active');
+    }
 
     // S3 connection indicator
     var s3Dot = document.getElementById('s3PollDot');
@@ -222,10 +236,176 @@ document.getElementById('sessionBtn').addEventListener('click', function() {
 // ─── Gear Toggle ─────────────────────────────────────────────────────────────
 
 document.getElementById('gearBtn').addEventListener('click', function() {
-  var section = document.getElementById('s3Section');
+  var mgmtSection = document.getElementById('mgmtSection');
+  var s3Section = document.getElementById('s3Section');
   var gear = document.getElementById('gearBtn');
-  var isOpen = section.classList.toggle('open');
+  var isOpen = mgmtSection.classList.toggle('open');
+  s3Section.classList.toggle('open', isOpen);
   gear.classList.toggle('open', isOpen);
+});
+
+// ─── Management Config ───────────────────────────────────────────────────────
+
+var MGMT_KEYS = ['managementUrl', 'managementToken', 'eventId', 'demoPcId', 'demoPcDbId', 'demoPcName'];
+
+// Load saved management values
+chrome.storage.local.get(MGMT_KEYS, function(config) {
+  if (config.managementUrl) document.getElementById('managementUrl').value = config.managementUrl;
+  if (config.managementToken) document.getElementById('managementToken').value = config.managementToken;
+  if (config.demoPcName) document.getElementById('demoPcName').value = config.demoPcName;
+  // If management URL is configured, try to load events
+  if (config.managementUrl) {
+    fetchEvents(config.managementUrl, config.managementToken, config.eventId);
+  }
+});
+
+function fetchEvents(mgmtUrl, token, selectedEventId) {
+  var headers = {};
+  if (token) headers['X-Auth-Token'] = token;
+  fetch(mgmtUrl + '/api/events', { headers: headers, cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject('Failed'); })
+    .then(function(events) {
+      var select = document.getElementById('mgmtEvent');
+      select.innerHTML = '';
+      if (!events || events.length === 0) {
+        var opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- no events found --';
+        select.appendChild(opt);
+        return;
+      }
+      events.forEach(function(evt) {
+        var opt = document.createElement('option');
+        opt.value = evt.id;
+        opt.textContent = evt.name;
+        if (selectedEventId && String(evt.id) === String(selectedEventId)) {
+          opt.selected = true;
+        }
+        select.appendChild(opt);
+      });
+    })
+    .catch(function() {
+      var select = document.getElementById('mgmtEvent');
+      select.innerHTML = '<option value="">-- failed to load --</option>';
+    });
+}
+
+// Connect button
+document.getElementById('mgmtConnectBtn').addEventListener('click', function() {
+  var mgmtUrl = document.getElementById('managementUrl').value.trim().replace(/\/+$/, '');
+  var token = document.getElementById('managementToken').value.trim();
+  var eventSelect = document.getElementById('mgmtEvent');
+  var eventId = eventSelect.value;
+  var demoPcName = document.getElementById('demoPcName').value.trim();
+  var btn = document.getElementById('mgmtConnectBtn');
+  var statusDot = document.getElementById('mgmtStatusDot');
+  var statusText = document.getElementById('mgmtStatusText');
+
+  if (!mgmtUrl) {
+    statusDot.classList.remove('active');
+    statusText.textContent = 'Enter a management URL';
+    return;
+  }
+
+  statusText.textContent = 'Connecting...';
+
+  // Test connection by fetching events
+  var headers = {};
+  if (token) headers['X-Auth-Token'] = token;
+  fetch(mgmtUrl + '/api/events', { headers: headers, cache: 'no-store' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(events) {
+      // Populate events dropdown
+      var select = document.getElementById('mgmtEvent');
+      select.innerHTML = '';
+      events.forEach(function(evt) {
+        var opt = document.createElement('option');
+        opt.value = evt.id;
+        opt.textContent = evt.name;
+        select.appendChild(opt);
+      });
+
+      // Select first event if none selected
+      if (!eventId && events.length > 0) {
+        eventId = String(events[0].id);
+        select.value = eventId;
+      }
+
+      // Save management config
+      var config = {
+        managementUrl: mgmtUrl,
+        managementToken: token,
+        demoPcName: demoPcName,
+      };
+
+      if (eventId) config.eventId = eventId;
+      if (demoPcName) config.demoPcId = demoPcName;
+
+      // Register demo PC if name is provided
+      if (demoPcName && eventId) {
+        var regHeaders = { 'Content-Type': 'application/json' };
+        if (token) regHeaders['X-Auth-Token'] = token;
+        fetch(mgmtUrl + '/api/demo-pcs/register', {
+          method: 'POST',
+          headers: regHeaders,
+          body: JSON.stringify({ event_id: parseInt(eventId, 10), demo_pc_name: demoPcName }),
+        })
+          .then(function(r) { return r.ok ? r.json() : Promise.reject('Register failed'); })
+          .then(function(data) {
+            if (data && data.demo_pc && data.demo_pc.id) {
+              config.demoPcDbId = data.demo_pc.id;
+            }
+            chrome.storage.local.set(config, function() {
+              statusDot.classList.add('active');
+              statusText.textContent = 'Connected & registered';
+              btn.textContent = 'Connected!';
+              btn.style.background = 'linear-gradient(135deg,#66bb6a 0%,#43a047 100%)';
+              setTimeout(function() {
+                btn.textContent = 'Connect';
+                btn.style.background = '';
+              }, 2000);
+              refreshStatus();
+            });
+          })
+          .catch(function() {
+            // Save config even if registration fails
+            chrome.storage.local.set(config, function() {
+              statusDot.classList.add('active');
+              statusText.textContent = 'Connected (registration failed)';
+              refreshStatus();
+            });
+          });
+      } else {
+        chrome.storage.local.set(config, function() {
+          statusDot.classList.add('active');
+          statusText.textContent = 'Connected';
+          btn.textContent = 'Connected!';
+          btn.style.background = 'linear-gradient(135deg,#66bb6a 0%,#43a047 100%)';
+          setTimeout(function() {
+            btn.textContent = 'Connect';
+            btn.style.background = '';
+          }, 2000);
+          refreshStatus();
+        });
+      }
+    })
+    .catch(function(err) {
+      statusDot.classList.remove('active');
+      statusText.textContent = 'Connection failed';
+      btn.textContent = 'Retry';
+      setTimeout(function() { btn.textContent = 'Connect'; }, 2000);
+    });
+});
+
+// Reload events when event dropdown is changed
+document.getElementById('mgmtEvent').addEventListener('change', function() {
+  var eventId = this.value;
+  if (eventId) {
+    chrome.storage.local.set({ eventId: eventId });
+  }
 });
 
 // ─── S3 Config ────────────────────────────────────────────────────────────────
@@ -298,34 +478,64 @@ document.getElementById('s3DemoBtn').addEventListener('click', function() {
 // ─── QR Code Pairing ─────────────────────────────────────────────────────────
 
 document.getElementById('pairBtn').addEventListener('click', function() {
-  chrome.storage.local.get(S3_KEYS, function(config) {
-    // Build pairing payload with current S3 config
-    var payload = {
-      type: 'boothapp-pair',
-      v: 1,
-      s3Bucket: config.s3Bucket || '',
-      s3Region: config.s3Region || '',
-      presignEndpoint: config.presignEndpoint || '',
-      awsAccessKeyId: config.awsAccessKeyId || '',
-      awsSecretAccessKey: config.awsSecretAccessKey || '',
-      awsSessionToken: config.awsSessionToken || '',
-    };
-
-    var json = JSON.stringify(payload);
-
-    // Generate QR code using qrcode-generator (Kazuhiko Arase, MIT)
-    // typeNumber 0 = auto-detect version, 'M' = medium error correction
-    var qr = qrcode(0, 'M');
-    qr.addData(json);
-    qr.make();
-
-    // Render as SVG (no canvas dependency)
-    var svgTag = qr.createSvgTag(4, 0);
-    var container = document.getElementById('qrImage');
-    container.innerHTML = svgTag;
-    document.getElementById('qrOverlay').classList.add('visible');
+  chrome.storage.local.get(S3_KEYS.concat(MGMT_KEYS), function(config) {
+    // If management URL is configured, fetch QR payload from management server
+    if (config.managementUrl && config.demoPcId) {
+      var headers = {};
+      if (config.managementToken) headers['X-Auth-Token'] = config.managementToken;
+      fetch(config.managementUrl + '/api/demo-pcs/' + encodeURIComponent(config.demoPcId) + '/qr-payload', {
+        headers: headers,
+        cache: 'no-store',
+      })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject('Failed'); })
+        .then(function(payload) {
+          renderQrPayload(payload);
+        })
+        .catch(function() {
+          // Fallback: build v2 payload locally from stored config
+          var payload = {
+            type: 'caseyapp-pair',
+            v: 2,
+            managementUrl: config.managementUrl,
+            eventId: config.eventId ? parseInt(config.eventId, 10) : null,
+            demoPcId: config.demoPcId || '',
+            badgeFields: ['name', 'company', 'title'],
+            eventName: '',
+          };
+          renderQrPayload(payload);
+        });
+    } else {
+      // Fallback: v1 payload with S3 config
+      var payload = {
+        type: 'boothapp-pair',
+        v: 1,
+        s3Bucket: config.s3Bucket || '',
+        s3Region: config.s3Region || '',
+        presignEndpoint: config.presignEndpoint || '',
+        awsAccessKeyId: config.awsAccessKeyId || '',
+        awsSecretAccessKey: config.awsSecretAccessKey || '',
+        awsSessionToken: config.awsSessionToken || '',
+      };
+      renderQrPayload(payload);
+    }
   });
 });
+
+function renderQrPayload(payload) {
+  var json = JSON.stringify(payload);
+
+  // Generate QR code using qrcode-generator (Kazuhiko Arase, MIT)
+  // typeNumber 0 = auto-detect version, 'M' = medium error correction
+  var qr = qrcode(0, 'M');
+  qr.addData(json);
+  qr.make();
+
+  // Render as SVG (no canvas dependency)
+  var svgTag = qr.createSvgTag(4, 0);
+  var container = document.getElementById('qrImage');
+  container.innerHTML = svgTag;
+  document.getElementById('qrOverlay').classList.add('visible');
+}
 
 document.getElementById('qrCloseBtn').addEventListener('click', function() {
   document.getElementById('qrOverlay').classList.remove('visible');
