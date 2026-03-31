@@ -423,6 +423,72 @@
       flex-shrink: 0;
     }
 
+    /* ── Product Cards (from clicks) ─────────────────────────────── */
+    .product-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .product-card {
+      background: var(--tm-white);
+      border: 1px solid var(--tm-gray-300);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      transition: box-shadow 0.15s ease;
+    }
+
+    .product-card:hover { box-shadow: var(--shadow-md); }
+
+    .product-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .product-card-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--tm-gray-900);
+    }
+
+    .product-card-stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+
+    .product-stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--tm-red-dark);
+      line-height: 1.2;
+    }
+
+    .product-stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tm-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .product-card-bar {
+      height: 4px;
+      background: var(--tm-gray-100);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .product-card-bar-fill {
+      height: 100%;
+      background: var(--tm-red);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
     /* ── Interest Table ───────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; }
 
@@ -865,6 +931,76 @@
               <div class="product-badge"><span class="p-icon">E</span>Endpoint Security</div>
             <div class="product-badge"><span class="p-icon">X</span>XDR</div>
             <div class="product-badge"><span class="p-icon">R</span>Risk Insights</div>
+            </div>
+            <div class="product-cards-grid">
+              <div class="product-card">
+              <div class="product-card-header">
+                <span class="p-icon">R</span>
+                <span class="product-card-name">Risk Insights</span>
+              </div>
+              <div class="product-card-stats">
+                <div class="product-stat">
+                  <div class="product-stat-value">3</div>
+                  <div class="product-stat-label">clicks</div>
+                </div>
+                <div class="product-stat">
+                  <div class="product-stat-value">4m 12s</div>
+                  <div class="product-stat-label">time spent</div>
+                </div>
+              </div>
+              <div class="product-card-bar"><div class="product-card-bar-fill" style="width:100%"></div></div>
+            </div>
+            <div class="product-card">
+              <div class="product-card-header">
+                <span class="p-icon">E</span>
+                <span class="product-card-name">Endpoint Security</span>
+              </div>
+              <div class="product-card-stats">
+                <div class="product-stat">
+                  <div class="product-stat-value">3</div>
+                  <div class="product-stat-label">clicks</div>
+                </div>
+                <div class="product-stat">
+                  <div class="product-stat-value">4m 7s</div>
+                  <div class="product-stat-label">time spent</div>
+                </div>
+              </div>
+              <div class="product-card-bar"><div class="product-card-bar-fill" style="width:98%"></div></div>
+            </div>
+            <div class="product-card">
+              <div class="product-card-header">
+                <span class="p-icon">X</span>
+                <span class="product-card-name">XDR</span>
+              </div>
+              <div class="product-card-stats">
+                <div class="product-stat">
+                  <div class="product-stat-value">3</div>
+                  <div class="product-stat-label">clicks</div>
+                </div>
+                <div class="product-stat">
+                  <div class="product-stat-value">4m 6s</div>
+                  <div class="product-stat-label">time spent</div>
+                </div>
+              </div>
+              <div class="product-card-bar"><div class="product-card-bar-fill" style="width:98%"></div></div>
+            </div>
+            <div class="product-card">
+              <div class="product-card-header">
+                <span class="p-icon">D</span>
+                <span class="product-card-name">Dashboard</span>
+              </div>
+              <div class="product-card-stats">
+                <div class="product-stat">
+                  <div class="product-stat-value">1</div>
+                  <div class="product-stat-label">clicks</div>
+                </div>
+                <div class="product-stat">
+                  <div class="product-stat-value">47s</div>
+                  <div class="product-stat-label">time spent</div>
+                </div>
+              </div>
+              <div class="product-card-bar"><div class="product-card-bar-fill" style="width:19%"></div></div>
+            </div>
             </div>
           </div>
         </div>

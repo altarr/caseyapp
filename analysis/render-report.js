@@ -101,6 +101,116 @@ function buildProductBadges(products) {
   }).join('\n            ');
 }
 
+// ── Product cards from clicks data ──────────────────────────────
+
+function extractProductFromUrl(pageUrl) {
+  // Extract the top-level product area from a V1 page URL path
+  // e.g. https://portal.xdr.trendmicro.com/app/endpoint-security/policies/byod -> endpoint-security
+  try {
+    const url = new URL(pageUrl);
+    const parts = url.pathname.split('/').filter(Boolean);
+    // Expect /app/<product-area>/...
+    if (parts[0] === 'app' && parts[1]) return parts[1];
+    return parts[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function prettifyProductName(slug) {
+  // Convert URL slug to display name: "endpoint-security" -> "Endpoint Security"
+  const ACRONYMS = { xdr: 'XDR', siem: 'SIEM', edr: 'EDR', byod: 'BYOD', api: 'API' };
+  return slug.replace(/-/g, ' ').replace(/\b\w+/g, word => {
+    const lower = word.toLowerCase();
+    return ACRONYMS[lower] || word.charAt(0).toUpperCase() + word.slice(1);
+  });
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
+
+function parseProductsFromClicks(clicks) {
+  // clicks = { events: [...] } from clicks.json
+  const events = (clicks && clicks.events) || [];
+  if (!events.length) return [];
+
+  // Sort by timestamp
+  const sorted = events.slice().sort((a, b) =>
+    new Date(a.timestamp) - new Date(b.timestamp)
+  );
+
+  // Group clicks by product area, track timestamps per product
+  const productMap = {}; // slug -> { clicks: number, timestamps: Date[] }
+
+  for (const evt of sorted) {
+    if (evt.type !== 'click' || !evt.page_url) continue;
+    const slug = extractProductFromUrl(evt.page_url);
+    if (!slug) continue;
+    if (!productMap[slug]) productMap[slug] = { clicks: 0, timestamps: [] };
+    productMap[slug].clicks++;
+    productMap[slug].timestamps.push(new Date(evt.timestamp));
+  }
+
+  // Estimate time spent per product:
+  // For each consecutive pair of events, attribute the time gap to the page_url product
+  // of the FIRST event in the pair.
+  const timeSpent = {}; // slug -> seconds
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].type !== 'click' || !sorted[i].page_url) continue;
+    const slug = extractProductFromUrl(sorted[i].page_url);
+    if (!slug) continue;
+    const gap = (new Date(sorted[i + 1].timestamp) - new Date(sorted[i].timestamp)) / 1000;
+    // Cap individual gaps at 5 minutes (avoid inflating from idle time)
+    const capped = Math.min(gap, 300);
+    timeSpent[slug] = (timeSpent[slug] || 0) + capped;
+  }
+
+  // Build result array
+  const results = Object.entries(productMap).map(([slug, data]) => ({
+    slug,
+    name: prettifyProductName(slug),
+    clicks: data.clicks,
+    timeSpentSeconds: timeSpent[slug] || 0,
+  }));
+
+  // Sort by time spent descending
+  results.sort((a, b) => b.timeSpentSeconds - a.timeSpentSeconds);
+  return results;
+}
+
+function buildProductCards(clicks) {
+  const products = parseProductsFromClicks(clicks);
+  if (!products.length) return '';
+
+  return products.map(p => {
+    const initial = (p.name[0] || '?').toUpperCase();
+    const pct = products[0].timeSpentSeconds > 0
+      ? Math.round((p.timeSpentSeconds / products[0].timeSpentSeconds) * 100)
+      : 0;
+    return `<div class="product-card">
+              <div class="product-card-header">
+                <span class="p-icon">${escapeHtml(initial)}</span>
+                <span class="product-card-name">${escapeHtml(p.name)}</span>
+              </div>
+              <div class="product-card-stats">
+                <div class="product-stat">
+                  <div class="product-stat-value">${p.clicks}</div>
+                  <div class="product-stat-label">clicks</div>
+                </div>
+                <div class="product-stat">
+                  <div class="product-stat-value">${escapeHtml(formatDuration(p.timeSpentSeconds))}</div>
+                  <div class="product-stat-label">time spent</div>
+                </div>
+              </div>
+              <div class="product-card-bar"><div class="product-card-bar-fill" style="width:${pct}%"></div></div>
+            </div>`;
+  }).join('\n            ');
+}
+
 function buildInterestsRows(interests) {
   if (!interests || !interests.length) {
     return '<tr><td colspan="3" class="empty">No interests recorded</td></tr>';
@@ -278,7 +388,7 @@ function buildVisitorEmailLink(email) {
   return `<a class="visitor-email-link" href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`;
 }
 
-function renderTemplate(template, summary, followUp, timeline) {
+function renderTemplate(template, summary, followUp, timeline, clicks) {
   const score = computeScore(summary, followUp);
 
   const replacements = {
@@ -307,6 +417,7 @@ function renderTemplate(template, summary, followUp, timeline) {
     pain_points:          buildPainPointRows(summary.key_interests),
     timeline_events:      buildTimelineEvents(timeline, summary.key_moments),
     follow_up_cards:      buildFollowUpCards(summary.follow_up_actions, followUp.priority),
+    product_cards:        buildProductCards(clicks),
   };
 
   let html = template;
@@ -325,7 +436,7 @@ async function run() {
   const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
   console.log(`[render-report] Template loaded: ${TEMPLATE_PATH}`);
 
-  let metadata, summary, followUp, timeline;
+  let metadata, summary, followUp, timeline, clicks;
 
   try {
     metadata = await readJson('metadata.json');
@@ -366,7 +477,14 @@ async function run() {
     timeline = {};
   }
 
-  const html = renderTemplate(template, summary, followUp, timeline);
+  try {
+    clicks = await readJson('clicks/clicks.json');
+  } catch (err) {
+    console.warn(`[render-report] clicks/clicks.json not found, skipping product cards: ${err.message}`);
+    clicks = {};
+  }
+
+  const html = renderTemplate(template, summary, followUp, timeline, clicks);
   await writeFile('output/summary.html', html);
   console.log('[render-report] Done');
 }
