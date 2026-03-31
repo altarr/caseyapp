@@ -4,7 +4,7 @@
   "title": "Set up S3 session storage bucket with proper structure",
   "description": "Create S3 bucket for session data on hackathon AWS account (us-east-1). Structure: sessions/<session-id>/ with subfolders per DATA-CONTRACT.md. Add lifecycle policy: session data expires after 90 days. Add CORS for extension upload. Create IAM policy with least-privilege for each workstream (extension writes clicks/screenshots, audio writes audio/transcript, analysis writes output/). Use CloudFormation.",
   "priority": 1,
-  "status": "in_progress",
+  "status": "completed",
   "assigned_worker": "claude-portable-worker",
   "substeps": [
     {
@@ -12,14 +12,14 @@
       "title": "Write CloudFormation template (bucket, lifecycle, CORS, IAM roles)",
       "status": "completed",
       "pr": null,
-      "notes": "infra/s3-session-storage.yaml — passes cfn-lint validation. Bucket, lifecycle (90 days), CORS (chrome-extension://*), 4 IAM policies + roles (extension, audio, analysis, app)."
+      "notes": "infra/s3-session-storage.yaml \u2014 passes cfn-lint validation. Bucket, lifecycle (90 days), CORS (chrome-extension://*), 4 IAM policies + roles (extension, audio, analysis, app)."
     },
     {
       "id": "test-script",
       "title": "Write test script for the 5 task tests",
       "status": "completed",
       "pr": null,
-      "notes": "infra/test-s3-setup.sh — runs all 5 verification tests against deployed stack."
+      "notes": "infra/test-s3-setup.sh \u2014 runs all 5 verification tests against deployed stack."
     },
     {
       "id": "deploy",
@@ -36,5 +36,7 @@
     "CORS allows PUT from chrome-extension:// origin",
     "IAM policy: extension role can write clicks/ but not output/",
     "IAM policy: analysis role can write output/ but not clicks/"
-  ]
+  ],
+  "notes": "S3 bucket boothapp-sessions-752266476357 exists, IAM roles configured, CloudFormation in infra/",
+  "completed_at": "2026-03-30T20:00:00Z"
 }

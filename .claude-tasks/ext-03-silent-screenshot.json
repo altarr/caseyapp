@@ -2,17 +2,21 @@
   "id": "ext-03-silent-screenshot",
   "workstream": "extension",
   "title": "Add silent screenshot capture on every click",
-  "description": "When a click is captured, immediately call chrome.tabs.captureVisibleTab() to take a screenshot. Must be completely silent — no flash, no delay, no UI indication. Save as JPEG quality 60. Tag with click index and timestamp. Store in memory/IndexedDB (not network). Also add periodic screenshot every 10 seconds as fallback. Screenshots must not exceed 1920x1080.",
+  "description": "When a click is captured, immediately call chrome.tabs.captureVisibleTab() to take a screenshot. Must be completely silent \u2014 no flash, no delay, no UI indication. Save as JPEG quality 60. Tag with click index and timestamp. Store in memory/IndexedDB (not network). Also add periodic screenshot every 10 seconds as fallback. Screenshots must not exceed 1920x1080.",
   "priority": 3,
-  "status": "pending",
+  "status": "completed",
   "assigned_worker": null,
   "substeps": [],
-  "depends_on": ["ext-02-click-tracker"],
+  "depends_on": [
+    "ext-02-click-tracker"
+  ],
   "tests": [
     "Click on page -> screenshot captured within 100ms, no visible flash",
     "10 seconds pass without click -> periodic screenshot captured",
     "Screenshot is JPEG, quality 60, max 1920x1080",
     "Screenshot filename matches click index from clicks.json",
     "50 clicks in a session -> 50 screenshots stored, no memory crash"
-  ]
+  ],
+  "notes": "Screenshot capture in background.js using captureVisibleTab, IndexedDB storage, resize via OffscreenCanvas",
+  "completed_at": "2026-03-30T20:00:00Z"
 }
