@@ -5,6 +5,7 @@ import os
 import sys
 
 from engines.analyzer import SessionAnalyzer
+from engines.email_template import render_follow_up_email
 
 
 def parse_args():
@@ -66,6 +67,12 @@ def write_output(output_dir: str, results: dict):
         output_dir: Local path or s3:// URI where output files are written.
         results: Dict with ``summary``, ``follow_up``, and optional ``html`` keys.
     """
+    html_files = []
+    if results.get("html"):
+        html_files.append(("summary.html", results["html"]))
+    if results.get("follow_up_email_html"):
+        html_files.append(("follow-up-email.html", results["follow_up_email_html"]))
+
     if output_dir.startswith("s3://"):
         import boto3
         prefix = output_dir.replace("s3://", "")
@@ -75,9 +82,9 @@ def write_output(output_dir: str, results: dict):
             key = f"{key_prefix}/{filename}".lstrip("/")
             s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(data, indent=2), ContentType="application/json")
             print(f"  Wrote s3://{bucket}/{key}")
-        if results.get("email_html"):
-            key = f"{key_prefix}/follow-up-email.html".lstrip("/")
-            s3.put_object(Bucket=bucket, Key=key, Body=results["email_html"], ContentType="text/html")
+        for filename, content in html_files:
+            key = f"{key_prefix}/{filename}".lstrip("/")
+            s3.put_object(Bucket=bucket, Key=key, Body=content, ContentType="text/html")
             print(f"  Wrote s3://{bucket}/{key}")
     else:
         os.makedirs(output_dir, exist_ok=True)
@@ -86,16 +93,11 @@ def write_output(output_dir: str, results: dict):
             with open(path, "w") as f:
                 json.dump(data, f, indent=2)
             print(f"  Wrote {path}")
-        if results.get("html"):
-            html_path = os.path.join(output_dir, "summary.html")
+        for filename, content in html_files:
+            html_path = os.path.join(output_dir, filename)
             with open(html_path, "w") as f:
-                f.write(results["html"])
+                f.write(content)
             print(f"  Wrote {html_path}")
-        if results.get("email_html"):
-            email_path = os.path.join(output_dir, "follow-up-email.html")
-            with open(email_path, "w") as f:
-                f.write(results["email_html"])
-            print(f"  Wrote {email_path}")
 
 
 def print_summary(results: dict):
@@ -144,6 +146,20 @@ def main():
     except Exception as e:
         print(f"Analysis failed: {e}", file=sys.stderr)
         return 1
+
+    # Generate follow-up email template from analysis results
+    try:
+        metadata = {}
+        if not args.session_dir.startswith("s3://"):
+            meta_path = os.path.join(args.session_dir, "metadata.json")
+            if os.path.exists(meta_path):
+                with open(meta_path) as f:
+                    metadata = json.load(f)
+        results["follow_up_email_html"] = render_follow_up_email(
+            results["summary"], results["follow_up"], metadata
+        )
+    except Exception as e:
+        print(f"Warning: follow-up email generation failed: {e}", file=sys.stderr)
 
     print_summary(results)
 

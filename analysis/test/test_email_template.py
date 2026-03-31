@@ -1,170 +1,182 @@
-"""Tests for the follow-up email template generator."""
+"""Tests for engines/email_template.py — follow-up email generator."""
 
-import os
+import pytest
 import sys
-import unittest
+import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from analysis.engines.email_template import (
-    render_follow_up_email,
-    _esc,
-    _build_product_rows,
-    _build_recommendation_rows,
-)
-
-SAMPLE_SUMMARY = {
-    "session_id": "TEST-001",
-    "visitor_name": "Jane Doe",
-    "se_name": "Casey M",
-    "demo_duration_seconds": 1020,
-    "session_score": 8,
-    "executive_summary": "Strong interest in endpoint security. Recommend scheduling a deep-dive.",
-    "products_demonstrated": ["Endpoint Security", "XDR", "Cloud Security"],
-    "key_interests": [
-        {"topic": "BYOD Policy", "confidence": "high", "evidence": "Asked 3 questions about BYOD"},
-        {"topic": "XDR Workbench", "confidence": "medium", "evidence": "Explored workbench deeply"},
-    ],
-    "follow_up_actions": ["Send POC guide for endpoint", "Schedule deep-dive on XDR"],
-    "key_moments": [],
-    "v1_tenant_link": "https://portal.xdr.trendmicro.com/test",
-    "generated_at": "2026-08-06T10:35:00Z",
-}
-
-SAMPLE_FOLLOW_UP = {
-    "priority": "high",
-    "tenant_url": "https://portal.xdr.trendmicro.com/test",
-    "summary_url": "https://boothapp.trendmicro.com/sessions/TEST-001/summary.html",
-    "sdr_notes": "CISO, 5000 endpoints.",
-    "tags": ["byod", "xdr"],
-}
-
-SAMPLE_METADATA = {
-    "session_id": "TEST-001",
-    "visitor_name": "Jane Doe",
-    "se_name": "Casey M",
-    "started_at": "2026-08-06T10:00:00Z",
-}
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from engines.email_template import render_follow_up_email, _esc, _build_interest_summary
 
 
-class TestEscapeHtml(unittest.TestCase):
-    def test_escapes_angle_brackets(self):
-        self.assertEqual(_esc("<b>bold</b>"), "&lt;b&gt;bold&lt;/b&gt;")
+# -- Fixtures --
 
-    def test_escapes_ampersand(self):
-        self.assertEqual(_esc("A & B"), "A &amp; B")
-
-    def test_none_returns_empty(self):
-        self.assertEqual(_esc(None), "")
-
-    def test_escapes_quotes(self):
-        self.assertEqual(_esc('"hello"'), "&quot;hello&quot;")
-
-
-class TestBuildProductRows(unittest.TestCase):
-    def test_renders_products(self):
-        html = _build_product_rows(["XDR", "Endpoint Security"])
-        self.assertIn("XDR", html)
-        self.assertIn("Endpoint Security", html)
-        self.assertEqual(html.count("<tr>"), 2)
-
-    def test_empty_products(self):
-        self.assertEqual(_build_product_rows([]), "")
-
-    def test_none_products(self):
-        self.assertEqual(_build_product_rows(None), "")
+@pytest.fixture
+def sample_summary():
+    return {
+        "session_id": "B291047",
+        "visitor_name": "Priya Sharma",
+        "products_demonstrated": ["Endpoint Security", "XDR", "Risk Insights"],
+        "key_interests": [
+            {"topic": "Endpoint policy management", "confidence": "high", "evidence": "Asked 3 questions"},
+            {"topic": "XDR detection rules", "confidence": "medium", "evidence": "Spent 2 min on page"},
+        ],
+        "follow_up_actions": [
+            "Send EP policy best practices guide",
+            "Schedule deep-dive on XDR custom detection rules",
+            "Share V1 tenant link for self-guided exploration",
+        ],
+        "demo_duration_seconds": 900,
+        "session_score": 8,
+        "executive_summary": "Visitor showed strong interest in endpoint policy management.",
+        "v1_tenant_link": "https://portal.xdr.trendmicro.com/demo",
+        "generated_at": "2026-08-06T10:45:00Z",
+    }
 
 
-class TestBuildRecommendationRows(unittest.TestCase):
-    def test_renders_interests_and_actions(self):
-        interests = [{"topic": "BYOD", "confidence": "high", "evidence": "Asked about it"}]
-        actions = ["Send guide"]
-        html = _build_recommendation_rows(interests, actions)
-        self.assertIn("BYOD", html)
-        self.assertIn("Asked about it", html)
-        self.assertIn("Send guide", html)
-
-    def test_limits_to_three_each(self):
-        interests = [{"topic": f"T{i}", "confidence": "low", "evidence": ""} for i in range(5)]
-        actions = [f"Action {i}" for i in range(5)]
-        html = _build_recommendation_rows(interests, actions)
-        # 3 interests + 3 actions = 6 rows
-        self.assertEqual(html.count("<tr>"), 6)
-
-    def test_empty_both(self):
-        self.assertEqual(_build_recommendation_rows([], []), "")
+@pytest.fixture
+def sample_follow_up():
+    return {
+        "session_id": "B291047",
+        "visitor_email": "priya@example.com",
+        "summary_url": "https://boothapp.trendmicro.com/sessions/B291047/summary.html",
+        "tenant_url": "https://portal.xdr.trendmicro.com/demo",
+        "priority": "high",
+        "tags": ["endpoint", "xdr"],
+        "sdr_notes": "Enterprise CISO, 5000 endpoints",
+    }
 
 
-class TestRenderFollowUpEmail(unittest.TestCase):
-    def setUp(self):
-        self.html = render_follow_up_email(SAMPLE_SUMMARY, SAMPLE_FOLLOW_UP, SAMPLE_METADATA)
+@pytest.fixture
+def sample_metadata():
+    return {
+        "session_id": "B291047",
+        "visitor_name": "Priya Sharma",
+        "se_name": "Casey Mondoux",
+        "started_at": "2026-08-06T10:15:00Z",
+        "ended_at": "2026-08-06T10:32:00Z",
+    }
 
-    def test_contains_visitor_name(self):
-        self.assertIn("Jane Doe", self.html)
 
-    def test_contains_greeting(self):
-        self.assertIn("Hi Jane Doe", self.html)
+# -- Helper tests --
 
-    def test_contains_products(self):
-        self.assertIn("Endpoint Security", self.html)
-        self.assertIn("XDR", self.html)
-        self.assertIn("Cloud Security", self.html)
+class TestEsc:
+    def test_escapes_html(self):
+        assert _esc('<script>alert("xss")</script>') == '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
 
-    def test_contains_recommendations(self):
-        self.assertIn("BYOD Policy", self.html)
-        self.assertIn("Send POC guide", self.html)
+    def test_none(self):
+        assert _esc(None) == ""
 
-    def test_contains_executive_summary(self):
-        self.assertIn("Strong interest in endpoint security", self.html)
 
-    def test_contains_cta(self):
-        self.assertIn("Schedule a Follow-Up Meeting", self.html)
-        self.assertIn("portal.xdr.trendmicro.com/test", self.html)
+class TestBuildInterestSummary:
+    def test_single_high(self):
+        interests = [{"topic": "XDR", "confidence": "high"}]
+        assert _build_interest_summary(interests) == "XDR"
 
-    def test_contains_trend_micro_branding(self):
-        self.assertIn("TREND MICRO", self.html)
-        self.assertIn("Vision One", self.html)
+    def test_two_high(self):
+        interests = [
+            {"topic": "XDR", "confidence": "high"},
+            {"topic": "EP", "confidence": "high"},
+        ]
+        assert _build_interest_summary(interests) == "XDR and EP"
 
-    def test_contains_se_name_in_signoff(self):
-        self.assertIn("Casey M", self.html)
+    def test_three_high(self):
+        interests = [
+            {"topic": "XDR", "confidence": "high"},
+            {"topic": "EP", "confidence": "high"},
+            {"topic": "Risk", "confidence": "high"},
+        ]
+        assert _build_interest_summary(interests) == "XDR, EP, and Risk"
 
-    def test_contains_tenant_note(self):
-        self.assertIn("30 days", self.html)
+    def test_no_high_falls_back(self):
+        interests = [
+            {"topic": "A", "confidence": "low"},
+            {"topic": "B", "confidence": "medium"},
+        ]
+        result = _build_interest_summary(interests)
+        assert "A" in result and "B" in result
 
-    def test_valid_html_structure(self):
-        self.assertTrue(self.html.startswith("<!DOCTYPE html>"))
-        self.assertIn("</html>", self.html)
+    def test_empty(self):
+        assert _build_interest_summary([]) == ""
 
-    def test_no_xss(self):
-        xss_summary = dict(SAMPLE_SUMMARY, visitor_name="<script>alert(1)</script>")
-        html = render_follow_up_email(xss_summary, SAMPLE_FOLLOW_UP)
-        self.assertNotIn("<script>alert(1)</script>", html)
-        self.assertIn("&lt;script&gt;", html)
+
+# -- Full render tests --
+
+class TestRenderFollowUpEmail:
+    def test_contains_visitor_name(self, sample_summary, sample_follow_up, sample_metadata):
+        html = render_follow_up_email(sample_summary, sample_follow_up, sample_metadata)
+        assert "Priya Sharma" in html
+
+    def test_contains_se_name(self, sample_summary, sample_follow_up, sample_metadata):
+        html = render_follow_up_email(sample_summary, sample_follow_up, sample_metadata)
+        assert "Casey Mondoux" in html
+
+    def test_contains_products(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "Endpoint Security" in html
+        assert "XDR" in html
+        assert "Risk Insights" in html
+
+    def test_contains_recommendations(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "Send EP policy best practices guide" in html
+        assert "Schedule deep-dive on XDR custom detection rules" in html
+
+    def test_contains_cta_meeting(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "Schedule a Follow-Up Meeting" in html
+
+    def test_contains_cta_explore(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "Explore Your Vision One Environment" in html
+
+    def test_contains_trend_micro_branding(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "TREND MICRO" in html
+        assert "Vision One" in html
+
+    def test_contains_tenant_url(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "portal.xdr.trendmicro.com" in html
+
+    def test_contains_executive_summary(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "endpoint policy management" in html
+
+    def test_personalized_intro(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "particular interest in" in html
+
+    def test_valid_html_structure(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert html.strip().startswith("<!DOCTYPE html>")
+        assert "</html>" in html
+        assert "<body" in html
+
+    def test_xss_escaped(self, sample_follow_up):
+        summary = {
+            "visitor_name": '<script>alert("xss")</script>',
+            "products_demonstrated": [],
+            "key_interests": [],
+            "follow_up_actions": [],
+        }
+        html = render_follow_up_email(summary, sample_follow_up)
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
 
     def test_minimal_data(self):
-        html = render_follow_up_email({"visitor_name": "Min"}, {})
-        self.assertIn("Hi Min", html)
-        self.assertIn("TREND MICRO", html)
-        # No products section when empty
-        self.assertNotIn("What We Covered", html)
-
-    def test_fallback_visitor_name(self):
         html = render_follow_up_email({}, {})
-        self.assertIn("Valued Visitor", html)
+        assert "Valued Visitor" in html
+        assert "TREND MICRO" in html
 
-    def test_no_tenant_note_without_url(self):
-        html = render_follow_up_email(SAMPLE_SUMMARY, {"priority": "medium"})
-        self.assertNotIn("30 days", html)
+    def test_no_metadata(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "Priya Sharma" in html
 
-    def test_email_table_layout(self):
-        # Email clients need table-based layout
-        self.assertIn('role="presentation"', self.html)
-        self.assertIn("cellpadding", self.html)
+    def test_summary_url_link(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert "boothapp.trendmicro.com" in html
 
-    def test_mso_conditional(self):
-        # Outlook compatibility
-        self.assertIn("<!--[if mso]>", self.html)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_email_table_layout(self, sample_summary, sample_follow_up):
+        html = render_follow_up_email(sample_summary, sample_follow_up)
+        assert 'role="presentation"' in html
+        assert "max-width:640px" in html
