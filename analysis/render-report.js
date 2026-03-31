@@ -91,6 +91,62 @@ function escapeHtml(str) {
 
 // ── HTML fragment builders ──────────────────────────────────────
 
+function buildInsightCards(summary, followUp) {
+  const cards = [];
+
+  // Card 1: Engagement level
+  const duration = Math.round((summary.demo_duration_seconds || 0) / 60);
+  const highInterests = (summary.key_interests || []).filter(i => i.confidence === 'high').length;
+  cards.push({
+    icon: '<svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z"/></svg>',
+    label: 'Engagement',
+    value: highInterests >= 2 ? 'Strong' : highInterests === 1 ? 'Good' : 'Moderate',
+    detail: `${duration} min demo, ${highInterests} high-confidence interest${highInterests !== 1 ? 's' : ''}`,
+    color: highInterests >= 2 ? '#4ade80' : highInterests === 1 ? '#facc15' : '#fb923c',
+  });
+
+  // Card 2: Products covered
+  const products = summary.products_demonstrated || [];
+  cards.push({
+    icon: '<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
+    label: 'Products Shown',
+    value: String(products.length),
+    detail: products.slice(0, 3).join(', ') || 'None recorded',
+    color: '#FF5252',
+  });
+
+  // Card 3: Follow-up priority
+  const priority = (followUp.priority || 'medium').toLowerCase();
+  const priorityLabels = { high: 'High Priority', medium: 'Medium Priority', low: 'Low Priority' };
+  const priorityColors = { high: '#FF5252', medium: '#FFB74D', low: '#999' };
+  cards.push({
+    icon: '<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+    label: 'Follow-Up Priority',
+    value: priorityLabels[priority] || 'Medium Priority',
+    detail: `${(summary.follow_up_actions || []).length} recommended action${(summary.follow_up_actions || []).length !== 1 ? 's' : ''}`,
+    color: priorityColors[priority] || '#FFB74D',
+  });
+
+  // Card 4: Key moments
+  const moments = summary.key_moments || [];
+  cards.push({
+    icon: '<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>',
+    label: 'Key Moments',
+    value: String(moments.length),
+    detail: moments.length ? moments[0].description.slice(0, 60) + (moments[0].description.length > 60 ? '...' : '') : 'No moments captured',
+    color: '#64B5F6',
+  });
+
+  return cards.map(c => `<div class="insight-card">
+              <div class="insight-icon" style="color:${c.color};background:${c.color}15">
+                ${c.icon}
+              </div>
+              <div class="insight-label">${escapeHtml(c.label)}</div>
+              <div class="insight-value" style="color:${c.color}">${escapeHtml(c.value)}</div>
+              <div class="insight-detail">${escapeHtml(c.detail)}</div>
+            </div>`).join('\n            ');
+}
+
 function buildProductBadges(products) {
   if (!products || !products.length) {
     return '<span class="empty">No products recorded</span>';
@@ -292,6 +348,7 @@ function renderTemplate(template, summary, followUp, timeline) {
     visitor_photo:        buildVisitorPhoto(summary),
     priority_chip:        buildPriorityChip(followUp.priority),
     tag_chips:            buildTagChips(followUp.tags),
+    insight_cards:        buildInsightCards(summary, followUp),
     executive_summary:    escapeHtml(followUp.sdr_notes || 'No executive summary available.'),
     sdr_notes:            escapeHtml(followUp.sdr_notes || 'No SDR notes recorded.'),
     products_shown:       buildProductBadges(summary.products_demonstrated),
