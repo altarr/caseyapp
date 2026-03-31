@@ -347,16 +347,16 @@
       patterns: [/threat.?intel/i, /campaign/i, /intelligence/i, /ioc/i, /sandbox/i, /suspicious.?object/i, /sweeping/i, /deep.?discover/i, /ddi\b/i, /ddan\b/i]
     },
     {
-      name: "Response",
-      patterns: [/response/i, /playbook/i, /isolat/i, /collect/i, /contain/i, /remedia/i, /action/i, /task/i, /custom.?script/i]
-    },
-    {
       name: "Network",
       patterns: [/network/i, /firewall/i, /tippingpoint/i, /ips\b/i, /ids\b/i, /intrusion/i, /gateway/i]
     },
     {
       name: "Cloud",
       patterns: [/cloud/i, /container/i, /kubernetes/i, /k8s/i, /conformity/i, /serverless/i, /file.?storage/i]
+    },
+    {
+      name: "Response",
+      patterns: [/\bresponse\b/i, /playbook/i, /\bisolat/i, /\bcollect\b/i, /\bcontain\b/i, /remedia/i, /\baction\b/i, /\btask\b/i, /custom.?script/i]
     }
   ];
 
