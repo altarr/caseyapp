@@ -498,18 +498,20 @@ app.post('/api/demo-pcs/activate', async (req, res) => {
     }
   }
 
-  // Generate temporary AWS credentials for the demo PC via STS
+  // Get AWS credentials for the demo PC
+  // Try STS AssumeRole for temporary creds, fall back to instance metadata or env vars
   let s3Config = { bucket: S3_BUCKET, region: process.env.AWS_REGION || 'us-east-1' };
   try {
-    const { STSClient, GetSessionTokenCommand } = require('@aws-sdk/client-sts');
-    const sts = new STSClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    const creds = await sts.send(new GetSessionTokenCommand({ DurationSeconds: 43200 })); // 12 hours
-    s3Config.access_key_id = creds.Credentials.AccessKeyId;
-    s3Config.secret_access_key = creds.Credentials.SecretAccessKey;
-    s3Config.session_token = creds.Credentials.SessionToken;
-    s3Config.expires = creds.Credentials.Expiration.toISOString();
+    const { fromInstanceMetadata } = require('@aws-sdk/credential-providers');
+    const provider = fromInstanceMetadata({ maxRetries: 2 });
+    const creds = await provider();
+    s3Config.access_key_id = creds.accessKeyId;
+    s3Config.secret_access_key = creds.secretAccessKey;
+    s3Config.session_token = creds.sessionToken || '';
+    s3Config.expires = creds.expiration ? creds.expiration.toISOString() : '';
+    console.log('[pairing] Using instance metadata credentials');
   } catch (err) {
-    console.error('[pairing] STS error, falling back to env vars:', err.message);
+    console.log('[pairing] Instance metadata unavailable, using env vars:', err.message);
     s3Config.access_key_id = process.env.AWS_ACCESS_KEY_ID || '';
     s3Config.secret_access_key = process.env.AWS_SECRET_ACCESS_KEY || '';
   }

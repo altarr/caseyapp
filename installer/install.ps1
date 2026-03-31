@@ -2,8 +2,16 @@
 # Self-contained: bundles Node.js, ffmpeg, and app code.
 # Prompts for management server URL and pairing code.
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $InstallDir = "C:\CaseyApp"
+
+trap {
+    Write-Host ""
+    Write-Host "  [ERROR] $_" -ForegroundColor Red
+    Write-Host "  Line: $($_.InvocationInfo.ScriptLineNumber)" -ForegroundColor Red
+    Read-Host "  Press Enter to exit"
+    exit 1
+}
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Red
