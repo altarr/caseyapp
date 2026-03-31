@@ -437,6 +437,51 @@
     box-shadow: 0 8px 40px rgba(0,0,0,0.5);
   }
 
+  /* ── Notes Panel ──────────────────────────────────────── */
+  .notes-card { grid-column: 1 / -1; }
+  .notes-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px;
+    resize: vertical;
+  }
+  .notes-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .notes-textarea::placeholder { color: var(--text3); }
+  .notes-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .notes-save-btn {
+    background: var(--accent-dim);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .notes-save-btn:hover { background: var(--accent); }
+  .notes-save-btn:disabled { opacity: 0.5; cursor: default; }
+  .notes-status {
+    font-size: 12px;
+    color: var(--text3);
+  }
+  .notes-status.ok { color: var(--green); }
+  .notes-status.err { color: var(--red); }
+
   /* ── Empty state ───────────────────────────────────────── */
   .empty {
     color: var(--text3);
@@ -543,6 +588,18 @@ if (!BoothAuth.requireAwsCreds()) {
     <div class="card analysis-card">
       <div class="card-header"><span class="icon">[*]</span> Analysis</div>
       <div class="analysis-scroll" id="analysis"></div>
+    </div>
+
+    <!-- Session Notes -->
+    <div class="card notes-card">
+      <div class="card-header"><span class="icon">[#]</span> Session Notes</div>
+      <div class="card-body">
+        <textarea class="notes-textarea" id="notes-text" placeholder="Add follow-up notes, deal stage, next steps..."></textarea>
+        <div class="notes-footer">
+          <button class="notes-save-btn" id="notes-save">Save Notes</button>
+          <span class="notes-status" id="notes-status"></span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -945,6 +1002,49 @@ if (!BoothAuth.requireAwsCreds()) {
 
     container.innerHTML = html || '<div class="empty">No analysis data</div>';
   }
+
+  // ── Notes ──────────────────────────────────────────────────────────
+  var notesKey = prefix + "output/notes.json";
+  var notesTextEl = document.getElementById("notes-text");
+  var notesSaveBtn = document.getElementById("notes-save");
+  var notesStatusEl = document.getElementById("notes-status");
+
+  // Load existing notes
+  fetchS3Json(notesKey).then(function (data) {
+    if (data && data.text) {
+      notesTextEl.value = data.text;
+    }
+  }).catch(function () { /* no notes yet */ });
+
+  notesSaveBtn.addEventListener("click", function () {
+    var text = notesTextEl.value;
+    notesSaveBtn.disabled = true;
+    notesStatusEl.textContent = "Saving...";
+    notesStatusEl.className = "notes-status";
+
+    var payload = JSON.stringify({
+      session_id: sessionId,
+      text: text,
+      updated_at: new Date().toISOString(),
+      updated_by: BoothAuth.currentUser() || "unknown"
+    });
+
+    s3.putObject({
+      Key: notesKey,
+      Body: payload,
+      ContentType: "application/json"
+    }, function (err) {
+      notesSaveBtn.disabled = false;
+      if (err) {
+        notesStatusEl.textContent = "Error: " + (err.message || "save failed");
+        notesStatusEl.className = "notes-status err";
+      } else {
+        notesStatusEl.textContent = "Saved";
+        notesStatusEl.className = "notes-status ok";
+        setTimeout(function () { notesStatusEl.textContent = ""; }, 3000);
+      }
+    });
+  });
 
   // ── Print Report ─────────────────────────────────────────────────
   function openPrintReport() {
