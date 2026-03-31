@@ -19,8 +19,9 @@ var PRODUCT_TOPICS = [
   { keyword: 'response', topic: 'Response' },
 ];
 
-// Parse transcript offset "HH:MM:SS.mmm" -> total seconds
+// Parse transcript offset "HH:MM:SS.mmm" -> total seconds, or NaN if invalid
 function parseOffset(ts) {
+  if (typeof ts !== 'string' || ts.length === 0) return NaN;
   const dotIdx = ts.indexOf('.');
   const fractional = dotIdx >= 0 ? Number('0.' + ts.slice(dotIdx + 1)) : 0;
   const hms = dotIdx >= 0 ? ts.slice(0, dotIdx) : ts;
@@ -159,9 +160,18 @@ function buildSegments(allEvents, durationSeconds) {
  */
 function correlate(metadata, clicks, transcript, screenshots) {
   try {
+  if (!metadata || typeof metadata !== 'object') {
+    throw new Error('metadata is required and must be an object');
+  }
   const sessionId = metadata.session_id;
   const startedAt = metadata.started_at; // ISO string (UTC)
+  if (!startedAt) {
+    throw new Error('metadata.started_at is required');
+  }
   const startMs = new Date(startedAt).getTime();
+  if (isNaN(startMs)) {
+    throw new Error('metadata.started_at is not a valid date: ' + startedAt);
+  }
 
   const hasClicks = clicks && Array.isArray(clicks.events) && clicks.events.length > 0;
   const hasTranscript = transcript && Array.isArray(transcript.entries) && transcript.entries.length > 0;
@@ -183,10 +193,14 @@ function correlate(metadata, clicks, transcript, screenshots) {
     };
   }
 
-  // --- Build click event objects ---
-  const clickEvents = ((clicks && clicks.events) || []).map((ev) => {
-    const tsMs = new Date(ev.timestamp).getTime();
-    return {
+  // --- Build click event objects (skip entries with missing/invalid timestamps) ---
+  const clickEvents = ((clicks && clicks.events) || []).reduce((acc, ev) => {
+    const tsMs = ev.timestamp ? new Date(ev.timestamp).getTime() : NaN;
+    if (isNaN(tsMs)) {
+      console.error('[correlate] skipping click event with missing/invalid timestamp at index ' + ev.index);
+      return acc;
+    }
+    acc.push({
       _tsMs: tsMs,
       offset_seconds: (tsMs - startMs) / 1000,
       timestamp: ev.timestamp,
@@ -199,18 +213,23 @@ function correlate(metadata, clicks, transcript, screenshots) {
       page_title: ev.page_title || null,
       screenshot: ev.screenshot_file || null,
       speech_at_moment: null, // populated below
-    };
-  });
+    });
+    return acc;
+  }, []);
 
   // Sort clicks by time (defensive — clicks.json should already be ordered)
   clickEvents.sort((a, b) => a._tsMs - b._tsMs);
 
-  // --- Build speech event objects ---
-  const speechEvents = ((transcript && transcript.entries) || []).map((entry) => {
+  // --- Build speech event objects (skip entries with missing/invalid timestamps) ---
+  const speechEvents = ((transcript && transcript.entries) || []).reduce((acc, entry) => {
     const offsetSeconds = parseOffset(entry.timestamp);
+    if (isNaN(offsetSeconds)) {
+      console.error('[correlate] skipping transcript entry with missing/invalid timestamp: ' + JSON.stringify(entry.text || '').slice(0, 80));
+      return acc;
+    }
     const absTimestamp = addSeconds(startedAt, offsetSeconds);
     const tsMs = new Date(absTimestamp).getTime();
-    return {
+    acc.push({
       _tsMs: tsMs,
       offset_seconds: offsetSeconds,
       timestamp: absTimestamp,
@@ -220,8 +239,9 @@ function correlate(metadata, clicks, transcript, screenshots) {
       text: entry.text || '',
       screenshot: null, // populated below
       clicks_during: [], // populated below
-    };
-  });
+    });
+    return acc;
+  }, []);
 
   // Sort speech by time (defensive)
   speechEvents.sort((a, b) => a._tsMs - b._tsMs);
@@ -475,6 +495,68 @@ if (require.main === module) {
   var result = correlate(metadata, clicks, transcript, farScreenshots);
   var click1 = result.timeline.find(function(e) { return e.type === 'click' && e.index === 1; });
   assert(!click1.screenshot_url, 'no screenshot_url when >2s away');
+
+  // Test 9: Click events with missing timestamps are skipped (not crash)
+  console.log('Test 9: click events with missing/invalid timestamps');
+  var badClicks = { events: [
+    { index: 1, timestamp: '2026-03-29T10:00:05.000Z', dom_path: 'body>div', page_title: 'Good' },
+    { index: 2 },  // missing timestamp entirely
+    { index: 3, timestamp: '' },  // empty string timestamp
+    { index: 4, timestamp: '2026-03-29T10:00:08.000Z', dom_path: 'body>a', page_title: 'Also Good' },
+  ]};
+  var r9 = correlate(metadata, badClicks, transcript);
+  assert(!r9.error, 'no error field');
+  assert(r9.click_count === 2, 'only 2 valid clicks kept');
+  assert(r9.event_count === 5, '2 clicks + 3 speech = 5 events');
+
+  // Test 10: Transcript entries with missing timestamps are skipped (not crash)
+  console.log('Test 10: transcript entries with missing/invalid timestamps');
+  var badTranscript = { duration_seconds: 10, entries: [
+    { timestamp: '00:00:03.000', speaker: 'SE', text: 'Good entry' },
+    { speaker: 'Visitor', text: 'Missing timestamp entirely' },  // no timestamp
+    { timestamp: '', speaker: 'SE', text: 'Empty timestamp' },  // empty string
+    { timestamp: '00:00:07.000', speaker: 'Visitor', text: 'Another good entry' },
+  ]};
+  var r10 = correlate(metadata, clicks, badTranscript);
+  assert(!r10.error, 'no error field');
+  assert(r10.speech_count === 2, 'only 2 valid speech entries kept');
+  assert(r10.click_count === 2, 'clicks unaffected');
+
+  // Test 11: Both clicks and transcript have some bad entries
+  console.log('Test 11: mixed valid/invalid entries in both inputs');
+  var r11 = correlate(metadata, badClicks, badTranscript);
+  assert(!r11.error, 'no error field');
+  assert(r11.click_count === 2, '2 valid clicks');
+  assert(r11.speech_count === 2, '2 valid speech');
+  assert(r11.event_count === 4, '4 total events');
+  assert(r11.segments.length > 0, 'segments still generated');
+
+  // Test 12: clicks object without events property (object but no .events)
+  console.log('Test 12: clicks object without events array');
+  var r12 = correlate(metadata, { noEventsHere: true }, transcript);
+  assert(!r12.error, 'no error field');
+  assert(r12.click_count === 0, '0 clicks from missing events array');
+  assert(r12.speech_count === 3, 'speech still processed');
+
+  // Test 13: transcript object without entries property
+  console.log('Test 13: transcript object without entries array');
+  var r13 = correlate(metadata, clicks, { duration_seconds: 10 });
+  assert(!r13.error, 'no error field');
+  assert(r13.click_count === 2, 'clicks still processed');
+  assert(r13.speech_count === 0, '0 speech from missing entries array');
+
+  // Test 14: metadata missing started_at
+  console.log('Test 14: metadata missing started_at');
+  var r14 = correlate({ session_id: 'no-start' }, clicks, transcript);
+  assert(r14.error, 'has error field');
+  assert(r14.session_id === 'no-start', 'session_id preserved from metadata');
+  assert(r14.timeline.length === 0, 'empty timeline on error');
+
+  // Test 15: metadata with invalid started_at date
+  console.log('Test 15: metadata with invalid started_at');
+  var r15 = correlate({ session_id: 'bad-date', started_at: 'not-a-date' }, clicks, transcript);
+  assert(r15.error, 'has error field');
+  assert(r15.session_id === 'bad-date', 'session_id preserved');
 
   console.log('');
   if (failures === 0) {
