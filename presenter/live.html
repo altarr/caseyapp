@@ -1,0 +1,536 @@
+<!-- BoothApp Live Session Monitor - Hackathon 2026 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Live Session</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    color: #f0f0f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    overflow: hidden;
+  }
+
+  /* -- Trend Micro red accent -- */
+  :root {
+    --tm-red: #D71920;
+    --tm-red-glow: rgba(215, 25, 32, 0.3);
+    --card-bg: #141414;
+    --card-border: #2a2a2a;
+    --muted: #666;
+    --text: #f0f0f0;
+  }
+
+  /* -- Header -- */
+  .header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .header h1 {
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .header .accent-bar {
+    width: 60px;
+    height: 3px;
+    background: var(--tm-red);
+    margin: 0.8rem auto 0;
+    border-radius: 2px;
+  }
+
+  /* -- Grid -- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 960px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+
+  .card.full { grid-column: 1 / -1; }
+
+  .card-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.6rem;
+    font-weight: 500;
+  }
+
+  /* -- Visitor name -- */
+  .visitor-name {
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .se-label {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  /* -- Duration -- */
+  .duration {
+    font-size: 5rem;
+    font-weight: 700;
+    font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+    color: var(--text);
+    letter-spacing: 0.04em;
+  }
+
+  /* -- Click count -- */
+  .click-count {
+    font-size: 5rem;
+    font-weight: 700;
+    color: var(--tm-red);
+  }
+
+  /* -- Recording status -- */
+  .rec-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 2rem;
+    font-weight: 600;
+  }
+
+  .rec-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .rec-dot.recording {
+    background: var(--tm-red);
+    box-shadow: 0 0 12px var(--tm-red-glow), 0 0 24px var(--tm-red-glow);
+    animation: pulse-red 1.4s ease-in-out infinite;
+  }
+
+  .rec-dot.ended {
+    background: var(--muted);
+  }
+
+  .rec-dot.waiting {
+    background: #b8860b;
+    animation: pulse-amber 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--tm-red-glow); }
+    50% { opacity: 0.4; box-shadow: 0 0 4px var(--tm-red-glow); }
+  }
+
+  @keyframes pulse-amber {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .card.recording-active {
+    border-color: var(--tm-red);
+    box-shadow: 0 0 20px var(--tm-red-glow);
+  }
+
+  /* -- Waiting state (no active session) -- */
+  .waiting-state {
+    text-align: center;
+    max-width: 600px;
+  }
+
+  .waiting-state .icon {
+    font-size: 3rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    font-family: monospace;
+  }
+
+  .waiting-state h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .waiting-state p {
+    font-size: 1.1rem;
+    color: #444;
+  }
+
+  /* -- Setup screen -- */
+  .setup {
+    text-align: center;
+    max-width: 440px;
+  }
+
+  .setup h2 {
+    font-size: 1.6rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .setup label {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    text-align: left;
+  }
+
+  .setup input {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: monospace;
+    margin-bottom: 0.8rem;
+  }
+
+  .setup input:focus { outline: 2px solid var(--tm-red); }
+
+  .setup button {
+    margin-top: 1rem;
+    font-size: 1.1rem;
+    padding: 0.6rem 2rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--tm-red);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .setup button:hover { background: #b5161c; }
+
+  .setup .hint {
+    margin-top: 0.8rem;
+    font-size: 0.8rem;
+    color: #444;
+  }
+
+  /* -- Footer -- */
+  .footer {
+    position: fixed;
+    bottom: 1rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #333;
+  }
+
+  .footer a { color: #555; text-decoration: none; }
+  .footer a:hover { color: var(--tm-red); }
+
+  .hidden { display: none !important; }
+
+  /* -- Responsive -- */
+  @media (max-width: 768px) {
+    .visitor-name { font-size: 2.8rem; }
+    .duration, .click-count { font-size: 3.5rem; }
+    .grid { gap: 1rem; }
+    .card { padding: 1.2rem 1.5rem; }
+  }
+
+  @media (max-width: 480px) {
+    .grid { grid-template-columns: 1fr; gap: 0.75rem; }
+    .visitor-name { font-size: 2.2rem; }
+    .duration, .click-count { font-size: 3rem; }
+  }
+</style>
+</head>
+<body>
+<script src="auth.js"></script>
+<script>if (!BoothAuth.requireAwsCreds()) { window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href); }
+else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
+
+<!-- Setup: enter API endpoint -->
+<div id="setup" class="setup">
+  <div class="header">
+    <h1>Live Session Monitor</h1>
+    <div class="accent-bar"></div>
+  </div>
+  <h2>Connect to API</h2>
+  <label for="api-url">API Endpoint URL</label>
+  <input id="api-url" type="text" placeholder="https://your-api.example.com or http://localhost:3000">
+  <button id="save-btn">Connect</button>
+  <div class="hint">Stored in localStorage. Polls /sessions for active session.</div>
+</div>
+
+<!-- Waiting: no active session -->
+<div id="waiting" class="waiting-state hidden">
+  <div class="header">
+    <h1>Live Session Monitor</h1>
+    <div class="accent-bar"></div>
+  </div>
+  <div class="icon">[ . . . ]</div>
+  <h2>Waiting for Session</h2>
+  <p>Polling every 5 seconds for an active session...</p>
+</div>
+
+<!-- Live dashboard -->
+<div id="dashboard" class="hidden">
+  <div class="header">
+    <h1>Live Session Monitor</h1>
+    <div class="accent-bar"></div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <div class="card-label">Visitor</div>
+      <div class="visitor-name" id="visitor-name">--</div>
+      <div class="se-label" id="se-name"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Duration</div>
+      <div class="duration" id="duration">00:00</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Clicks</div>
+      <div class="click-count" id="click-count">0</div>
+    </div>
+
+    <div class="card full" id="status-card">
+      <div class="card-label">Recording</div>
+      <div class="rec-indicator" id="rec-status">
+        <span class="rec-dot waiting"></span>
+        <span>Waiting</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="sessions.html">All Sessions</a> &middot;
+  <a href="index.html">Session View</a> &middot;
+  <a href="workers.html">Workers</a>
+</div>
+
+<script>
+(function () {
+  var POLL_MS = 5000;
+  var LS_KEY = "boothapp_api_url";
+
+  // ── Elements ──────────────────────────────────────────────────────────────
+  var setupEl    = document.getElementById("setup");
+  var waitingEl  = document.getElementById("waiting");
+  var dashEl     = document.getElementById("dashboard");
+  var nameEl     = document.getElementById("visitor-name");
+  var seNameEl   = document.getElementById("se-name");
+  var durationEl = document.getElementById("duration");
+  var clicksEl   = document.getElementById("click-count");
+  var statusEl   = document.getElementById("rec-status");
+  var statusCard = document.getElementById("status-card");
+  var saveBtn    = document.getElementById("save-btn");
+  var apiInput   = document.getElementById("api-url");
+
+  var apiUrl = null;
+  var activeSession = null;
+  var timerHandle = null;
+  var pollHandle = null;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ── View switching ────────────────────────────────────────────────────────
+  function showSetup() {
+    setupEl.classList.remove("hidden");
+    waitingEl.classList.add("hidden");
+    dashEl.classList.add("hidden");
+  }
+
+  function showWaiting() {
+    setupEl.classList.add("hidden");
+    waitingEl.classList.remove("hidden");
+    dashEl.classList.add("hidden");
+  }
+
+  function showDashboard() {
+    setupEl.classList.add("hidden");
+    waitingEl.classList.add("hidden");
+    dashEl.classList.remove("hidden");
+  }
+
+  // ── Config ────────────────────────────────────────────────────────────────
+  function loadConfig() {
+    var url = localStorage.getItem(LS_KEY);
+    if (url) {
+      apiUrl = url.replace(/\/+$/, "");
+      return true;
+    }
+    return false;
+  }
+
+  function saveConfig(url) {
+    localStorage.setItem(LS_KEY, url);
+    apiUrl = url.replace(/\/+$/, "");
+  }
+
+  // ── Setup flow ────────────────────────────────────────────────────────────
+  saveBtn.addEventListener("click", function () {
+    var val = apiInput.value.trim();
+    if (!val) return;
+    saveConfig(val);
+    startPolling();
+  });
+
+  apiInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") saveBtn.click();
+  });
+
+  if (loadConfig()) {
+    startPolling();
+  } else {
+    showSetup();
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────────
+  function startPolling() {
+    showWaiting();
+    poll();
+    if (pollHandle) clearInterval(pollHandle);
+    pollHandle = setInterval(poll, POLL_MS);
+  }
+
+  function poll() {
+    fetch(apiUrl + "/sessions")
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (sessions) {
+        if (!Array.isArray(sessions)) { onNoSession(); return; }
+
+        // Find active session: status is recording, in_progress, or active
+        var active = null;
+        for (var i = 0; i < sessions.length; i++) {
+          var st = (sessions[i].status || "").toLowerCase();
+          if (st === "recording" || st === "in_progress" || st === "active") {
+            // Pick the most recently started
+            if (!active || (sessions[i].started_at > active.started_at)) {
+              active = sessions[i];
+            }
+          }
+        }
+
+        if (!active) { onNoSession(); return; }
+
+        activeSession = active;
+        renderSession();
+        showDashboard();
+      })
+      .catch(function () {
+        // Network error -- stay on current view, don't flash
+      });
+  }
+
+  function onNoSession() {
+    activeSession = null;
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+    showWaiting();
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderSession() {
+    if (!activeSession) return;
+
+    nameEl.textContent = activeSession.visitor_name || "--";
+    seNameEl.textContent = activeSession.se_name ? "SE: " + activeSession.se_name : "";
+
+    // Click count
+    var clicks = (activeSession.click_count != null) ? activeSession.click_count : 0;
+    clicksEl.textContent = clicks;
+
+    // Status
+    renderStatus();
+
+    // Duration
+    renderDuration();
+    if (!timerHandle) {
+      timerHandle = setInterval(renderDuration, 1000);
+    }
+  }
+
+  function renderDuration() {
+    if (!activeSession || !activeSession.started_at) {
+      durationEl.textContent = "--:--";
+      return;
+    }
+    var start = new Date(activeSession.started_at).getTime();
+    var end = activeSession.ended_at
+      ? new Date(activeSession.ended_at).getTime()
+      : Date.now();
+    var diff = Math.max(0, Math.floor((end - start) / 1000));
+    var h = Math.floor(diff / 3600);
+    var m = Math.floor((diff % 3600) / 60);
+    var s = diff % 60;
+
+    if (h > 0) {
+      durationEl.textContent =
+        h + ":" +
+        (m < 10 ? "0" : "") + m + ":" +
+        (s < 10 ? "0" : "") + s;
+    } else {
+      durationEl.textContent =
+        (m < 10 ? "0" : "") + m + ":" +
+        (s < 10 ? "0" : "") + s;
+    }
+  }
+
+  function renderStatus() {
+    if (!activeSession) return;
+    var st = (activeSession.status || "").toLowerCase();
+
+    if (st === "completed" || st === "ended" || activeSession.ended_at) {
+      statusEl.innerHTML = '<span class="rec-dot ended"></span><span>Ended</span>';
+      statusCard.classList.remove("recording-active");
+    } else if (st === "recording" || st === "in_progress" || st === "active") {
+      statusEl.innerHTML = '<span class="rec-dot recording"></span><span>Recording</span>';
+      statusCard.classList.add("recording-active");
+    } else {
+      statusEl.innerHTML = '<span class="rec-dot waiting"></span><span>' + esc(activeSession.status || "Waiting") + '</span>';
+      statusCard.classList.remove("recording-active");
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
