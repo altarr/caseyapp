@@ -210,12 +210,48 @@ function computeEngagement(clickEvents, speechEvents, durationSeconds, topicCoun
 }
 
 /**
+ * Normalize clicks input: accepts { events: [...] }, { clicks: [...] }, or a top-level array.
+ * Always returns an array (may be empty).
+ */
+function normalizeClicks(clicks) {
+  if (!clicks) return [];
+  if (Array.isArray(clicks)) return clicks;
+  if (Array.isArray(clicks.events)) return clicks.events;
+  if (Array.isArray(clicks.clicks)) return clicks.clicks;
+  return [];
+}
+
+/**
+ * Normalize transcript input: accepts { entries: [...] }, { results: [...] },
+ * { items: [...] }, { transcripts: [...] }, or a top-level array.
+ * Always returns { entries: Array, duration_seconds: number|null }.
+ */
+function normalizeTranscript(transcript) {
+  if (!transcript) return { entries: [], duration_seconds: null };
+  var entries = null;
+  var duration = (transcript && !Array.isArray(transcript) && typeof transcript.duration_seconds === 'number')
+    ? transcript.duration_seconds : null;
+  if (Array.isArray(transcript)) {
+    entries = transcript;
+  } else if (Array.isArray(transcript.entries)) {
+    entries = transcript.entries;
+  } else if (Array.isArray(transcript.results)) {
+    entries = transcript.results;
+  } else if (Array.isArray(transcript.items)) {
+    entries = transcript.items;
+  } else if (Array.isArray(transcript.transcripts)) {
+    entries = transcript.transcripts;
+  }
+  return { entries: entries || [], duration_seconds: duration };
+}
+
+/**
  * Correlate audio transcript + click events into a unified chronological timeline.
  *
  * Inputs (plain objects parsed from JSON):
  *   metadata   — metadata.json  (needs session_id, started_at)
- *   clicks     — clicks.json    (needs events[])
- *   transcript — transcript.json (needs entries[], duration_seconds)
+ *   clicks     — clicks.json    (accepts events[], clicks[], or top-level array)
+ *   transcript — transcript.json (accepts entries[], results[], items[], transcripts[], or top-level array)
  *   screenshots (optional) — array of { filename, timestamp } for periodic + click screenshots
  *
  * Output:
@@ -239,12 +275,17 @@ function computeEngagement(clickEvents, speechEvents, durationSeconds, topicCoun
  */
 function correlate(metadata, clicks, transcript, screenshots) {
   try {
-  var sessionId = metadata.session_id;
-  var startedAt = metadata.started_at; // ISO string (UTC)
-  var startMs = new Date(startedAt).getTime();
+  var sessionId = (metadata && metadata.session_id) || 'unknown';
+  var startedAt = (metadata && metadata.started_at) || null;
+  var startMs = startedAt ? new Date(startedAt).getTime() : 0;
 
-  var hasClicks = clicks && Array.isArray(clicks.events) && clicks.events.length > 0;
-  var hasTranscript = transcript && Array.isArray(transcript.entries) && transcript.entries.length > 0;
+  var clicksArray = normalizeClicks(clicks);
+  var normTranscript = normalizeTranscript(transcript);
+  var entriesArray = normTranscript.entries;
+  var durationSeconds = normTranscript.duration_seconds;
+
+  var hasClicks = clicksArray.length > 0;
+  var hasTranscript = entriesArray.length > 0;
 
   if (!hasClicks && !hasTranscript) {
     var now = new Date().toISOString();
@@ -253,7 +294,7 @@ function correlate(metadata, clicks, transcript, screenshots) {
       session_id: sessionId,
       generated_at: now,
       started_at: startedAt,
-      duration_seconds: (transcript && transcript.duration_seconds) || null,
+      duration_seconds: durationSeconds,
       event_count: 0,
       click_count: 0,
       speech_count: 0,
@@ -267,7 +308,7 @@ function correlate(metadata, clicks, transcript, screenshots) {
   var ssIndex = buildScreenshotIndex(screenshots, startMs);
 
   // --- Build click event objects ---
-  var clickEvents = ((clicks && clicks.events) || []).map(function (ev) {
+  var clickEvents = clicksArray.map(function (ev) {
     var tsMs = new Date(ev.timestamp).getTime();
     return {
       _tsMs: tsMs,
@@ -290,15 +331,16 @@ function correlate(metadata, clicks, transcript, screenshots) {
   clickEvents.sort(function (a, b) { return a._tsMs - b._tsMs; });
 
   // --- Build speech event objects ---
-  var speechEvents = ((transcript && transcript.entries) || []).map(function (entry) {
-    var offsetSeconds = parseOffset(entry.timestamp);
-    var absTimestamp = addSeconds(startedAt, offsetSeconds);
+  var speechEvents = entriesArray.map(function (entry) {
+    var entryTs = entry.timestamp || '00:00:00.000';
+    var offsetSeconds = parseOffset(entryTs);
+    var absTimestamp = startedAt ? addSeconds(startedAt, offsetSeconds) : new Date(offsetSeconds * 1000).toISOString();
     var tsMs = new Date(absTimestamp).getTime();
     return {
       _tsMs: tsMs,
       offset_seconds: offsetSeconds,
       timestamp: absTimestamp,
-      timestamp_offset: entry.timestamp,
+      timestamp_offset: entryTs,
       type: 'speech',
       speaker: entry.speaker || null,
       text: entry.text || '',
@@ -381,7 +423,6 @@ function correlate(metadata, clicks, transcript, screenshots) {
   var topicsDetected = detectTopics(clickEvents, speechEvents);
 
   // --- Compute engagement score ---
-  var durationSeconds = (transcript && transcript.duration_seconds) || null;
   var engagementScore = computeEngagement(clickEvents, speechEvents, durationSeconds, topicsDetected.length);
 
   // --- Merge and sort everything chronologically ---
@@ -414,11 +455,13 @@ function correlate(metadata, clicks, transcript, screenshots) {
     var errNow = new Date().toISOString();
     console.error('[' + errNow + '] correlate error: ' + err.message);
     console.error(err.stack);
+    var errDuration = (transcript && !Array.isArray(transcript) && typeof transcript.duration_seconds === 'number')
+      ? transcript.duration_seconds : null;
     return {
       session_id: (metadata && metadata.session_id) || 'unknown',
       generated_at: errNow,
       started_at: (metadata && metadata.started_at) || null,
-      duration_seconds: (transcript && transcript.duration_seconds) || null,
+      duration_seconds: errDuration,
       event_count: 0,
       click_count: 0,
       speech_count: 0,
@@ -430,7 +473,7 @@ function correlate(metadata, clicks, transcript, screenshots) {
   }
 }
 
-module.exports = { correlate, parseOffset, detectTopics, computeEngagement, findNearestScreenshot, buildScreenshotIndex };
+module.exports = { correlate, parseOffset, detectTopics, computeEngagement, findNearestScreenshot, buildScreenshotIndex, normalizeClicks, normalizeTranscript };
 
 // --- Self-test when run directly: node correlator.js ---
 if (require.main === module) {
@@ -508,12 +551,11 @@ if (require.main === module) {
   assert(empty.timeline.length === 0, 'empty timeline');
   assert(!empty.error, 'no error field');
 
-  // Test 5: Bad metadata triggers catch
-  console.log('Test 5: error handling (bad metadata)');
+  // Test 5: Null metadata handled gracefully
+  console.log('Test 5: null metadata (graceful fallback)');
   var bad = correlate(null, clicks, transcript);
-  assert(bad.error, 'has error field');
   assert(bad.session_id === 'unknown', 'session_id = unknown');
-  assert(bad.timeline.length === 0, 'empty timeline on error');
+  assert(bad.timeline.length === 5, 'still produces timeline with null metadata');
 
   // Test 6: Screenshot matching
   console.log('Test 6: screenshot timestamp matching');
@@ -535,8 +577,8 @@ if (require.main === module) {
   assert(full.engagement_score > 0, 'score > 0 for active session');
   // Empty session should score 0
   assert(empty.engagement_score === 0, 'empty session scores 0');
-  // Error session should score 0
-  assert(bad.engagement_score === 0, 'error session scores 0');
+  // Null metadata session still produces engagement score
+  assert(typeof bad.engagement_score === 'number', 'null metadata session has engagement score');
 
   // Test 8: Product topic detection
   console.log('Test 8: product topic detection');
@@ -573,6 +615,60 @@ if (require.main === module) {
   // Empty index
   var emptyResult = findNearestScreenshot([], new Date(startedAt).getTime());
   assert(emptyResult === null, 'null for empty index');
+
+  // Test 11: Clicks as top-level array (demo fallback format)
+  console.log('Test 11: clicks as top-level array');
+  var clicksArray = [
+    { index: 1, timestamp: '2026-03-29T10:00:05.000Z', dom_path: 'body>div>button', element: 'Button', coordinates: { x: 100, y: 200 }, page_url: 'https://example.com', page_title: 'Test', screenshot_file: 'shot-001.png' },
+  ];
+  var arrayClickResult = correlate(metadata, clicksArray, transcript);
+  assert(arrayClickResult.click_count === 1, 'top-level array: click_count = 1');
+  assert(arrayClickResult.speech_count === 3, 'top-level array: speech_count = 3');
+  assert(!arrayClickResult.error, 'top-level array: no error');
+
+  // Test 12: Clicks as { clicks: [...] } format
+  console.log('Test 12: clicks as { clicks: [...] }');
+  var clicksWrapped = { clicks: clicks.events };
+  var wrappedResult = correlate(metadata, clicksWrapped, transcript);
+  assert(wrappedResult.click_count === 2, '{ clicks: [] }: click_count = 2');
+  assert(!wrappedResult.error, '{ clicks: [] }: no error');
+
+  // Test 13: Transcript as { results: [...] }
+  console.log('Test 13: transcript as { results: [...] }');
+  var transcriptResults = { duration_seconds: 20, results: transcript.entries };
+  var resultsResult = correlate(metadata, clicks, transcriptResults);
+  assert(resultsResult.speech_count === 3, '{ results: [] }: speech_count = 3');
+  assert(!resultsResult.error, '{ results: [] }: no error');
+
+  // Test 14: Transcript as { items: [...] }
+  console.log('Test 14: transcript as { items: [...] }');
+  var transcriptItems = { duration_seconds: 20, items: transcript.entries };
+  var itemsResult = correlate(metadata, clicks, transcriptItems);
+  assert(itemsResult.speech_count === 3, '{ items: [] }: speech_count = 3');
+  assert(!itemsResult.error, '{ items: [] }: no error');
+
+  // Test 15: Transcript as top-level array
+  console.log('Test 15: transcript as top-level array');
+  var transcriptArray = transcript.entries;
+  var arrayTransResult = correlate(metadata, clicks, transcriptArray);
+  assert(arrayTransResult.speech_count === 3, 'top-level transcript array: speech_count = 3');
+  assert(arrayTransResult.duration_seconds === null, 'top-level transcript array: no duration');
+  assert(!arrayTransResult.error, 'top-level transcript array: no error');
+
+  // Test 16: Transcript as { transcripts: [...] }
+  console.log('Test 16: transcript as { transcripts: [...] }');
+  var transcriptTranscripts = { duration_seconds: 20, transcripts: transcript.entries };
+  var transcriptsResult = correlate(metadata, clicks, transcriptTranscripts);
+  assert(transcriptsResult.speech_count === 3, '{ transcripts: [] }: speech_count = 3');
+  assert(!transcriptsResult.error, '{ transcripts: [] }: no error');
+
+  // Test 17: Completely empty/malformed inputs
+  console.log('Test 17: malformed inputs return valid empty timeline');
+  var malformed = correlate({}, {}, {});
+  assert(malformed.event_count === 0, 'malformed: event_count = 0');
+  assert(malformed.session_id === 'unknown', 'malformed: session_id = unknown');
+  assert(Array.isArray(malformed.timeline), 'malformed: timeline is array');
+  assert(!malformed.error, 'malformed: no error (just empty)');
 
   console.log('');
   if (failures === 0) {
