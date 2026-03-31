@@ -1,3 +1,10 @@
-Confirmed: `background.js` has 3 places that write `v1helper_session` to storage, and none include `visitor_name`. The spec correctly identifies all the change points (lines 299, 306, and 440).
+# E2E Pipeline Test Improvements
 
-The spec is complete, internally consistent, and references the correct lines/structures in the codebase. Spec delivered at `.specs/popup-redesign/spec.md`.
+## Problem
+The initial e2e test (PR #180) covers the happy path. Potential improvements:
+- Field name mapping between spec (key_insights/recommendations) and implementation (key_interests/follow_up_actions)
+- No negative test cases (what if watcher is down?)
+- No performance metrics (how long did analysis take?)
+
+## Status
+Placeholder for future improvements. No tasks currently assigned.
