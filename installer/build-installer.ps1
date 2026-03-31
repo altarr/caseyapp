@@ -26,11 +26,31 @@ foreach ($dir in $dirs) {
     }
 }
 
+# Strip brand folder — keep only digital essentials (logos, qrcode.min.js, favicon)
+if (Test-Path "$BuildDir\brand") {
+    # Remove everything non-digital
+    @("physical", "imagery", ".git") | ForEach-Object {
+        $p = Join-Path "$BuildDir\brand" $_
+        if (Test-Path $p) { Remove-Item -Recurse -Force $p }
+    }
+    # Remove PDFs, AI files, large images, templates
+    Get-ChildItem "$BuildDir\brand" -Recurse -Include "*.pdf","*.ai","*.tif","*.eps","*.otf","*.psd" | Remove-Item -Force
+    # Remove stock photos and large imagery
+    @("digital\imagery\stock", "digital\imagery", "digital\templates", "digital\gradients", "digital\fonts") | ForEach-Object {
+        $p = Join-Path "$BuildDir\brand" $_
+        if (Test-Path $p) { Remove-Item -Recurse -Force $p }
+    }
+}
+
 # Copy root files
 Copy-Item "$RepoRoot\package.json" "$BuildDir\package.json"
 if (Test-Path "$RepoRoot\package-lock.json") {
     Copy-Item "$RepoRoot\package-lock.json" "$BuildDir\package-lock.json"
 }
+
+# Remove root node_modules if copied
+$rootNm = Join-Path $BuildDir "node_modules"
+if (Test-Path $rootNm) { Remove-Item -Recurse -Force $rootNm }
 
 # Copy installer script
 Copy-Item "$PSScriptRoot\install.ps1" "$BuildDir\install.ps1"
