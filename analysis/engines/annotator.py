@@ -131,6 +131,9 @@ def annotate_screenshot(img, clicks_on_image):
         nh = num_bbox[3] - num_bbox[1] + 6
         nx = x - r - 4
         ny = y - r - nh + 2
+        # Keep badge on screen
+        nx = max(0, min(nx, img.width - nw))
+        ny = max(0, ny)
         draw.rounded_rectangle([nx, ny, nx + nw, ny + nh], radius=4, fill=NUMBER_BG)
         draw.text((nx + 5, ny + 2), num_text, fill=NUMBER_COLOR, font=font_num)
 
