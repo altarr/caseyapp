@@ -644,8 +644,8 @@
           return fetch(apiUrl + '/api/sessions/' + encodeURIComponent(s.session_id))
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(detail) {
-              if (detail && detail.summary) {
-                s._summary = detail.summary;
+              if (detail && detail.analysis) {
+                s._summary = detail.analysis;
               }
               return s;
             })
