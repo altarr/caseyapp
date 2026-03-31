@@ -6,7 +6,8 @@
     { label: 'Sessions', href: '/sessions.html' },
     { label: 'Analytics', href: '/analytics.html' },
     { label: 'Live Monitor', href: '/live-dashboard.html' },
-    { label: 'Admin', href: '/admin.html' }
+    { label: 'Admin', href: '/admin.html' },
+    { label: 'Setup', href: '/quick-setup.html' }
   ];
 
   var HEALTH_POLL_MS = 10000;
