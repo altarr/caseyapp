@@ -423,6 +423,72 @@
       flex-shrink: 0;
     }
 
+    /* ── Product Cards (from clicks) ─────────────────────────────── */
+    .product-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .product-card {
+      background: var(--tm-white);
+      border: 1px solid var(--tm-gray-300);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      transition: box-shadow 0.15s ease;
+    }
+
+    .product-card:hover { box-shadow: var(--shadow-md); }
+
+    .product-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .product-card-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--tm-gray-900);
+    }
+
+    .product-card-stats {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+
+    .product-stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--tm-red-dark);
+      line-height: 1.2;
+    }
+
+    .product-stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tm-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .product-card-bar {
+      height: 4px;
+      background: var(--tm-gray-100);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .product-card-bar-fill {
+      height: 100%;
+      background: var(--tm-red);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
     /* ── Interest Table ───────────────────────────────────────── */
     table { width: 100%; border-collapse: collapse; }
 
@@ -860,6 +926,9 @@
           <div class="section-body">
             <div class="product-grid">
               {{products_shown}}
+            </div>
+            <div class="product-cards-grid">
+              {{product_cards}}
             </div>
           </div>
         </div>
