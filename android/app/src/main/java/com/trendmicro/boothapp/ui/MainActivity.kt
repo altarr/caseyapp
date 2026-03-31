@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private var capturedBitmap: Bitmap? = null
     private var activeSessionId: String? = null
     private var activeDemoPc: String? = null
+    private var audioOptedOut: Boolean = false
     private var sessionStartTime: Long = 0L
     private val timerHandler = Handler(Looper.getMainLooper())
     private val timerRunnable = object : Runnable {
@@ -119,6 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnStartSession.setOnClickListener { startSession() }
         binding.btnEndSession.setOnClickListener { confirmEndSession() }
+        binding.btnStopAudio.setOnClickListener { confirmStopAudio() }
     }
 
     override fun onResume() {
@@ -262,6 +264,9 @@ class MainActivity : AppCompatActivity() {
                 // Swap buttons
                 binding.btnCapture.visibility = View.GONE
                 binding.btnStartSession.visibility = View.GONE
+                binding.btnStopAudio.visibility = View.VISIBLE
+                binding.btnStopAudio.isEnabled = true
+                binding.btnStopAudio.text = getString(R.string.stop_audio)
                 binding.btnEndSession.visibility = View.VISIBLE
                 binding.btnEndSession.isEnabled = true
 
@@ -336,6 +341,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmStopAudio() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.stop_audio_confirm_title)
+            .setMessage(R.string.stop_audio_confirm_message)
+            .setPositiveButton(R.string.confirm) { _, _ -> stopAudio() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun stopAudio() {
+        val url = prefs.orchestratorUrl
+        val sessionId = activeSessionId
+        if (url.isBlank() || sessionId == null) return
+
+        binding.btnStopAudio.isEnabled = false
+
+        lifecycleScope.launch {
+            val api = SessionApi(url)
+            val result = api.stopAudio(sessionId, activeDemoPc)
+
+            result.onSuccess {
+                audioOptedOut = true
+                binding.btnStopAudio.text = getString(R.string.audio_stopped)
+                toast(getString(R.string.audio_stop_success))
+            }
+
+            result.onFailure { e ->
+                binding.btnStopAudio.isEnabled = true
+                toast(getString(R.string.error_session, e.message))
+            }
+        }
+    }
+
     private fun confirmEndSession() {
         AlertDialog.Builder(this)
             .setTitle(R.string.end_session_confirm_title)
@@ -376,6 +414,7 @@ class MainActivity : AppCompatActivity() {
         activeDemoPc = null
         capturedBadgeFile = null
         capturedBitmap = null
+        audioOptedOut = false
 
         binding.tvStatus.text = getString(R.string.no_session)
         binding.tvStatus.setTextColor(ContextCompat.getColor(this, R.color.tm_text_secondary))
@@ -390,6 +429,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnCapture.text = getString(R.string.capture_badge)
         binding.btnStartSession.visibility = View.VISIBLE
         binding.btnStartSession.isEnabled = false
+        binding.btnStopAudio.visibility = View.GONE
         binding.btnEndSession.visibility = View.GONE
 
         showProgress(false)

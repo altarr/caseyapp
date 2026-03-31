@@ -319,6 +319,20 @@
             app:cornerRadius="10dp" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStopAudio"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="6dp"
+            android:text="@string/stop_audio"
+            android:textSize="13sp"
+            android:textAllCaps="true"
+            android:letterSpacing="0.06"
+            android:visibility="gone"
+            app:backgroundTint="@color/tm_amber"
+            app:cornerRadius="10dp" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnEndSession"
             android:layout_width="0dp"
             android:layout_height="56dp"

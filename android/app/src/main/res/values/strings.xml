@@ -38,4 +38,9 @@
     <string name="scan_qr">Scan QR</string>
     <string name="paired_success">Paired with demo PC</string>
     <string name="auto_starting_session">Starting session automatically...</string>
+    <string name="stop_audio">Stop Audio</string>
+    <string name="audio_stopped">Audio Stopped</string>
+    <string name="stop_audio_confirm_title">Stop Audio?</string>
+    <string name="stop_audio_confirm_message">Stop audio recording? Screenshots will continue.</string>
+    <string name="audio_stop_success">Audio recording stopped</string>
 </resources>

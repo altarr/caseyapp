@@ -93,4 +93,31 @@ class SessionApi(private val baseUrl: String) {
                 Result.failure(e)
             }
         }
+
+    @Suppress("UNCHECKED_CAST")
+    suspend fun stopAudio(sessionId: String, demoPc: String? = null): Result<Map<String, Any>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bodyMap = mutableMapOf<String, Any>()
+                if (demoPc != null) bodyMap["demo_pc"] = demoPc
+                val body = gson.toJson(bodyMap).toRequestBody(jsonType)
+
+                val httpRequest = Request.Builder()
+                    .url("$baseUrl/sessions/$sessionId/stop-audio")
+                    .post(body)
+                    .build()
+
+                val response = client.newCall(httpRequest).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                if (response.isSuccessful) {
+                    val map = gson.fromJson(responseBody, Map::class.java) as Map<String, Any>
+                    Result.success(map)
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
 }

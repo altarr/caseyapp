@@ -139,12 +139,17 @@ class QrScanActivity : AppCompatActivity() {
             val accessKey = json.get("awsAccessKeyId")?.asString ?: ""
             val secretKey = json.get("awsSecretAccessKey")?.asString ?: ""
 
+            val demoPcId = json.get("demoPcId")?.asString ?: ""
+
             // Save to preferences
             prefs.awsAccessKeyId = accessKey
             prefs.awsSecretAccessKey = secretKey
             // presignEndpoint acts as the orchestrator URL for the app
             if (presign.isNotBlank()) {
                 prefs.orchestratorUrl = presign
+            }
+            if (demoPcId.isNotBlank()) {
+                prefs.defaultDemoPc = demoPcId
             }
 
             Log.d(TAG, "QR pairing successful: bucket=$bucket region=$region")
