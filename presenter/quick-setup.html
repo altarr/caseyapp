@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="components/nav.js"></script>
+<title>BoothApp — Quick Setup</title>
+<link rel="stylesheet" href="styles/mobile.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-muted: #8b949e;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-red: #f85149;
+    --accent-orange: #f78166;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 1.5rem 2rem;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  .setup-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+  }
+
+  .countdown {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Master Indicator ───────────────────────────────────────── */
+  .master-status {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    margin-bottom: 2rem;
+    border-radius: 16px;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    transition: border-color 0.4s, background 0.4s;
+  }
+
+  .master-status.ready {
+    border-color: var(--accent-green);
+    background: rgba(63, 185, 80, 0.06);
+  }
+
+  .master-status.not-ready {
+    border-color: var(--accent-red);
+    background: rgba(248, 81, 73, 0.06);
+  }
+
+  .master-label {
+    font-size: 4.5rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    transition: color 0.4s;
+  }
+
+  .master-status.ready .master-label { color: var(--accent-green); }
+  .master-status.not-ready .master-label { color: var(--accent-red); }
+
+  .master-sub {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+  }
+
+  /* ── Check Cards ────────────────────────────────────────────── */
+  .checks-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .check-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 0.3s;
+  }
+
+  .check-card.pass { border-left: 4px solid var(--accent-green); }
+  .check-card.fail { border-left: 4px solid var(--accent-red); }
+  .check-card.checking { border-left: 4px solid var(--accent-orange); }
+
+  .check-icon {
+    font-size: 2rem;
+    width: 48px;
+    text-align: center;
+    flex-shrink: 0;
+    font-family: monospace;
+  }
+
+  .check-card.pass .check-icon { color: var(--accent-green); }
+  .check-card.fail .check-icon { color: var(--accent-red); }
+  .check-card.checking .check-icon { color: var(--accent-orange); }
+
+  .check-info { flex: 1; min-width: 0; }
+
+  .check-name {
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+
+  .check-detail {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .check-actions {
+    flex-shrink: 0;
+  }
+
+  .btn-fix {
+    display: none;
+    padding: 0.5rem 1.25rem;
+    border: 1px solid var(--accent-red);
+    border-radius: 8px;
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--accent-red);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-fix:hover { background: rgba(248, 81, 73, 0.2); }
+  .check-card.fail .btn-fix { display: inline-block; }
+
+  .btn-recheck {
+    padding: 0.6rem 1.5rem;
+    border: 1px solid var(--accent-blue);
+    border-radius: 8px;
+    background: rgba(88, 166, 255, 0.1);
+    color: var(--accent-blue);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1.5rem;
+    transition: background 0.2s;
+  }
+
+  .btn-recheck:hover { background: rgba(88, 166, 255, 0.2); }
+
+  /* ── Credentials Bar ────────────────────────────────────────── */
+  .creds-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .creds-bar .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .creds-bar .dot.ok { background: var(--accent-green); }
+  .creds-bar .dot.err { background: var(--accent-red); }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  .setup-footer {
+    text-align: center;
+    margin-top: 2rem;
+  }
+
+  @media (max-width: 600px) {
+    .master-label { font-size: 3rem; }
+    .check-name { font-size: 1.1rem; }
+    body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="setup-container">
+  <header>
+    <h1>Quick Setup</h1>
+    <div class="countdown" id="countdown">Next check in 10s</div>
+  </header>
+
+  <div class="creds-bar" id="creds-bar">
+    <span class="dot" id="creds-dot"></span>
+    <span id="creds-text">Checking AWS credentials...</span>
+  </div>
+
+  <div class="master-status" id="master-status">
+    <div class="master-label" id="master-label">CHECKING...</div>
+    <div class="master-sub" id="master-sub">Running system checks</div>
+  </div>
+
+  <div class="checks-grid" id="checks-grid"></div>
+
+  <div class="setup-footer">
+    <button class="btn-recheck" onclick="runAllChecks()">Re-check Now</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var BUCKET = 'boothapp-sessions-752266476357';
+  var REGION = 'us-east-1';
+  var LAMBDA_FN = 'boothapp-session-watcher';
+  var EXTENSION_ID = localStorage.getItem('boothapp_ext_id') || '';
+  var REFRESH_INTERVAL = 10000;
+  var s3 = null;
+  var lambda = null;
+  var refreshTimer = null;
+  var countdown = 10;
+  var countdownTimer = null;
+  var awsReady = false;
+
+  // ── Check definitions ──────────────────────────────────────────────────────
+
+  var checks = [
+    {
+      id: 's3',
+      name: 'AWS S3 Bucket',
+      detail: 'Checking...',
+      status: 'checking', // pass | fail | checking
+      fix: fixS3,
+      fixLabel: 'Configure'
+    },
+    {
+      id: 'extension',
+      name: 'Chrome Extension',
+      detail: 'Checking...',
+      status: 'checking',
+      fix: fixExtension,
+      fixLabel: 'Install'
+    },
+    {
+      id: 'audio',
+      name: 'Audio Recorder',
+      detail: 'Checking...',
+      status: 'checking',
+      fix: fixAudio,
+      fixLabel: 'Fix'
+    },
+    {
+      id: 'lambda',
+      name: 'Lambda Connectivity',
+      detail: 'Checking...',
+      status: 'checking',
+      fix: fixLambda,
+      fixLabel: 'Configure'
+    },
+    {
+      id: 'watcher',
+      name: 'Watcher Service',
+      detail: 'Checking...',
+      status: 'checking',
+      fix: fixWatcher,
+      fixLabel: 'Restart'
+    }
+  ];
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  function renderChecks() {
+    var grid = document.getElementById('checks-grid');
+    grid.innerHTML = '';
+    for (var i = 0; i < checks.length; i++) {
+      var c = checks[i];
+      var card = document.createElement('div');
+      card.className = 'check-card ' + c.status;
+
+      var icon = c.status === 'pass' ? '[OK]' : c.status === 'fail' ? '[!!]' : '[..]';
+      card.innerHTML =
+        '<div class="check-icon">' + icon + '</div>' +
+        '<div class="check-info">' +
+          '<div class="check-name">' + esc(c.name) + '</div>' +
+          '<div class="check-detail">' + esc(c.detail) + '</div>' +
+        '</div>' +
+        '<div class="check-actions">' +
+          '<button class="btn-fix" data-check="' + c.id + '">' + esc(c.fixLabel) + '</button>' +
+        '</div>';
+
+      grid.appendChild(card);
+    }
+
+    // Bind fix buttons
+    var btns = grid.querySelectorAll('.btn-fix');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].addEventListener('click', (function(id) {
+        return function() { triggerFix(id); };
+      })(btns[j].getAttribute('data-check')));
+    }
+
+    updateMaster();
+  }
+
+  function updateMaster() {
+    var allPass = true;
+    var anyChecking = false;
+    for (var i = 0; i < checks.length; i++) {
+      if (checks[i].status === 'fail') allPass = false;
+      if (checks[i].status === 'checking') anyChecking = true;
+    }
+
+    var el = document.getElementById('master-status');
+    var label = document.getElementById('master-label');
+    var sub = document.getElementById('master-sub');
+
+    if (anyChecking) {
+      el.className = 'master-status';
+      label.textContent = 'CHECKING...';
+      sub.textContent = 'Running system checks';
+    } else if (allPass) {
+      el.className = 'master-status ready';
+      label.textContent = 'READY';
+      sub.textContent = 'All systems operational';
+    } else {
+      el.className = 'master-status not-ready';
+      label.textContent = 'NOT READY';
+      var failCount = checks.filter(function(c) { return c.status === 'fail'; }).length;
+      sub.textContent = failCount + ' check' + (failCount > 1 ? 's' : '') + ' failed';
+    }
+  }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── AWS Init ───────────────────────────────────────────────────────────────
+
+  function initAWS() {
+    var ak = localStorage.getItem('boothapp_aws_ak');
+    var sk = localStorage.getItem('boothapp_aws_sk');
+    var dotEl = document.getElementById('creds-dot');
+    var textEl = document.getElementById('creds-text');
+
+    if (!ak || !sk) {
+      dotEl.className = 'dot err';
+      textEl.textContent = 'AWS credentials not found. Go to Admin to configure.';
+      awsReady = false;
+      return;
+    }
+
+    AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+    s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+    lambda = new AWS.Lambda({ region: REGION });
+    dotEl.className = 'dot ok';
+    textEl.textContent = 'AWS credentials loaded (Access Key: ' + ak.slice(0, 4) + '...)';
+    awsReady = true;
+  }
+
+  // ── Individual Checks ──────────────────────────────────────────────────────
+
+  function setCheck(id, status, detail) {
+    for (var i = 0; i < checks.length; i++) {
+      if (checks[i].id === id) {
+        checks[i].status = status;
+        checks[i].detail = detail;
+        break;
+      }
+    }
+    renderChecks();
+  }
+
+  function checkS3() {
+    if (!awsReady) {
+      setCheck('s3', 'fail', 'AWS credentials not configured');
+      return;
+    }
+    setCheck('s3', 'checking', 'Testing bucket access...');
+    s3.listObjectsV2({ MaxKeys: 1 }, function(err, data) {
+      if (err) {
+        setCheck('s3', 'fail', 'Error: ' + (err.message || err.code));
+      } else {
+        setCheck('s3', 'pass', 'Bucket accessible (' + BUCKET + ')');
+      }
+    });
+  }
+
+  function checkExtension() {
+    setCheck('extension', 'checking', 'Looking for V1-Helper extension...');
+
+    // Try to detect extension via postMessage handshake
+    var found = false;
+    var timeout = setTimeout(function() {
+      if (!found) {
+        setCheck('extension', 'fail', 'Extension not detected (V1-Helper not responding)');
+      }
+    }, 3000);
+
+    // The extension content script logs to console on load.
+    // We detect it by sending a custom event and listening for a response,
+    // or by checking if the extension set a marker on the page.
+    // Simplest approach: try chrome.runtime.sendMessage if extension ID is known
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage && EXTENSION_ID) {
+      try {
+        chrome.runtime.sendMessage(EXTENSION_ID, { type: 'PING' }, function(response) {
+          if (chrome.runtime.lastError) {
+            // Extension not reachable
+          } else if (response && response.type === 'PONG') {
+            found = true;
+            clearTimeout(timeout);
+            setCheck('extension', 'pass', 'V1-Helper v' + (response.version || '?') + ' connected');
+            return;
+          }
+        });
+      } catch (e) { /* ignore */ }
+    }
+
+    // Fallback: check for the content script marker on the page
+    // V1-Helper content.js logs a message; we inject a tiny probe
+    window.postMessage({ type: 'V1_HELPER_PING', source: 'quick-setup' }, '*');
+
+    function onMessage(evt) {
+      if (evt.data && evt.data.type === 'V1_HELPER_PONG') {
+        found = true;
+        clearTimeout(timeout);
+        window.removeEventListener('message', onMessage);
+        setCheck('extension', 'pass', 'V1-Helper detected via content script');
+      }
+    }
+    window.addEventListener('message', onMessage);
+
+    // Also check if extension popup left a flag in localStorage
+    var extVer = localStorage.getItem('v1helper_version');
+    if (extVer) {
+      found = true;
+      clearTimeout(timeout);
+      setCheck('extension', 'pass', 'V1-Helper v' + extVer + ' (last seen)');
+    }
+  }
+
+  function checkAudio() {
+    setCheck('audio', 'checking', 'Checking audio devices...');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      setCheck('audio', 'fail', 'MediaDevices API not available (HTTPS required)');
+      return;
+    }
+
+    navigator.mediaDevices.enumerateDevices().then(function(devices) {
+      var audioInputs = devices.filter(function(d) { return d.kind === 'audioinput'; });
+      if (audioInputs.length === 0) {
+        setCheck('audio', 'fail', 'No audio input devices found');
+      } else {
+        // Try to get a stream to verify permission
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          var labels = audioInputs
+            .map(function(d) { return d.label || 'Unnamed'; })
+            .slice(0, 2)
+            .join(', ');
+          setCheck('audio', 'pass', audioInputs.length + ' input(s): ' + labels);
+        }).catch(function(err) {
+          setCheck('audio', 'fail', 'Microphone permission denied: ' + err.message);
+        });
+      }
+    }).catch(function(err) {
+      setCheck('audio', 'fail', 'Device enumeration failed: ' + err.message);
+    });
+  }
+
+  function checkLambda() {
+    if (!awsReady) {
+      setCheck('lambda', 'fail', 'AWS credentials not configured');
+      return;
+    }
+    setCheck('lambda', 'checking', 'Invoking ' + LAMBDA_FN + '...');
+
+    lambda.invoke({
+      FunctionName: LAMBDA_FN,
+      InvocationType: 'DryRun'
+    }, function(err, data) {
+      if (err) {
+        if (err.code === 'ResourceNotFoundException') {
+          setCheck('lambda', 'fail', 'Function not found: ' + LAMBDA_FN);
+        } else if (err.code === 'AccessDeniedException') {
+          setCheck('lambda', 'fail', 'Access denied to Lambda (check IAM)');
+        } else {
+          setCheck('lambda', 'fail', 'Error: ' + (err.message || err.code));
+        }
+      } else {
+        setCheck('lambda', 'pass', 'Lambda reachable (status ' + (data.StatusCode || 204) + ')');
+      }
+    });
+  }
+
+  function checkWatcher() {
+    setCheck('watcher', 'checking', 'Polling /api/health...');
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/health', true);
+    xhr.timeout = 5000;
+    xhr.onload = function() {
+      try {
+        var data = JSON.parse(xhr.responseText);
+        if (data.status === 'ok') {
+          setCheck('watcher', 'pass', 'Healthy (uptime ' + data.uptime + 's, v' + (data.version || '?') + ')');
+        } else {
+          setCheck('watcher', 'fail', 'Unhealthy status: ' + data.status);
+        }
+      } catch (e) {
+        setCheck('watcher', 'fail', 'Invalid health response');
+      }
+    };
+    xhr.onerror = function() {
+      setCheck('watcher', 'fail', 'Server unreachable');
+    };
+    xhr.ontimeout = function() {
+      setCheck('watcher', 'fail', 'Health check timed out (5s)');
+    };
+    xhr.send();
+  }
+
+  // ── Fix Actions ────────────────────────────────────────────────────────────
+
+  function triggerFix(id) {
+    for (var i = 0; i < checks.length; i++) {
+      if (checks[i].id === id && checks[i].fix) {
+        checks[i].fix();
+        break;
+      }
+    }
+  }
+
+  function fixS3() {
+    window.location.href = '/admin.html';
+  }
+
+  function fixExtension() {
+    var extId = prompt('Enter V1-Helper Extension ID (from chrome://extensions):');
+    if (extId && extId.trim()) {
+      localStorage.setItem('boothapp_ext_id', extId.trim());
+      EXTENSION_ID = extId.trim();
+      checkExtension();
+    }
+  }
+
+  function fixAudio() {
+    // Trigger permission prompt
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        stream.getTracks().forEach(function(t) { t.stop(); });
+        checkAudio();
+      }).catch(function() {
+        alert('Microphone access denied. Check browser settings:\nchrome://settings/content/microphone');
+      });
+    } else {
+      alert('MediaDevices API not available. Ensure you are using HTTPS or localhost.');
+    }
+  }
+
+  function fixLambda() {
+    window.location.href = '/admin.html';
+  }
+
+  function fixWatcher() {
+    alert('Watcher service is down.\n\nRestart it with:\n  cd presenter && node server.js\n\nOr check the deployment at /admin.html');
+  }
+
+  // ── Run All ────────────────────────────────────────────────────────────────
+
+  window.runAllChecks = function() {
+    resetCountdown();
+    checkS3();
+    checkExtension();
+    checkAudio();
+    checkLambda();
+    checkWatcher();
+  };
+
+  // ── Countdown / Auto-refresh ───────────────────────────────────────────────
+
+  function resetCountdown() {
+    countdown = REFRESH_INTERVAL / 1000;
+    updateCountdownDisplay();
+  }
+
+  function updateCountdownDisplay() {
+    var el = document.getElementById('countdown');
+    el.textContent = 'Next check in ' + countdown + 's';
+  }
+
+  function startAutoRefresh() {
+    resetCountdown();
+    if (countdownTimer) clearInterval(countdownTimer);
+    if (refreshTimer) clearInterval(refreshTimer);
+
+    countdownTimer = setInterval(function() {
+      countdown--;
+      if (countdown <= 0) countdown = REFRESH_INTERVAL / 1000;
+      updateCountdownDisplay();
+    }, 1000);
+
+    refreshTimer = setInterval(function() {
+      window.runAllChecks();
+    }, REFRESH_INTERVAL);
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+
+  function boot() {
+    initAWS();
+    renderChecks();
+    window.runAllChecks();
+    startAutoRefresh();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>
