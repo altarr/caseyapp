@@ -49,6 +49,8 @@ function createRouter(opts) {
                 ...s,
                 session_score: summary.session_score,
                 executive_summary: summary.executive_summary,
+                products_count: Array.isArray(summary.products_demonstrated) ? summary.products_demonstrated.length : 0,
+                follow_up_count: Array.isArray(summary.follow_up_actions) ? summary.follow_up_actions.length : 0,
                 has_analysis: true,
               };
             }
