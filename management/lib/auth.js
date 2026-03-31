@@ -105,8 +105,8 @@ function resetUserPassword(id, newPassword) {
 
 function authMiddleware(req, res, next) {
   // Public routes that don't need auth
-  const publicPaths = ['/api/auth/login', '/api/health', '/login.html', '/styles.css',
-    '/brand/', '/favicon.ico'];
+  const publicPaths = ['/api/auth/login', '/api/health', '/api/demo-pcs/activate',
+    '/api/sessions/active', '/login.html', '/styles.css', '/brand/', '/favicon.ico'];
   if (publicPaths.some(p => req.path.startsWith(p))) return next();
 
   const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
