@@ -1,6 +1,10 @@
 # CaseyApp Demo PC Installer
 # Self-contained: bundles Node.js, ffmpeg, and app code.
 # Prompts for management server URL and pairing code.
+param(
+    [string]$ManagementUrl = "",
+    [string]$Code = ""
+)
 
 $ErrorActionPreference = "Continue"
 $InstallDir = "C:\CaseyApp"
@@ -21,7 +25,7 @@ Write-Host ""
 
 # ── Step 1: Get management server URL and pairing code ───────────────────────
 
-$MgmtUrl = Read-Host "  Management Server URL (e.g., https://caseyapp.trendcyberrange.com)"
+if ($ManagementUrl) { $MgmtUrl = $ManagementUrl } else { $MgmtUrl = Read-Host "  Management Server URL (e.g., https://caseyapp.trendcyberrange.com)" }
 $MgmtUrl = $MgmtUrl.TrimEnd('/')
 
 if (-not $MgmtUrl) {
@@ -41,7 +45,7 @@ try {
     exit 1
 }
 
-$PairingCode = Read-Host "  Pairing Code (from management dashboard)"
+if ($Code) { $PairingCode = $Code } else { $PairingCode = Read-Host "  Pairing Code (from management dashboard)" }
 
 if (-not $PairingCode) {
     Write-Host "  [ERROR] Pairing code is required." -ForegroundColor Red
@@ -95,17 +99,44 @@ if (-not $ffmpegSearch) {
     Write-Host "  [OK] ffmpeg already installed" -ForegroundColor Green
 }
 
-# Copy app files (installer is run from the extracted archive which contains the app)
+# Copy app files — look in script dir (extracted zip) or parent (repo)
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (Test-Path "$scriptDir\packager") {
-    Copy-Item -Path "$scriptDir\packager" -Destination "$InstallDir\packager" -Recurse -Force
-    Copy-Item -Path "$scriptDir\presenter" -Destination "$InstallDir\presenter" -Recurse -Force
-    Copy-Item -Path "$scriptDir\extension" -Destination "$InstallDir\extension" -Recurse -Force
-    Copy-Item -Path "$scriptDir\audio" -Destination "$InstallDir\audio" -Recurse -Force
-    Copy-Item -Path "$scriptDir\brand" -Destination "$InstallDir\brand" -Recurse -Force -ErrorAction SilentlyContinue
-    Copy-Item -Path "$scriptDir\package.json" -Destination "$InstallDir\package.json" -Force
-    Copy-Item -Path "$scriptDir\package-lock.json" -Destination "$InstallDir\package-lock.json" -Force -ErrorAction SilentlyContinue
+$sourceDir = $scriptDir
+if (-not (Test-Path "$sourceDir\packager")) {
+    $sourceDir = Split-Path -Parent $scriptDir  # repo root when running from installer/
 }
+if (-not (Test-Path "$sourceDir\packager")) {
+    Write-Host "  [ERROR] Cannot find app files (packager/, presenter/, etc.)" -ForegroundColor Red
+    Write-Host "  Script dir: $scriptDir" -ForegroundColor Red
+    Read-Host "  Press Enter to exit"
+    exit 1
+}
+
+$components = @("packager", "presenter", "extension", "audio", "infra")
+foreach ($comp in $components) {
+    $src = Join-Path $sourceDir $comp
+    $dst = Join-Path $InstallDir $comp
+    if (Test-Path $src) {
+        Copy-Item -Path $src -Destination $dst -Recurse -Force
+        # Remove node_modules (will install fresh)
+        $nm = Join-Path $dst "node_modules"
+        if (Test-Path $nm) { Remove-Item -Recurse -Force $nm }
+        Write-Host "  [OK] Copied $comp" -ForegroundColor Green
+    }
+}
+# Copy brand digital logos only
+$brandSrc = Join-Path $sourceDir "brand\digital\logos"
+if (Test-Path $brandSrc) {
+    New-Item -ItemType Directory -Path "$InstallDir\brand\digital\logos" -Force | Out-Null
+    Copy-Item -Path "$brandSrc\*" -Destination "$InstallDir\brand\digital\logos" -Recurse -Force
+}
+# Copy brand qrcode.min.js
+$qrSrc = Join-Path $sourceDir "brand\digital\qrcode.min.js"
+if (Test-Path $qrSrc) { Copy-Item $qrSrc "$InstallDir\brand\digital\qrcode.min.js" -Force }
+
+Copy-Item (Join-Path $sourceDir "package.json") "$InstallDir\package.json" -Force
+$lockFile = Join-Path $sourceDir "package-lock.json"
+if (Test-Path $lockFile) { Copy-Item $lockFile "$InstallDir\package-lock.json" -Force }
 
 # ── Step 4: Install npm dependencies ─────────────────────────────────────────
 
