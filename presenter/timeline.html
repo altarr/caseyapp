@@ -600,19 +600,19 @@ function renderSummary(summary) {
   let html = '';
 
   // Products shown
-  if (summary.products_shown && summary.products_shown.length) {
+  if (summary.products_demonstrated && summary.products_demonstrated.length) {
     html += '<div style="margin-bottom:20px"><div style="font-size:13px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Products Demonstrated</div>';
-    html += summary.products_shown.map(p =>
+    html += summary.products_demonstrated.map(p =>
       `<span class="chip accent" style="margin-right:6px;margin-bottom:4px">${esc(p)}</span>`
     ).join('');
     html += '</div>';
   }
 
   // Visitor interests
-  if (summary.visitor_interests && summary.visitor_interests.length) {
+  if (summary.key_interests && summary.key_interests.length) {
     html += `<table class="interests-table">
       <thead><tr><th>Topic</th><th>Confidence</th><th>Evidence</th></tr></thead><tbody>`;
-    for (const i of summary.visitor_interests) {
+    for (const i of summary.key_interests) {
       const cls = 'confidence-' + (i.confidence || 'low').toLowerCase();
       html += `<tr>
         <td style="font-weight:500">${esc(i.topic)}</td>
@@ -647,7 +647,7 @@ function renderSummary(summary) {
 }
 
 function renderFollowUp(summary, followUp) {
-  const actions = summary?.recommended_follow_up || [];
+  const actions = summary?.follow_up_actions || [];
   if (actions.length === 0 && !followUp) return;
 
   const section = document.getElementById('followup-section');

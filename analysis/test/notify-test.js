@@ -24,12 +24,12 @@ const sampleMetadata = {
 const sampleSummary = {
   session_id: 'TEST-001',
   visitor_name: 'Priya Sharma',
-  demo_duration_minutes: 17,
-  products_shown: ['XDR', 'Endpoint Security'],
-  visitor_interests: [
+  demo_duration_seconds: 1020,
+  products_demonstrated: ['XDR', 'Endpoint Security'],
+  key_interests: [
     { topic: 'XDR correlation', confidence: 'high', evidence: 'asked 3 questions about it' },
   ],
-  recommended_follow_up: [
+  follow_up_actions: [
     'Schedule deep-dive on XDR workbench',
     'Share XDR integration guide PDF',
   ],

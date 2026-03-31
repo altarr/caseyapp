@@ -69,10 +69,10 @@ console.log('Test 1: withRetry succeeds on first attempt');
       return {
         session_id: sessionId,
         visitor_name: (metadata && metadata.visitor_name) || 'Unknown Visitor',
-        demo_duration_minutes: timeline ? Math.round((timeline.duration_seconds || 0) / 60) : 0,
-        products_shown: [],
-        visitor_interests: [],
-        recommended_follow_up: ['Review session recording manually'],
+        demo_duration_seconds: timeline ? (timeline.duration_seconds || 0) : 0,
+        products_demonstrated: [],
+        key_interests: [],
+        follow_up_actions: ['Review session recording manually'],
         key_moments: [],
         generated_at: new Date().toISOString(),
         fallback: true,
@@ -83,13 +83,13 @@ console.log('Test 1: withRetry succeeds on first attempt');
     const fb = buildFallbackSummary('sess-1', { visitor_name: 'Alice' }, { duration_seconds: 300 });
     assert(fb.session_id === 'sess-1', 'session_id set');
     assert(fb.visitor_name === 'Alice', 'visitor_name from metadata');
-    assert(fb.demo_duration_minutes === 5, 'duration converted to minutes');
+    assert(fb.demo_duration_seconds === 300, 'duration in seconds');
     assert(fb.fallback === true, 'fallback flag set');
-    assert(fb.recommended_follow_up.length === 1, 'has fallback follow-up action');
+    assert(fb.follow_up_actions.length === 1, 'has fallback follow-up action');
 
     const fb2 = buildFallbackSummary('sess-2', null, null);
     assert(fb2.visitor_name === 'Unknown Visitor', 'defaults to Unknown Visitor');
-    assert(fb2.demo_duration_minutes === 0, 'defaults duration to 0');
+    assert(fb2.demo_duration_seconds === 0, 'defaults duration to 0');
 
     // Test 5: checkTimeout
     console.log('Test 5: timeout checking');

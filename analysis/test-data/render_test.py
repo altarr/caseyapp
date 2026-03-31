@@ -11,18 +11,18 @@ from engines.prompts import render_html_report
 summary = {
     "session_id": "B291047",
     "visitor_name": "Priya Sharma",
-    "demo_duration_minutes": 17,
+    "demo_duration_seconds": 1020,
     "session_score": 8,
     "executive_summary": "Priya showed strong interest in BYOD containerization and automated risk response for her 3,500-endpoint financial firm. Schedule a POC scoping call within the week to capitalize on competitive evaluation against CrowdStrike.",
-    "products_shown": ["Endpoint Security", "XDR", "Risk Insights"],
-    "visitor_interests": [
+    "products_demonstrated": ["Endpoint Security", "XDR", "Risk Insights"],
+    "key_interests": [
         {"topic": "BYOD Container Policy", "confidence": "high", "evidence": "Asked 3 detailed questions about MDM-free enrollment and platform-specific policies"},
         {"topic": "Automated Risk Remediation", "confidence": "high", "evidence": "Said 'That automated response is what we need' after seeing workflow demo"},
         {"topic": "XDR Correlation Speed", "confidence": "medium", "evidence": "Compared 20-min SIEM correlation to V1's sub-2-minute detection"},
         {"topic": "Splunk Integration", "confidence": "medium", "evidence": "Asked specifically about native Splunk app and API push"},
         {"topic": "EU Data Residency", "confidence": "low", "evidence": "Brief question about regulatory requirements at end of session"},
     ],
-    "recommended_follow_up": [
+    "follow_up_actions": [
         "Send BYOD container deployment guide with iOS/Android comparison matrix",
         "Schedule POC scoping call for 3,500-endpoint environment within 5 business days",
         "Provide competitive comparison: V1 BYOD vs CrowdStrike Falcon Go mobile coverage",
@@ -53,7 +53,7 @@ follow_up = {
 
 # Simulated factual extraction (for timeline enrichment)
 factual = {
-    "products_shown": ["Endpoint Security", "XDR", "Risk Insights"],
+    "products_demonstrated": ["Endpoint Security", "XDR", "Risk Insights"],
     "features_demonstrated": [
         {"feature": "BYOD Policy Configuration", "timestamp_rel": "01:02", "evidence": "Navigated to Endpoint Security > BYOD Policy panel"},
         {"feature": "Device Enrollment Settings", "timestamp_rel": "02:44", "evidence": "Clicked Device Enrollment Settings button, showed PIN and OS requirements"},
@@ -86,5 +86,5 @@ with open(html_path, "w") as f:
 
 print(f"HTML report: {len(html)} bytes")
 print(f"Written to: {html_path}")
-print(f"Sections: gauge, timeline ({len(factual['features_demonstrated'])} features + {len(summary['key_moments'])} key moments), {len(summary['products_shown'])} product tags, {len(summary['visitor_interests'])} interests, {len(summary['recommended_follow_up'])} follow-ups")
+print(f"Sections: gauge, timeline ({len(factual['features_demonstrated'])} features + {len(summary['key_moments'])} key moments), {len(summary['products_demonstrated'])} product tags, {len(summary['key_interests'])} interests, {len(summary['follow_up_actions'])} follow-ups")
 print("OK")

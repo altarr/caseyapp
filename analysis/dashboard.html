@@ -231,18 +231,18 @@ function setStatus(msg, ok) {
 function computeScore(data) {
   var score = 0;
   // Duration: up to 3 points (15+ min = 3, 10+ = 2, 5+ = 1)
-  var dur = data.demo_duration_minutes || 0;
+  var dur = Math.round((data.demo_duration_seconds || 0) / 60) || 0;
   if (dur >= 15) score += 3;
   else if (dur >= 10) score += 2;
   else if (dur >= 5) score += 1;
 
   // Products shown: up to 3 points (3+ = 3, 2 = 2, 1 = 1)
-  var prods = (data.products_shown || []).length;
+  var prods = (data.products_demonstrated || []).length;
   if (prods >= 3) score += 3;
   else score += prods;
 
   // Interests with high confidence: up to 2 points
-  var highInterests = (data.visitor_interests || []).filter(function(i) { return i.confidence === 'high'; }).length;
+  var highInterests = (data.key_interests || []).filter(function(i) { return i.confidence === 'high'; }).length;
   if (highInterests >= 2) score += 2;
   else score += highInterests;
 
@@ -278,12 +278,12 @@ function render(data) {
     if (m) company = m[1];
   }
   document.getElementById('vCompany').textContent = company || (data.tags || []).join(', ') || '';
-  document.getElementById('vDuration').textContent = data.demo_duration_minutes || '--';
+  document.getElementById('vDuration').textContent = Math.round((data.demo_duration_seconds || 0) / 60) || '--';
 
   // Products
   var pills = document.getElementById('vProducts');
   pills.innerHTML = '';
-  (data.products_shown || []).forEach(function(p) {
+  (data.products_demonstrated || []).forEach(function(p) {
     var span = document.createElement('span');
     span.className = 'pill';
     span.textContent = p;
@@ -299,12 +299,12 @@ function render(data) {
   document.getElementById('scoreLabel').textContent =
     score >= 8 ? 'High engagement' : score >= 5 ? 'Moderate engagement' : 'Low engagement';
 
-  // Timeline (key_moments + products_shown as fallback)
+  // Timeline (key_moments + products_demonstrated as fallback)
   var tl = document.getElementById('timeline');
   tl.innerHTML = '';
   var moments = data.key_moments || [];
-  if (moments.length === 0 && data.products_shown) {
-    moments = data.products_shown.map(function(p, i) {
+  if (moments.length === 0 && data.products_demonstrated) {
+    moments = data.products_demonstrated.map(function(p, i) {
       return { timestamp: '--:--', description: 'Demonstrated ' + p };
     });
   }
@@ -317,7 +317,7 @@ function render(data) {
   // Interests
   var intEl = document.getElementById('interests');
   intEl.innerHTML = '';
-  (data.visitor_interests || []).forEach(function(vi) {
+  (data.key_interests || []).forEach(function(vi) {
     var row = document.createElement('div');
     row.className = 'interest-row';
     row.innerHTML =
@@ -329,7 +329,7 @@ function render(data) {
   // Follow-ups
   var fu = document.getElementById('followUps');
   fu.innerHTML = '';
-  (data.recommended_follow_up || []).forEach(function(text, i) {
+  (data.follow_up_actions || []).forEach(function(text, i) {
     var card = document.createElement('div');
     card.className = 'follow-card';
     card.innerHTML = '<span class="num">' + (i + 1) + '</span>' + esc(text);
