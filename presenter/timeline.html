@@ -751,7 +751,7 @@ async function loadSession() {
     show('loading');
     document.getElementById('session-id-display').textContent = sessionId || 'DEMO';
     try {
-      const base = '../analysis/sample_data';
+      const base = '/analysis/sample_data';
       const [metadata, clicks, transcript] = await Promise.all([
         fetchLocalJson(`${base}/sample_metadata.json`),
         fetchLocalJson(`${base}/sample_clicks.json`),
