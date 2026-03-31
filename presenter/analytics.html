@@ -8,6 +8,8 @@
 <title>BoothApp — Session Analytics</title>
 <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="auth.js"></script>
 <link rel="stylesheet" href="styles/mobile.css">
 <style>
@@ -447,6 +449,15 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
     <span class="export-count" id="export-count"></span>
   </div>
 
+  <!-- Data Export -->
+  <div class="export-bar">
+    <h2>Data Export</h2>
+    <button class="export-btn" id="export-json">Export All Sessions (JSON)</button>
+    <button class="export-btn" id="export-summary-csv">Export Summary (CSV)</button>
+    <button class="export-btn" id="export-pdf">Export Metrics (PDF)</button>
+    <span class="export-count" id="data-export-count"></span>
+  </div>
+
   <!-- Charts row 1: sessions by day + peak hours -->
   <div class="charts-grid">
     <div class="chart-card full-width">
@@ -677,6 +688,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
     var sessions = filterSessions(activeRange);
     renderKPIs(sessions);
     updateExportCount(sessions);
+    updateDataExportCount(sessions);
     renderSessionsByDay(sessions);
     renderPeakHours(sessions);
     renderProducts(sessions);
@@ -1353,6 +1365,149 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
     var csv = generateSalesforceCSV(sessions);
     var ts = new Date().toISOString().slice(0, 10);
     downloadFile(csv, "boothapp-salesforce-import-" + ts + ".csv", "text/csv;charset=utf-8;");
+  });
+
+  // ── Data Export ─────────────────────────────────────────────────────────────
+
+  function updateDataExportCount(sessions) {
+    var el = document.getElementById("data-export-count");
+    var withAnalysis = sessions.filter(function (s) { return s.summary; }).length;
+    el.textContent = withAnalysis + " analyzed / " + sessions.length + " total sessions";
+  }
+
+  // JSON: full session data (metadata + summary + feedback)
+  document.getElementById("export-json").addEventListener("click", function () {
+    var sessions = filterSessions(activeRange);
+    var exportData = sessions.map(function (s) {
+      return {
+        session_id: s.id,
+        metadata: s.metadata || null,
+        analysis: s.summary || null,
+        feedback: s.feedback || null
+      };
+    });
+    var json = JSON.stringify(exportData, null, 2);
+    var ts = new Date().toISOString().slice(0, 10);
+    downloadFile(json, "boothapp-sessions-" + ts + ".json", "application/json");
+  });
+
+  // Summary CSV: one row per session with key fields
+  document.getElementById("export-summary-csv").addEventListener("click", function () {
+    var sessions = filterSessions(activeRange);
+    var headers = ["session_id", "visitor_name", "company", "title", "session_date",
+      "duration_sec", "session_score", "coverage_score", "follow_up_score",
+      "products_demonstrated", "key_interests", "follow_up_actions", "follow_up_priority"];
+    var lines = [headers.join(",")];
+    sessions.forEach(function (s) {
+      var meta = s.metadata || {};
+      var sum = s.summary || {};
+      var dur = getSessionDuration(s);
+      var interests = (sum.key_interests || []).map(function (ki) {
+        return typeof ki === "string" ? ki : (ki.topic || "");
+      }).filter(Boolean).join("; ");
+      var actions = (sum.follow_up_actions || []).join("; ");
+      var products = (sum.products_demonstrated || []).join("; ");
+      var sessionDate = meta.started_at || meta.created_at || "";
+      if (sessionDate) {
+        var d = new Date(sessionDate);
+        if (!isNaN(d.getTime())) {
+          sessionDate = d.getFullYear() + "-" +
+            String(d.getMonth() + 1).padStart(2, "0") + "-" +
+            String(d.getDate()).padStart(2, "0");
+        }
+      }
+      var row = [
+        s.id,
+        sum.visitor_name || meta.visitor_name || "",
+        meta.visitor_company || sum.visitor_company || "",
+        meta.visitor_title || sum.visitor_title || "",
+        sessionDate,
+        dur != null ? Math.round(dur) : "",
+        sum.session_score != null ? sum.session_score : "",
+        sum.coverage_score != null ? sum.coverage_score : "",
+        sum.follow_up_score != null ? sum.follow_up_score : "",
+        products,
+        interests,
+        actions,
+        getFollowUpPriority(sum.session_score)
+      ];
+      lines.push(row.map(csvEscape).join(","));
+    });
+    var ts = new Date().toISOString().slice(0, 10);
+    downloadFile(lines.join("\r\n"), "boothapp-summary-" + ts + ".csv", "text/csv;charset=utf-8;");
+  });
+
+  // PDF: capture dashboard as-rendered
+  document.getElementById("export-pdf").addEventListener("click", function () {
+    var btn = document.getElementById("export-pdf");
+    btn.textContent = "Generating PDF...";
+    btn.disabled = true;
+
+    var dashboard = document.getElementById("dashboard");
+    html2canvas(dashboard, {
+      backgroundColor: "#0d1117",
+      scale: 2,
+      useCORS: true,
+      logging: false
+    }).then(function (canvas) {
+      var jsPDF = window.jspdf.jsPDF;
+      var imgData = canvas.toDataURL("image/png");
+      var imgW = canvas.width;
+      var imgH = canvas.height;
+
+      // A4 landscape for wide dashboard
+      var pdf = new jsPDF("l", "mm", "a4");
+      var pdfW = pdf.internal.pageSize.getWidth();
+      var pdfH = pdf.internal.pageSize.getHeight();
+      var margin = 10;
+      var usableW = pdfW - margin * 2;
+      var scaledH = (imgH / imgW) * usableW;
+
+      // Title
+      pdf.setFontSize(14);
+      pdf.setTextColor(88, 166, 255);
+      pdf.text("BoothApp Session Analytics", margin, margin + 4);
+      pdf.setFontSize(9);
+      pdf.setTextColor(139, 148, 158);
+      pdf.text("Generated: " + new Date().toLocaleString(), margin, margin + 10);
+
+      var yOffset = margin + 16;
+      var pageUsableH = pdfH - yOffset - margin;
+
+      // If the image fits on one page
+      if (scaledH <= pageUsableH) {
+        pdf.addImage(imgData, "PNG", margin, yOffset, usableW, scaledH);
+      } else {
+        // Multi-page: slice the canvas
+        var pxPerPage = Math.floor((pageUsableH / usableW) * imgW);
+        var pages = Math.ceil(imgH / pxPerPage);
+        for (var i = 0; i < pages; i++) {
+          if (i > 0) {
+            pdf.addPage();
+            yOffset = margin;
+            pageUsableH = pdfH - margin * 2;
+            pxPerPage = Math.floor((pageUsableH / usableW) * imgW);
+          }
+          var sliceH = Math.min(pxPerPage, imgH - i * pxPerPage);
+          var sliceCanvas = document.createElement("canvas");
+          sliceCanvas.width = imgW;
+          sliceCanvas.height = sliceH;
+          var sliceCtx = sliceCanvas.getContext("2d");
+          sliceCtx.drawImage(canvas, 0, i * pxPerPage, imgW, sliceH, 0, 0, imgW, sliceH);
+          var sliceImg = sliceCanvas.toDataURL("image/png");
+          var sliceRenderedH = (sliceH / imgW) * usableW;
+          pdf.addImage(sliceImg, "PNG", margin, yOffset, usableW, sliceRenderedH);
+        }
+      }
+
+      var ts = new Date().toISOString().slice(0, 10);
+      pdf.save("boothapp-metrics-" + ts + ".pdf");
+    }).catch(function (err) {
+      showError("PDF generation failed: " + err.message);
+    }).finally(function () {
+      btn.textContent = "Export Metrics (PDF)";
+      btn.disabled = false;
+    });
   });
 
   // ── Init ──────────────────────────────────────────────────────────────────
