@@ -463,7 +463,7 @@ app.post('/api/demo-pcs/pairing-code', requireAdmin, (req, res) => {
 });
 
 // Demo PC calls this with the pairing code to register and get AWS credentials
-app.post('/api/demo-pcs/activate', (req, res) => {
+app.post('/api/demo-pcs/activate', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Pairing code required' });
 
