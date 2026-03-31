@@ -3,12 +3,10 @@ package com.trendmicro.boothapp.ui
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.trendmicro.boothapp.R
 import com.trendmicro.boothapp.data.AppPreferences
 import com.trendmicro.boothapp.databinding.ActivitySettingsBinding
 
-/**
- * Settings screen for configuring orchestrator URL, default demo PC/SE name, and AWS credentials.
- */
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
@@ -22,6 +20,7 @@ class SettingsActivity : AppCompatActivity() {
         prefs = AppPreferences(this)
         loadCurrentSettings()
 
+        binding.btnBack.setOnClickListener { finish() }
         binding.btnSave.setOnClickListener { saveSettings() }
     }
 
@@ -34,7 +33,14 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun saveSettings() {
-        prefs.orchestratorUrl = binding.etOrchestratorUrl.text?.toString() ?: ""
+        val url = binding.etOrchestratorUrl.text?.toString()?.trim() ?: ""
+        if (url.isNotBlank() && !url.startsWith("https://")) {
+            binding.tilOrchestratorUrl.error = getString(R.string.error_invalid_url)
+            return
+        }
+        binding.tilOrchestratorUrl.error = null
+
+        prefs.orchestratorUrl = url
         prefs.defaultDemoPc = binding.etDefaultDemoPc.text?.toString() ?: "booth-pc-1"
         prefs.defaultSeName = binding.etDefaultSeName.text?.toString() ?: ""
         prefs.awsAccessKeyId = binding.etAwsAccessKey.text?.toString() ?: ""

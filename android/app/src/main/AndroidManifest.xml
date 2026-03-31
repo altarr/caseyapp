@@ -29,7 +29,8 @@
         <activity
             android:name=".ui.SettingsActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="portrait"
+            android:parentActivityName=".ui.MainActivity" />
 
     </application>
 </manifest>

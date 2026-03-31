@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnCapture.setOnClickListener { capturePhoto() }
         binding.btnStartSession.setOnClickListener { startSession() }
-        binding.btnEndSession.setOnClickListener { endSession() }
+        binding.btnEndSession.setOnClickListener { confirmEndSession() }
     }
 
     override fun onResume() {
@@ -271,6 +272,15 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Metadata upload init failed", e)
             }
         }
+    }
+
+    private fun confirmEndSession() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.end_session_confirm_title)
+            .setMessage(R.string.end_session_confirm_message)
+            .setPositiveButton(R.string.confirm) { _, _ -> endSession() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun endSession() {
