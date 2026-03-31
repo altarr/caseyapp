@@ -24,11 +24,21 @@ const { claimTenant } = require('./tenant-pool');
 // ── Input validation ───────────────────────────────────────────────────────
 
 const SESSION_ID_RE = /^[A-Z0-9]{1,20}$/;
+const DEMO_PC_RE = /^[a-zA-Z0-9_-]{1,50}$/;
 
 function validateSessionId(session_id) {
   if (!session_id || typeof session_id !== 'string' || !SESSION_ID_RE.test(session_id)) {
     throw Object.assign(
       new Error(`Invalid session_id: must be 1-20 uppercase alphanumeric characters`),
+      { statusCode: 400 }
+    );
+  }
+}
+
+function validateDemoPc(demo_pc) {
+  if (!demo_pc || typeof demo_pc !== 'string' || !DEMO_PC_RE.test(demo_pc)) {
+    throw Object.assign(
+      new Error(`Invalid demo_pc: must be 1-50 alphanumeric, underscore, or hyphen characters`),
       { statusCode: 400 }
     );
   }
@@ -146,7 +156,7 @@ function generateSessionId() {
  * @returns {{ session_id, metadata, tenant_available }}
  */
 async function createSession({ visitor_name, badge_photo, demo_pc, se_name, audio_consent }) {
-  if (!demo_pc) throw Object.assign(new Error('demo_pc is required'), { statusCode: 400 });
+  validateDemoPc(demo_pc);
 
   const session_id = generateSessionId();
   const now = new Date().toISOString();
@@ -221,6 +231,7 @@ async function endSession(session_id, opts = {}) {
 
   const now = new Date().toISOString();
   const demo_pc = opts.demo_pc || metadata.demo_pc;
+  validateDemoPc(demo_pc);
 
   // Signal Chrome extension to stop audio before ending session
   await putObject('active-session.json', {
@@ -290,6 +301,6 @@ async function getSession(session_id) {
 module.exports = {
   createSession, endSession, getSession,
   transitionState, getSessionState,
-  validateSessionId,
+  validateSessionId, validateDemoPc,
   VALID_STATES, TRANSITIONS,
 };

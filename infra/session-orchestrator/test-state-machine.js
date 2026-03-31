@@ -37,7 +37,7 @@ tp.claimTenant = async () => null;
 const {
   createSession, endSession, getSession,
   transitionState, getSessionState,
-  validateSessionId,
+  validateSessionId, validateDemoPc,
   VALID_STATES, TRANSITIONS,
 } = require('./orchestrator');
 
@@ -301,6 +301,46 @@ function eq(a, b) {
 
   await test('getSessionState rejects invalid session_id', async () => {
     try { await getSessionState(null); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  // ── Demo PC Validation ──────────────────────────────────────────────
+
+  console.log('\n=== Demo PC Validation ===');
+
+  await test('validateDemoPc accepts valid alphanumeric with hyphens/underscores', () => {
+    validateDemoPc('pc-1');
+    validateDemoPc('demo_pc_01');
+    validateDemoPc('BOOTH3');
+  });
+
+  await test('validateDemoPc rejects empty string', async () => {
+    try { validateDemoPc(''); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  await test('validateDemoPc rejects null', async () => {
+    try { validateDemoPc(null); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  await test('validateDemoPc rejects path traversal', async () => {
+    try { validateDemoPc('../etc/passwd'); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  await test('validateDemoPc rejects slashes', async () => {
+    try { validateDemoPc('pc/1'); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  await test('validateDemoPc rejects string > 50 chars', async () => {
+    try { validateDemoPc('a'.repeat(51)); throw new Error('should have thrown'); }
+    catch (err) { eq(err.statusCode, 400); }
+  });
+
+  await test('createSession rejects invalid demo_pc', async () => {
+    try { await createSession({ visitor_name: 'Test', demo_pc: '../hack' }); throw new Error('should have thrown'); }
     catch (err) { eq(err.statusCode, 400); }
   });
 
