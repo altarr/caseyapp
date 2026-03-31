@@ -100,10 +100,8 @@ class QrScanActivity : AppCompatActivity() {
                     scanner.process(inputImage)
                         .addOnSuccessListener { barcodes ->
                             for (barcode in barcodes) {
-                                if (barcode.valueType == Barcode.TYPE_TEXT ||
-                                    barcode.valueType == Barcode.TYPE_UNKNOWN
-                                ) {
-                                    val raw = barcode.rawValue ?: continue
+                                val raw = barcode.rawValue ?: continue
+                                if (raw.contains("caseyapp-pair") || raw.contains("boothapp-pair")) {
                                     if (handleQrPayload(raw)) {
                                         scanned = true
                                         return@addOnSuccessListener
