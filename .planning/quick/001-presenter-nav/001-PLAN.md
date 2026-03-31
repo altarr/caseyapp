@@ -1,14 +1,12 @@
-# Presenter Navigation Bar Component
+# 001 -- Responsive Presenter Nav Bar
 
 ## Goal
-Create a reusable nav bar component (`presenter/components/nav.js`) that injects a consistent navigation bar into all presenter pages via a single `<script>` include.
+Update the presenter nav bar to show 5 key pages (Home, Analytics, Architecture, Demo Script, Slides) with current-page highlighting, hamburger menu on mobile, and dark theme consistency.
 
 ## Success Criteria
-1. nav.js creates and injects a nav bar at the top of every page that includes it
-2. Logo text "BoothApp" on the left
-3. Links: Home (/), Sessions (/sessions.html), Analytics (/analytics.html), Live Monitor (/live-dashboard.html), Admin (/admin.html)
-4. Active page highlighting based on current URL pathname
-5. Hamburger menu for mobile (< 768px)
-6. System health dot (green/red) polling /api/health every 10s
-7. Dark theme with glassmorphism effect (backdrop-filter blur + semi-transparent bg)
-8. All presenter HTML pages include `<script src="components/nav.js"></script>`
+1. Nav links show exactly: Home, Analytics, Architecture, Demo Script, Slides
+2. Current page is visually highlighted
+3. Hamburger menu works on mobile (<768px)
+4. Dark theme consistent with existing pages (#0d1117 bg, #58a6ff accent)
+5. Nav is present on all existing presenter pages (already true via nav.js include)
+6. Architecture and Slides pages exist (placeholder content)

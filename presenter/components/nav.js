@@ -3,15 +3,10 @@
 
   var NAV_LINKS = [
     { label: 'Home', href: '/' },
-    { label: 'Sessions', href: '/sessions.html' },
     { label: 'Analytics', href: '/analytics.html' },
-    { label: 'Heatmap', href: '/heatmap.html' },
-    { label: 'Live Monitor', href: '/live-dashboard.html' },
-    { label: 'Highlights', href: '/highlights.html' },
-    { label: 'ROI Calculator', href: '/roi-calculator.html' },
-    { label: 'Admin', href: '/admin.html' },
-    { label: 'API Docs', href: '/api-docs.html' },
-    { label: 'Setup', href: '/quick-setup.html' }
+    { label: 'Architecture', href: '/architecture.html' },
+    { label: 'Demo Script', href: '/demo-script.html' },
+    { label: 'Slides', href: '/slides.html' }
   ];
 
   var HEALTH_POLL_MS = 10000;
