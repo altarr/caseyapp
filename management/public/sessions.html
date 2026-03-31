@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Sessions</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">CaseyApp</a>
+  <a href="/">Dashboard</a>
+  <a href="/badges.html">Badge Training</a>
+  <a href="/sessions.html" class="active">Sessions</a>
+  <a href="/contacts.html">Contacts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Sessions</h1>
+    <p>Import and review demo session recordings from S3</p>
+  </div>
+
+  <div class="card">
+    <h2>Import from S3</h2>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="import-all-btn">Import All New Sessions</button>
+      <button class="btn btn-outline btn-sm" id="refresh-btn">Refresh List</button>
+    </div>
+    <div id="import-status" style="margin-top:0.75rem"></div>
+  </div>
+
+  <div class="card">
+    <h2>Imported Sessions</h2>
+    <table class="table" id="sessions-table">
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>Visitor</th>
+          <th>Company</th>
+          <th>Screenshots</th>
+          <th>Audio</th>
+          <th>Contact Match</th>
+          <th>Imported</th>
+        </tr>
+      </thead>
+      <tbody id="sessions-body">
+        <tr><td colspan="7" style="color:var(--text-dim)">No sessions imported</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Session Detail Modal -->
+  <div id="detail-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:1000;overflow-y:auto;padding:2rem">
+    <div class="card" style="max-width:900px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 id="detail-title" style="margin:0">Session</h2>
+        <button class="btn btn-outline btn-sm" id="close-detail">Close</button>
+      </div>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch('/api' + path, opts).then(function(r) { return r.json(); });
+  }
+
+  function loadSessions() {
+    api('GET', '/sessions').then(function(data) {
+      var tbody = document.getElementById('sessions-body');
+      if (!data.sessions.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-dim)">No sessions imported</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.sessions.map(function(s) {
+        var matchBadge = s.contact_id
+          ? '<span class="badge badge-green">' + Math.round(s.match_confidence*100) + '%</span> ' + (s.contact_name||'')
+          : '<span class="badge badge-amber">Unmatched</span>';
+        return '<tr style="cursor:pointer" data-sid="' + s.session_id + '">' +
+          '<td style="font-family:monospace;font-size:0.8rem">' + s.session_id + '</td>' +
+          '<td>' + (s.visitor_name||'-') + '</td>' +
+          '<td>' + (s.visitor_company||'-') + '</td>' +
+          '<td>' + s.screenshot_count + '</td>' +
+          '<td>' + (s.has_audio ? '<span class="badge badge-green">Yes</span>' : s.audio_opted_out ? '<span class="badge badge-red">Opted out</span>' : '<span class="badge badge-amber">No</span>') + '</td>' +
+          '<td>' + matchBadge + '</td>' +
+          '<td style="font-size:0.8rem;color:var(--text-muted)">' + (s.imported_at||'') + '</td>' +
+          '</tr>';
+      }).join('');
+    });
+  }
+
+  document.getElementById('import-all-btn').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Importing...';
+    var status = document.getElementById('import-status');
+
+    api('POST', '/sessions/import-all', { event_id: null }).then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Import All New Sessions';
+      status.innerHTML = '<span class="badge badge-green">' + data.imported + ' imported</span>';
+      if (data.errors) status.innerHTML += ' <span class="badge badge-red">' + data.errors + ' errors</span>';
+      loadSessions();
+    }).catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'Import All New Sessions';
+      status.innerHTML = '<span class="badge badge-red">Error: ' + err.message + '</span>';
+    });
+  });
+
+  document.getElementById('refresh-btn').addEventListener('click', loadSessions);
+
+  // Session detail
+  document.getElementById('sessions-body').addEventListener('click', function(e) {
+    var tr = e.target.closest('tr[data-sid]');
+    if (!tr) return;
+    var sid = tr.dataset.sid;
+    showDetail(sid);
+  });
+
+  document.getElementById('close-detail').addEventListener('click', function() {
+    document.getElementById('detail-overlay').style.display = 'none';
+  });
+
+  function showDetail(sid) {
+    document.getElementById('detail-overlay').style.display = 'block';
+    document.getElementById('detail-title').textContent = 'Session ' + sid;
+    var content = document.getElementById('detail-content');
+    content.innerHTML = '<span class="spinner"></span> Loading...';
+
+    api('GET', '/sessions/' + sid).then(function(data) {
+      var s = data.session;
+      if (!s) { content.innerHTML = '<p>Session not found</p>'; return; }
+
+      var html = '<div style="margin-bottom:1rem">' +
+        '<p><strong>Visitor:</strong> ' + (s.visitor_name||'-') + '</p>' +
+        '<p><strong>Company:</strong> ' + (s.visitor_company||'-') + '</p>' +
+        '<p><strong>Screenshots:</strong> ' + s.screenshot_count + '</p>' +
+        '<p><strong>Audio:</strong> ' + (s.has_audio ? 'Yes' : s.audio_opted_out ? 'Opted out' : 'No') + '</p>' +
+        '</div>';
+
+      // Screenshot thumbnails
+      if (s.screenshot_count > 0 && s.local_path) {
+        html += '<h3 style="color:var(--red);font-size:0.85rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:1rem 0 0.5rem">Screenshots</h3>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        for (var i = 0; i < Math.min(s.screenshot_count, 20); i++) {
+          var mins = Math.floor(i / 60);
+          var secs = i % 60;
+          var fname = 'screenshot_' + String(mins).padStart(2,'0') + 'm' + String(secs).padStart(2,'0') + 's000.jpg';
+          html += '<img src="/api/sessions/' + sid + '/screenshots/' + fname + '" style="width:150px;height:auto;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
+        }
+        html += '</div>';
+      }
+
+      // Matches
+      if (data.matches && data.matches.length) {
+        html += '<h3 style="color:var(--red);font-size:0.85rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:1rem 0 0.5rem">Contact Matches</h3>';
+        html += '<table class="table"><thead><tr><th>Contact</th><th>Email</th><th>Confidence</th><th>Reasoning</th></tr></thead><tbody>';
+        data.matches.forEach(function(m) {
+          html += '<tr><td>' + m.first_name + ' ' + m.last_name + '</td><td>' + m.email + '</td>' +
+            '<td>' + Math.round(m.match_confidence*100) + '%</td><td style="font-size:0.8rem;color:var(--text-muted)">' + (m.match_reasoning||'') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+
+      content.innerHTML = html;
+    });
+  }
+
+  loadSessions();
+})();
+</script>
+</body>
+</html>

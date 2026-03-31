@@ -1,0 +1,163 @@
+/* CaseyApp Management — TrendAI Brand Styles */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #000000;
+  --card: #0a0a0a;
+  --input-bg: #111111;
+  --border: #1a1a1a;
+  --input-border: #333333;
+  --text: #e5e5e5;
+  --text-muted: #888888;
+  --text-dim: #666666;
+  --placeholder: #444444;
+  --red: #d71920;
+  --red-dark: #b81419;
+  --amber: #ff9500;
+  --signal: #2e0fe4;
+  --green: #22c55e;
+  --error: #ff6b6f;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.page { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+.page-header { margin-bottom: 2rem; }
+.page-header h1 {
+  font-size: 1.4rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--red), var(--amber));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.page-header p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.3rem; }
+
+/* ── Nav ────────────────────────────────────────────────────────── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+  height: 56px; display: flex; align-items: center; gap: 1.5rem;
+  padding: 0 2rem;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-size: 1.1rem; font-weight: 700; text-decoration: none;
+  background: linear-gradient(135deg, var(--red), var(--amber));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.nav a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; padding: 0.4rem 0.75rem; border-radius: 6px; }
+.nav a:hover { color: var(--text); background: rgba(215,25,32,0.08); }
+.nav a.active { color: var(--red); background: rgba(215,25,32,0.12); }
+body { padding-top: 56px; }
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 28px 32px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  margin-bottom: 1.5rem;
+}
+.card h2 { font-size: 0.9rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--red); margin-bottom: 1rem; }
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  border: none; border-radius: 10px; padding: 12px 24px;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  text-decoration: none;
+}
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-primary { background: linear-gradient(135deg, var(--red), var(--amber)); color: #fff; }
+.btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--input-border); }
+.btn-outline:hover { border-color: var(--red); color: var(--text); }
+.btn-sm { padding: 8px 16px; font-size: 11px; }
+.btn-danger { background: var(--error); color: #fff; }
+
+/* ── Forms ──────────────────────────────────────────────────────── */
+.field-label {
+  display: block; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.input, select.input {
+  width: 100%; background: var(--input-bg);
+  border: 1px solid var(--input-border); border-radius: 10px;
+  padding: 12px 14px; font-size: 14px; color: var(--text);
+  outline: none; transition: border-color 0.15s;
+  font-family: inherit;
+}
+.input::placeholder { color: var(--placeholder); }
+.input:focus { border-color: var(--red); }
+.form-group { margin-bottom: 1.25rem; }
+.form-row { display: flex; gap: 1rem; }
+.form-row > * { flex: 1; }
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+.table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.table th {
+  text-align: left; padding: 0.6rem 0.8rem;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); color: var(--text); }
+.table tr:hover td { background: rgba(215,25,32,0.04); }
+
+/* ── Badges/Tags ────────────────────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 3px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge-red { background: rgba(215,25,32,0.15); color: var(--red); }
+.badge-amber { background: rgba(255,149,0,0.15); color: var(--amber); }
+
+/* ── Upload Zone ────────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed var(--input-border); border-radius: 16px;
+  padding: 3rem; text-align: center; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.upload-zone:hover { border-color: var(--red); background: rgba(215,25,32,0.04); }
+.upload-zone.dragover { border-color: var(--amber); background: rgba(255,149,0,0.06); }
+.upload-zone p { color: var(--text-muted); font-size: 0.9rem; }
+.upload-zone .label { color: var(--red); font-weight: 600; }
+
+/* ── Stat Cards ─────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; color: var(--red); }
+.stat-card .stat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-top: 0.25rem; }
+
+/* ── Spinner ────────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block; width: 20px; height: 20px;
+  border: 2px solid var(--input-border); border-top-color: var(--red);
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Confidence Bar ─────────────────────────────────────────────── */
+.confidence-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.confidence-bar .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.confidence-bar .fill.high { background: var(--green); }
+.confidence-bar .fill.medium { background: var(--amber); }
+.confidence-bar .fill.low { background: var(--error); }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page { padding: 1rem; }
+  .card { padding: 1.25rem; }
+  .form-row { flex-direction: column; }
+  .stats { grid-template-columns: 1fr 1fr; }
+}

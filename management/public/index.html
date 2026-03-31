@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Management</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-logo">CaseyApp</a>
+  <a href="/" class="active">Dashboard</a>
+  <a href="/badges.html">Badge Training</a>
+  <a href="/sessions.html">Sessions</a>
+  <a href="/contacts.html">Contacts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Management Dashboard</h1>
+    <p>Badge training, session import, and contact matching</p>
+  </div>
+
+  <!-- Event Selector -->
+  <div class="card">
+    <h2>Active Event</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="field-label">Event</label>
+        <select class="input" id="event-select">
+          <option value="">No events — create one below</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:0.5rem;padding-bottom:1.25rem">
+        <button class="btn btn-primary btn-sm" id="activate-btn">Set Active</button>
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:0.5rem">
+      <div class="form-group">
+        <label class="field-label">New Event Name</label>
+        <input type="text" class="input" id="new-event-name" placeholder="e.g. Black Hat 2026">
+      </div>
+      <div class="form-group">
+        <label class="field-label">Date</label>
+        <input type="text" class="input" id="new-event-date" placeholder="e.g. 2026-08-05">
+      </div>
+      <div class="form-group">
+        <label class="field-label">Location</label>
+        <input type="text" class="input" id="new-event-location" placeholder="e.g. Las Vegas">
+      </div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:1.25rem">
+        <button class="btn btn-outline btn-sm" id="create-event-btn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="stat-value" id="stat-sessions">-</div><div class="stat-label">Sessions</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-contacts">-</div><div class="stat-label">Contacts</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-matched">-</div><div class="stat-label">Matched</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-profiles">-</div><div class="stat-label">Badge Profiles</div></div>
+  </div>
+
+  <!-- Quick Links -->
+  <div style="display:flex;gap:1rem;flex-wrap:wrap">
+    <a href="/badges.html" class="btn btn-primary">Badge Training</a>
+    <a href="/sessions.html" class="btn btn-outline">Import Sessions</a>
+    <a href="/contacts.html" class="btn btn-outline">Import Contacts</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  var activeEventId = null;
+
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch('/api' + path, opts).then(function(r) { return r.json(); });
+  }
+
+  function loadEvents() {
+    api('GET', '/events').then(function(data) {
+      var sel = document.getElementById('event-select');
+      sel.innerHTML = '';
+      if (!data.events.length) {
+        sel.innerHTML = '<option value="">No events</option>';
+        return;
+      }
+      data.events.forEach(function(e) {
+        var opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = e.name + (e.date ? ' (' + e.date + ')' : '') + (e.active ? ' [ACTIVE]' : '');
+        if (e.active) { activeEventId = e.id; opt.selected = true; }
+        sel.appendChild(opt);
+      });
+      loadStats();
+    });
+  }
+
+  function loadStats() {
+    var eid = activeEventId || document.getElementById('event-select').value;
+    if (!eid) return;
+    api('GET', '/sessions?event_id=' + eid).then(function(d) {
+      document.getElementById('stat-sessions').textContent = d.sessions.length;
+      var matched = d.sessions.filter(function(s) { return s.contact_id; }).length;
+      document.getElementById('stat-matched').textContent = matched;
+    });
+    api('GET', '/contacts?event_id=' + eid + '&limit=1').then(function(d) {
+      document.getElementById('stat-contacts').textContent = d.total || 0;
+    });
+    api('GET', '/badges/profiles?event_id=' + eid).then(function(d) {
+      document.getElementById('stat-profiles').textContent = d.profiles.length;
+    });
+  }
+
+  document.getElementById('create-event-btn').addEventListener('click', function() {
+    var name = document.getElementById('new-event-name').value.trim();
+    if (!name) return;
+    api('POST', '/events', {
+      name: name,
+      date: document.getElementById('new-event-date').value.trim(),
+      location: document.getElementById('new-event-location').value.trim()
+    }).then(function() {
+      document.getElementById('new-event-name').value = '';
+      document.getElementById('new-event-date').value = '';
+      document.getElementById('new-event-location').value = '';
+      loadEvents();
+    });
+  });
+
+  document.getElementById('activate-btn').addEventListener('click', function() {
+    var id = document.getElementById('event-select').value;
+    if (!id) return;
+    api('POST', '/events/' + id + '/activate').then(function() {
+      activeEventId = id;
+      loadEvents();
+    });
+  });
+
+  loadEvents();
+})();
+</script>
+</body>
+</html>

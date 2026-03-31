@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Badge Training</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">CaseyApp</a>
+  <a href="/">Dashboard</a>
+  <a href="/badges.html" class="active">Badge Training</a>
+  <a href="/sessions.html">Sessions</a>
+  <a href="/contacts.html">Contacts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Badge Training</h1>
+    <p>Upload sample badges to teach the AI which fields map where</p>
+  </div>
+
+  <div class="card">
+    <h2>Upload Badge Sample</h2>
+    <div class="upload-zone" id="upload-zone">
+      <p><span class="label">Click or drag</span> a badge image here</p>
+      <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-dim)">JPEG, PNG, or WebP up to 10MB</p>
+      <input type="file" id="badge-file" accept="image/*" style="display:none">
+    </div>
+  </div>
+
+  <!-- Analysis Result -->
+  <div class="card" id="result-card" style="display:none">
+    <h2>Extracted Fields</h2>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap">
+      <div style="flex:0 0 300px">
+        <img id="badge-preview" style="max-width:300px;border-radius:8px;border:1px solid var(--border)">
+      </div>
+      <div style="flex:1;min-width:300px">
+        <table class="table" id="fields-table">
+          <thead><tr><th>Value</th><th>Field Type</th><th>Confidence</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem">
+          <button class="btn btn-primary btn-sm" id="save-profile-btn">Save as Profile</button>
+          <button class="btn btn-outline btn-sm" id="clear-btn">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Saved Profiles -->
+  <div class="card">
+    <h2>Saved Profiles</h2>
+    <div id="profiles-list"><p style="color:var(--text-dim)">No profiles yet</p></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var uploadZone = document.getElementById('upload-zone');
+  var fileInput = document.getElementById('badge-file');
+  var resultCard = document.getElementById('result-card');
+  var currentFields = [];
+  var currentFile = null;
+
+  uploadZone.addEventListener('click', function() { fileInput.click(); });
+  uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', function() { uploadZone.classList.remove('dragover'); });
+  uploadZone.addEventListener('drop', function(e) {
+    e.preventDefault(); uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function() { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(file) {
+    currentFile = file;
+    uploadZone.innerHTML = '<p><span class="spinner"></span> Analyzing badge with AI...</p>';
+
+    var formData = new FormData();
+    formData.append('badge', file);
+
+    fetch('/api/badges/analyze', { method: 'POST', body: formData })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        uploadZone.innerHTML = '<p><span class="label">Click or drag</span> another badge</p><input type="file" id="badge-file" accept="image/*" style="display:none">';
+        document.getElementById('badge-file').addEventListener('change', function() { if (this.files[0]) handleFile(this.files[0]); });
+
+        if (data.error) { alert('Error: ' + data.error); return; }
+        currentFields = data.fields || [];
+        showResult(file, data);
+      })
+      .catch(function(err) {
+        uploadZone.innerHTML = '<p style="color:var(--error)">Error: ' + err.message + '</p>';
+      });
+  }
+
+  function showResult(file, data) {
+    resultCard.style.display = 'block';
+    var preview = document.getElementById('badge-preview');
+    preview.src = URL.createObjectURL(file);
+
+    var tbody = document.querySelector('#fields-table tbody');
+    tbody.innerHTML = '';
+    (data.fields || []).forEach(function(f, i) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + f.value + '</td>' +
+        '<td><select class="input" data-idx="' + i + '" style="padding:6px;font-size:12px">' +
+          '<option value="name"' + (f.field_type==='name'?' selected':'') + '>Name</option>' +
+          '<option value="company"' + (f.field_type==='company'?' selected':'') + '>Company</option>' +
+          '<option value="title"' + (f.field_type==='title'?' selected':'') + '>Title</option>' +
+          '<option value="email"' + (f.field_type==='email'?' selected':'') + '>Email</option>' +
+          '<option value="phone"' + (f.field_type==='phone'?' selected':'') + '>Phone</option>' +
+          '<option value="role"' + (f.field_type==='role'?' selected':'') + '>Role</option>' +
+          '<option value="event"' + (f.field_type==='event'?' selected':'') + '>Event</option>' +
+          '<option value="id"' + (f.field_type==='id'?' selected':'') + '>ID</option>' +
+          '<option value="other"' + (f.field_type==='other'?' selected':'') + '>Other</option>' +
+        '</select></td>' +
+        '<td><div class="confidence-bar" style="width:80px"><div class="fill ' +
+          (f.confidence>=0.8?'high':f.confidence>=0.5?'medium':'low') +
+          '" style="width:' + Math.round(f.confidence*100) + '%"></div></div> ' +
+          Math.round(f.confidence*100) + '%</td>' +
+        '<td><button class="btn btn-outline btn-sm" onclick="this.closest(\'tr\').remove()">Remove</button></td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('save-profile-btn').addEventListener('click', function() {
+    var name = prompt('Profile name (e.g. "Black Hat 2026"):');
+    if (!name) return;
+
+    var selects = document.querySelectorAll('#fields-table select');
+    var mappings = [];
+    var corrections = [];
+    selects.forEach(function(sel) {
+      var idx = parseInt(sel.dataset.idx);
+      var original = currentFields[idx];
+      mappings.push({ value: original.value, field_type: sel.value, confidence: original.confidence });
+      if (sel.value !== original.field_type) {
+        corrections.push({ original_value: original.value, original_type: original.field_type, corrected_type: sel.value });
+      }
+    });
+
+    fetch('/api/badges/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: 1, name: name, field_mappings: mappings, sample_corrections: corrections })
+    }).then(function(r) { return r.json(); }).then(function() { loadProfiles(); alert('Profile saved!'); });
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', function() {
+    resultCard.style.display = 'none';
+    currentFields = [];
+  });
+
+  function loadProfiles() {
+    fetch('/api/badges/profiles').then(function(r) { return r.json(); }).then(function(data) {
+      var el = document.getElementById('profiles-list');
+      if (!data.profiles.length) { el.innerHTML = '<p style="color:var(--text-dim)">No profiles yet</p>'; return; }
+      el.innerHTML = '<table class="table"><thead><tr><th>Name</th><th>Fields</th><th>Created</th></tr></thead><tbody>' +
+        data.profiles.map(function(p) {
+          var fields = JSON.parse(p.field_mappings || '[]');
+          return '<tr><td>' + p.name + '</td><td>' + fields.length + ' fields</td><td>' + (p.created_at||'') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    });
+  }
+
+  loadProfiles();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Contacts</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">CaseyApp</a>
+  <a href="/">Dashboard</a>
+  <a href="/badges.html">Badge Training</a>
+  <a href="/sessions.html">Sessions</a>
+  <a href="/contacts.html" class="active">Contacts</a>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Contacts</h1>
+    <p>Import attendee CSV and match to demo sessions using AI</p>
+  </div>
+
+  <!-- CSV Import -->
+  <div class="card">
+    <h2>Import CSV</h2>
+    <div class="upload-zone" id="csv-zone">
+      <p><span class="label">Click or drag</span> a CSV file here</p>
+      <p style="margin-top:0.5rem;font-size:0.8rem;color:var(--text-dim)">Supports: Name, Email, Company, Title, Phone, Address, Lead Score, etc.</p>
+      <input type="file" id="csv-file" accept=".csv,.tsv,.txt" style="display:none">
+    </div>
+    <div id="csv-status" style="margin-top:0.75rem"></div>
+  </div>
+
+  <!-- AI Matching -->
+  <div class="card">
+    <h2>AI Contact Matching</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem">
+      Uses Claude AI to fuzzy-match demo session visitors to imported contacts based on name and company similarity.
+    </p>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary btn-sm" id="match-btn">Run AI Matching</button>
+      <span id="match-status"></span>
+    </div>
+    <div id="match-results" style="margin-top:1rem"></div>
+  </div>
+
+  <!-- Contact List -->
+  <div class="card">
+    <h2>Contact List</h2>
+    <div style="margin-bottom:1rem">
+      <input type="text" class="input" id="search-input" placeholder="Search by name, company, or email..." style="max-width:400px">
+    </div>
+    <table class="table" id="contacts-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Company</th>
+          <th>Title</th>
+          <th>Matched Session</th>
+        </tr>
+      </thead>
+      <tbody id="contacts-body">
+        <tr><td colspan="5" style="color:var(--text-dim)">No contacts imported</td></tr>
+      </tbody>
+    </table>
+    <div id="contacts-pagination" style="margin-top:1rem;display:flex;gap:0.5rem"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var csvZone = document.getElementById('csv-zone');
+  var csvFile = document.getElementById('csv-file');
+  var currentPage = 0;
+  var pageSize = 50;
+
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch('/api' + path, opts).then(function(r) { return r.json(); });
+  }
+
+  // CSV Upload
+  csvZone.addEventListener('click', function() { csvFile.click(); });
+  csvZone.addEventListener('dragover', function(e) { e.preventDefault(); csvZone.classList.add('dragover'); });
+  csvZone.addEventListener('dragleave', function() { csvZone.classList.remove('dragover'); });
+  csvZone.addEventListener('drop', function(e) {
+    e.preventDefault(); csvZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) uploadCsv(e.dataTransfer.files[0]);
+  });
+  csvFile.addEventListener('change', function() { if (csvFile.files[0]) uploadCsv(csvFile.files[0]); });
+
+  function uploadCsv(file) {
+    var status = document.getElementById('csv-status');
+    status.innerHTML = '<span class="spinner"></span> Importing...';
+
+    var formData = new FormData();
+    formData.append('csv', file);
+
+    fetch('/api/contacts/import-csv', { method: 'POST', body: formData })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) { status.innerHTML = '<span class="badge badge-red">' + data.error + '</span>'; return; }
+        status.innerHTML = '<span class="badge badge-green">' + data.imported + ' contacts imported</span>' +
+          '<span style="margin-left:0.5rem;color:var(--text-muted);font-size:0.8rem">Detected: ' +
+          (data.detected_fields || []).join(', ') + '</span>';
+        loadContacts();
+      })
+      .catch(function(err) {
+        status.innerHTML = '<span class="badge badge-red">Error: ' + err.message + '</span>';
+      });
+  }
+
+  // AI Matching
+  document.getElementById('match-btn').addEventListener('click', function() {
+    var btn = this;
+    var status = document.getElementById('match-status');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Matching...';
+    status.textContent = 'This may take a minute for large contact lists...';
+
+    api('POST', '/contacts/match', { event_id: 1 }).then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Run AI Matching';
+
+      if (data.error) { status.innerHTML = '<span class="badge badge-red">' + data.error + '</span>'; return; }
+      status.innerHTML = '<span class="badge badge-green">' + data.matched + ' matched</span>';
+      if (data.failed) status.innerHTML += ' <span class="badge badge-amber">' + data.failed + ' unmatched</span>';
+
+      // Show match results
+      var resultsEl = document.getElementById('match-results');
+      if (data.matches && data.matches.length) {
+        resultsEl.innerHTML = '<table class="table"><thead><tr><th>Session Visitor</th><th>Matched Contact</th><th>Email</th><th>Confidence</th><th>Reasoning</th></tr></thead><tbody>' +
+          data.matches.map(function(m) {
+            var confClass = m.confidence >= 0.8 ? 'high' : m.confidence >= 0.5 ? 'medium' : 'low';
+            return '<tr><td>' + m.visitor_name + '</td><td>' + m.contact_name + '</td><td>' + m.contact_email + '</td>' +
+              '<td><div class="confidence-bar" style="width:60px;display:inline-block;vertical-align:middle"><div class="fill ' + confClass + '" style="width:' + Math.round(m.confidence*100) + '%"></div></div> ' + Math.round(m.confidence*100) + '%</td>' +
+              '<td style="font-size:0.8rem;color:var(--text-muted)">' + m.reasoning + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      }
+
+      loadContacts();
+    }).catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'Run AI Matching';
+      status.innerHTML = '<span class="badge badge-red">Error: ' + err.message + '</span>';
+    });
+  });
+
+  // Contact List
+  var searchTimer;
+  document.getElementById('search-input').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { currentPage = 0; loadContacts(); }, 300);
+  });
+
+  function loadContacts() {
+    var search = document.getElementById('search-input').value.trim();
+    var q = '?limit=' + pageSize + '&offset=' + (currentPage * pageSize);
+    if (search) q += '&search=' + encodeURIComponent(search);
+
+    api('GET', '/contacts' + q).then(function(data) {
+      var tbody = document.getElementById('contacts-body');
+      if (!data.contacts.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-dim)">No contacts found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.contacts.map(function(c) {
+        return '<tr>' +
+          '<td>' + (c.first_name||'') + ' ' + (c.last_name||'') + '</td>' +
+          '<td style="font-size:0.85rem">' + (c.email||'-') + '</td>' +
+          '<td>' + (c.company||'-') + '</td>' +
+          '<td style="font-size:0.85rem;color:var(--text-muted)">' + (c.title||'-') + '</td>' +
+          '<td>-</td>' +
+          '</tr>';
+      }).join('');
+    });
+  }
+
+  loadContacts();
+})();
+</script>
+</body>
+</html>
