@@ -1,11 +1,9 @@
-<!-- BoothApp Presenter - Hackathon 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BoothApp — Presenter Dashboard</title>
-<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<title>BoothApp — AI-Powered Demo Capture</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -17,341 +15,259 @@
     --text-muted: #8b949e;
     --text-dim: #484f58;
     --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
     --accent-red: #f85149;
     --accent-orange: #f78166;
-    --accent-green: #3fb950;
-    --accent-yellow: #d29922;
+    --accent-purple: #a371f7;
   }
 
   body {
-    background: var(--bg-primary);
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #1a1e2e 70%, #0d1117 100%);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     padding: 2rem;
   }
 
-  /* -- Logo header -- */
-  .logo-header {
+  /* -- Hero section -- */
+  .hero {
     text-align: center;
-    margin-bottom: 1rem;
-    padding-top: 0.5rem;
+    margin-bottom: 2.5rem;
   }
 
-  .logo-header .logo-icon {
-    width: 72px;
-    height: 72px;
-    margin: 0 auto 0.6rem;
-    background: linear-gradient(135deg, var(--accent-blue), #a371f7);
-    border-radius: 18px;
+  .logo-icon {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 1.2rem;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+    border-radius: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 24px rgba(88, 166, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(88, 166, 255, 0.25), 0 0 64px rgba(163, 113, 247, 0.1);
   }
 
-  .logo-header .logo-icon svg {
-    width: 44px;
-    height: 44px;
+  .logo-icon svg {
+    width: 56px;
+    height: 56px;
     fill: #fff;
   }
 
-  .logo-header .logo-title {
-    font-size: 2.6rem;
+  .logo-title {
+    font-size: 3.5rem;
     font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
   }
 
-  .logo-header .logo-title span {
+  .logo-title span {
     color: var(--accent-blue);
   }
 
-  .logo-header .logo-subtitle {
-    font-size: 0.9rem;
+  .tagline {
+    font-size: 1.15rem;
     color: var(--text-muted);
-    letter-spacing: 0.08em;
+    margin-top: 0.5rem;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-top: 0.15rem;
+    font-weight: 500;
   }
 
-  /* -- Session counter bar -- */
-  .session-counter {
+  /* -- Session status bar -- */
+  .status-bar {
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     justify-content: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2.5rem;
     flex-wrap: wrap;
   }
 
-  .counter-chip {
+  .status-chip {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.5rem;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 0.35rem 0.9rem;
-    font-size: 0.85rem;
+    border-radius: 24px;
+    padding: 0.5rem 1.2rem;
+    font-size: 0.9rem;
+    transition: border-color 0.3s;
   }
 
-  .counter-dot {
-    width: 8px;
-    height: 8px;
+  .status-chip:hover {
+    border-color: var(--accent-blue);
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
-  .counter-dot.active    { background: var(--accent-red); animation: pulse 1.5s infinite; }
-  .counter-dot.completed { background: var(--accent-green); }
-  .counter-dot.total     { background: var(--accent-blue); }
+  .status-dot.active { background: var(--accent-red); animation: pulse 1.5s infinite; }
+  .status-dot.completed { background: var(--accent-green); }
+  .status-dot.total { background: var(--accent-blue); }
 
-  .counter-chip .count {
+  .status-chip .count {
     font-weight: 700;
-    font-family: monospace;
+    font-family: "SF Mono", "Cascadia Code", monospace;
+    font-size: 1.1rem;
     color: var(--text-primary);
   }
 
-  .counter-chip .count-label {
+  .status-chip .label {
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
   }
 
-  h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--accent-blue);
-    margin-bottom: 0.5rem;
-    letter-spacing: 0.02em;
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
   }
 
-  .session-id {
-    font-size: 1.2rem;
-    color: var(--text-muted);
-    margin-bottom: 2rem;
-    font-family: monospace;
-  }
-
-  .grid {
+  /* -- Quick actions grid -- */
+  .actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
     width: 100%;
-    max-width: 900px;
+    max-width: 520px;
+    margin-bottom: 3rem;
   }
 
-  .card {
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1.5rem 1rem;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 2rem 2.5rem;
-    text-align: center;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    cursor: pointer;
   }
 
-  .card-label {
-    font-size: 1.4rem;
+  .action-btn:hover {
+    border-color: var(--accent-blue);
+    background: #1c2333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(88, 166, 255, 0.12);
+  }
+
+  .action-btn .icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-btn .icon svg {
+    width: 24px;
+    height: 24px;
+    fill: #fff;
+  }
+
+  .action-btn .icon.green  { background: linear-gradient(135deg, #238636, #3fb950); }
+  .action-btn .icon.blue   { background: linear-gradient(135deg, #1f6feb, #58a6ff); }
+  .action-btn .icon.orange { background: linear-gradient(135deg, #bd561d, #f78166); }
+  .action-btn .icon.purple { background: linear-gradient(135deg, #8957e5, #a371f7); }
+
+  .action-btn .btn-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .action-btn .btn-desc {
+    font-size: 0.75rem;
     color: var(--text-muted);
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* -- Team credits -- */
+  .credits {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    max-width: 600px;
+  }
+
+  .credits-title {
+    font-size: 0.8rem;
+    color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.1em;
     margin-bottom: 0.8rem;
   }
 
-  .card-value {
-    font-size: 4.5rem;
-    font-weight: 700;
-    line-height: 1.1;
-    word-break: break-word;
-  }
-
-  .card-value.name   { color: #f0f6fc; font-size: 3.5rem; }
-  .card-value.timer  { color: var(--accent-blue); font-family: monospace; }
-  .card-value.clicks { color: var(--accent-orange); }
-
-  .status-dot {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-  }
-  .status-dot.recording { background: var(--accent-red); animation: pulse 1.5s infinite; }
-  .status-dot.ended     { background: var(--text-muted); }
-  .status-dot.waiting   { background: var(--accent-yellow); animation: pulse 2s infinite; }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.3; }
-  }
-
-  .card-value.status { font-size: 2.5rem; }
-
-  .card.full-width {
-    grid-column: 1 / -1;
-  }
-
-  .se-name {
-    font-size: 1rem;
-    color: var(--text-muted);
-    margin-top: 0.3rem;
-  }
-
-  /* -- Screenshot thumbnail -- */
-  .screenshot-wrap {
-    width: 100%;
-    max-height: 340px;
-    overflow: hidden;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 180px;
-  }
-  .screenshot-wrap img {
-    width: 100%;
-    height: auto;
-    display: block;
-    object-fit: contain;
-  }
-  .screenshot-wrap .placeholder {
-    color: var(--text-dim);
+  .team-name {
     font-size: 1.1rem;
-    font-style: italic;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
   }
-  .screenshot-meta {
-    margin-top: 0.5rem;
+
+  .members {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 1.2rem;
     font-size: 0.85rem;
     color: var(--text-dim);
   }
 
-  .error-banner {
-    background: #f8514922;
-    border: 1px solid var(--accent-red);
-    color: var(--accent-red);
-    padding: 1rem 2rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-    font-size: 1.2rem;
-    display: none;
-    width: 100%;
-    max-width: 900px;
-    text-align: center;
-  }
-
-  .refresh-indicator {
-    margin-top: 1.5rem;
-    font-size: 0.9rem;
-    color: var(--text-dim);
+  .members span {
+    white-space: nowrap;
   }
 
   /* -- Footer -- */
-  .site-footer {
-    margin-top: auto;
-    padding-top: 2.5rem;
-    padding-bottom: 0.5rem;
-    text-align: center;
-    font-size: 0.8rem;
+  .footer {
+    font-size: 0.75rem;
     color: var(--text-dim);
     letter-spacing: 0.03em;
   }
 
-  .site-footer .team-name {
-    font-weight: 600;
-    color: var(--text-muted);
-  }
-
-  /* -- Setup screen -- */
-  .setup {
-    text-align: center;
-    margin-top: 2rem;
-  }
-  .setup label {
-    display: block;
-    font-size: 1.3rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-  }
-  .setup input {
-    font-size: 2rem;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-primary);
-    text-align: center;
+  .refresh-note {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 2rem;
     font-family: monospace;
-    width: 320px;
-  }
-  .setup input:focus { outline: 2px solid var(--accent-blue); }
-  .setup button {
-    display: block;
-    margin: 1.5rem auto 0;
-    font-size: 1.4rem;
-    padding: 0.7rem 2.5rem;
-    border-radius: 8px;
-    border: none;
-    background: #238636;
-    color: #fff;
-    cursor: pointer;
-    font-weight: 600;
-  }
-  .setup button:hover { background: #2ea043; }
-
-  .hidden { display: none !important; }
-
-  /* -- Responsive: tablet (< 768px) -- */
-  @media (max-width: 768px) {
-    body { padding: 1rem; }
-    .logo-header .logo-title { font-size: 2rem; }
-    .logo-header .logo-icon { width: 56px; height: 56px; border-radius: 14px; }
-    .logo-header .logo-icon svg { width: 34px; height: 34px; }
-    h1 { font-size: 1.6rem; }
-    .grid { gap: 1rem; }
-    .card { padding: 1.2rem 1.5rem; }
-    .card-label { font-size: 1.1rem; }
-    .card-value { font-size: 3.5rem; }
-    .card-value.name { font-size: 2.5rem; }
-    .card-value.status { font-size: 2rem; }
-    .screenshot-wrap { max-height: 260px; min-height: 140px; }
-    .session-counter { gap: 0.6rem; }
   }
 
-  /* -- Responsive: phone (< 480px) -- */
-  @media (max-width: 480px) {
-    body { padding: 0.75rem; }
-    .logo-header .logo-title { font-size: 1.6rem; }
-    .logo-header .logo-icon { width: 48px; height: 48px; border-radius: 12px; }
-    .logo-header .logo-icon svg { width: 28px; height: 28px; }
-    h1 { font-size: 1.3rem; }
-    .session-id { font-size: 0.95rem; margin-bottom: 1rem; }
-    .grid { grid-template-columns: 1fr; gap: 0.75rem; }
-    .card { padding: 1rem; }
-    .card-label { font-size: 1rem; margin-bottom: 0.4rem; }
-    .card-value { font-size: 3rem; }
-    .card-value.name { font-size: 2rem; }
-    .card-value.status { font-size: 1.6rem; }
-    .setup input { width: 100%; font-size: 1.5rem; }
-    .screenshot-wrap { max-height: 200px; min-height: 120px; }
-    .session-counter { gap: 0.5rem; }
-    .counter-chip { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  /* -- Responsive -- */
+  @media (max-width: 600px) {
+    body { padding: 1.5rem 1rem; }
+    .logo-title { font-size: 2.5rem; }
+    .logo-icon { width: 72px; height: 72px; border-radius: 18px; }
+    .logo-icon svg { width: 44px; height: 44px; }
+    .tagline { font-size: 0.95rem; }
+    .actions { grid-template-columns: 1fr; max-width: 320px; }
+    .status-bar { gap: 0.8rem; }
+    .status-chip { padding: 0.4rem 0.9rem; font-size: 0.85rem; }
   }
 </style>
 </head>
 <body>
 <script src="auth.js"></script>
-<script>if (!BoothAuth.requireAwsCreds()) { window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href); }
-else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
+<script>
+if (!BoothAuth.requireAwsCreds()) { window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href); }
+else if (!BoothAuth.requireLogin()) { /* redirects */ }
+</script>
 
-<!-- Logo header -->
-<div class="logo-header">
+<!-- Hero -->
+<div class="hero">
   <div class="logo-icon">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" opacity="0.3"/>
@@ -361,112 +277,87 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
     </svg>
   </div>
   <div class="logo-title">Booth<span>App</span></div>
-  <div class="logo-subtitle">Presenter Dashboard</div>
+  <div class="tagline">AI-Powered Demo Capture</div>
 </div>
 
-<!-- Session counter (populated by JS) -->
-<div class="session-counter" id="session-counter">
-  <div class="counter-chip">
-    <span class="counter-dot active"></span>
+<!-- Real-time session status -->
+<div class="status-bar" id="status-bar">
+  <div class="status-chip">
+    <span class="status-dot active"></span>
     <span class="count" id="cnt-active">-</span>
-    <span class="count-label">Active</span>
+    <span class="label">Active</span>
   </div>
-  <div class="counter-chip">
-    <span class="counter-dot completed"></span>
+  <div class="status-chip">
+    <span class="status-dot completed"></span>
     <span class="count" id="cnt-completed">-</span>
-    <span class="count-label">Completed</span>
+    <span class="label">Completed</span>
   </div>
-  <div class="counter-chip">
-    <span class="counter-dot total"></span>
+  <div class="status-chip">
+    <span class="status-dot total"></span>
     <span class="count" id="cnt-total">-</span>
-    <span class="count-label">Total</span>
+    <span class="label">Total</span>
   </div>
 </div>
 
-<div style="max-width:900px;margin:0 auto 1rem;display:flex;justify-content:flex-end;gap:1rem;font-size:0.85rem;">
-  <span id="auth-user" style="color:var(--text-muted);font-family:monospace;"></span>
-  <a href="sessions.html" style="color:var(--text-muted);text-decoration:none;">Sessions</a>
-  <a href="admin.html" id="admin-link" style="color:var(--text-muted);text-decoration:none;display:none;">Admin</a>
-  <a href="#" id="logout-link" style="color:var(--text-muted);text-decoration:none;">Logout</a>
+<!-- Quick actions -->
+<div class="actions">
+  <a href="session.html" class="action-btn">
+    <div class="icon green">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    </div>
+    <span class="btn-label">Start New Session</span>
+    <span class="btn-desc">Enter session ID and begin tracking</span>
+  </a>
+  <a href="sessions.html" class="action-btn">
+    <div class="icon blue">
+      <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+    </div>
+    <span class="btn-label">View Sessions</span>
+    <span class="btn-desc">Browse all captured demos</span>
+  </a>
+  <a href="live.html" class="action-btn">
+    <div class="icon orange">
+      <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+    </div>
+    <span class="btn-label">Live Monitor</span>
+    <span class="btn-desc">Watch active sessions in real time</span>
+  </a>
+  <a href="admin.html" class="action-btn">
+    <div class="icon purple">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    </div>
+    <span class="btn-label">Admin Panel</span>
+    <span class="btn-desc">Manage users and settings</span>
+  </a>
 </div>
-<script>
-  document.getElementById("auth-user").textContent = BoothAuth.currentUser() || "";
-  if (BoothAuth.isAdmin()) document.getElementById("admin-link").style.display = "";
-  document.getElementById("logout-link").addEventListener("click", function(e) { e.preventDefault(); BoothAuth.logout(); });
-</script>
 
-<!-- Setup: enter session ID if not in URL -->
-<div id="setup" class="setup">
-  <label for="session-input">Enter Session ID</label>
-  <input id="session-input" type="text" placeholder="A726594" autofocus>
-  <button id="go-btn">Go</button>
-</div>
+<!-- Refresh indicator -->
+<div class="refresh-note" id="refresh-note">Status refreshes every 5s</div>
 
-<!-- Dashboard -->
-<div id="dashboard" class="hidden">
-  <div class="session-id" id="sid-display"></div>
-  <div class="error-banner" id="error-banner"></div>
-
-  <div class="grid">
-    <div class="card full-width">
-      <div class="card-label">Visitor</div>
-      <div class="card-value name" id="visitor-name">--</div>
-      <div class="se-name" id="se-name"></div>
-    </div>
-    <div class="card">
-      <div class="card-label">Duration</div>
-      <div class="card-value timer" id="duration">00:00</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Clicks</div>
-      <div class="card-value clicks" id="click-count">0</div>
-    </div>
-    <div class="card full-width">
-      <div class="card-label">Status</div>
-      <div class="card-value status" id="rec-status">
-        <span class="status-dot waiting"></span> Waiting
-      </div>
-    </div>
-    <div class="card full-width">
-      <div class="card-label">Last Screenshot</div>
-      <div class="screenshot-wrap" id="screenshot-wrap">
-        <span class="placeholder">No screenshots yet</span>
-      </div>
-      <div class="screenshot-meta" id="screenshot-meta"></div>
-    </div>
-  </div>
-
-  <div class="refresh-indicator" id="refresh-indicator">Auto-refresh: 5s</div>
-  <div style="margin-top:1rem;text-align:center">
-    <a href="sessions.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;margin-right:1.5rem;">All Sessions</a>
-    <a href="live.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;margin-right:1.5rem;">Live Monitor</a>
-    <a href="workers.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;">Worker Status</a>
+<!-- Team credits -->
+<div class="credits">
+  <div class="credits-title">Built by</div>
+  <div class="team-name">Smells Like Machine Learning</div>
+  <div class="members">
+    <span>Casey Mondoux</span>
+    <span>Joel Ginsberg</span>
+    <span>Tom Gamull</span>
+    <span>Kush Mangat</span>
+    <span>Chris LaFleur</span>
   </div>
 </div>
 
 <!-- Footer -->
-<footer class="site-footer">
-  <span class="team-name">Smells Like Machine Learning</span> &mdash; Hackathon 2026
-</footer>
+<div class="footer">Hackathon 2026</div>
 
 <script>
 (function () {
-  // ── Config (mirrors infra/config.js) ────────────────────────────────────────
-  var BUCKET = "boothapp-sessions-752266476357";
-  var REGION = "us-east-1";
   var REFRESH_MS = 5000;
-  var COUNTER_REFRESH_MS = 15000;
+  var cntActive    = document.getElementById("cnt-active");
+  var cntCompleted = document.getElementById("cnt-completed");
+  var cntTotal     = document.getElementById("cnt-total");
 
-  function s3Url(key) {
-    return "https://" + BUCKET + ".s3." + REGION + ".amazonaws.com/" + key;
-  }
-
-  // ── Session counter ─────────────────────────────────────────────────────────
-  var cntActiveEl    = document.getElementById("cnt-active");
-  var cntCompletedEl = document.getElementById("cnt-completed");
-  var cntTotalEl     = document.getElementById("cnt-total");
-
-  function refreshSessionCounts() {
+  function refreshStatus() {
     var apiUrl = (localStorage.getItem("boothapp_api_url") || "").replace(/\/+$/, "");
     if (!apiUrl) return;
     fetch(apiUrl + "/sessions")
@@ -483,191 +374,19 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
             completed++;
           }
         });
-        cntActiveEl.textContent = active;
-        cntCompletedEl.textContent = completed;
-        cntTotalEl.textContent = data.length;
+        cntActive.textContent = active;
+        cntCompleted.textContent = completed;
+        cntTotal.textContent = data.length;
       })
       .catch(function () {
-        cntActiveEl.textContent = "-";
-        cntCompletedEl.textContent = "-";
-        cntTotalEl.textContent = "-";
+        cntActive.textContent = "-";
+        cntCompleted.textContent = "-";
+        cntTotal.textContent = "-";
       });
   }
 
-  refreshSessionCounts();
-  setInterval(refreshSessionCounts, COUNTER_REFRESH_MS);
-
-  // ── URL param ───────────────────────────────────────────────────────────────
-  var params = new URLSearchParams(window.location.search);
-  var sessionId = params.get("session") || "";
-
-  var setupEl        = document.getElementById("setup");
-  var dashboardEl    = document.getElementById("dashboard");
-  var sidDisplay     = document.getElementById("sid-display");
-  var errorBanner    = document.getElementById("error-banner");
-  var nameEl         = document.getElementById("visitor-name");
-  var seNameEl       = document.getElementById("se-name");
-  var durationEl     = document.getElementById("duration");
-  var clicksEl       = document.getElementById("click-count");
-  var statusEl       = document.getElementById("rec-status");
-  var screenshotEl   = document.getElementById("screenshot-wrap");
-  var screenshotMeta = document.getElementById("screenshot-meta");
-  var sessionInput   = document.getElementById("session-input");
-  var goBtn          = document.getElementById("go-btn");
-
-  function showError(msg) {
-    errorBanner.textContent = msg;
-    errorBanner.style.display = "block";
-  }
-  function clearError() {
-    errorBanner.style.display = "none";
-  }
-
-  function esc(str) {
-    var d = document.createElement("div");
-    d.textContent = str;
-    return d.innerHTML;
-  }
-
-  // ── Setup screen ────────────────────────────────────────────────────────────
-  function activate(sid) {
-    sessionId = sid.trim();
-    if (!sessionId) return;
-    params.set("session", sessionId);
-    window.history.replaceState({}, "", "?" + params.toString());
-    setupEl.classList.add("hidden");
-    dashboardEl.classList.remove("hidden");
-    sidDisplay.textContent = "Session: " + sessionId;
-    poll();
-    setInterval(poll, REFRESH_MS);
-  }
-
-  if (sessionId) {
-    activate(sessionId);
-  } else {
-    goBtn.addEventListener("click", function () { activate(sessionInput.value); });
-    sessionInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") activate(sessionInput.value);
-    });
-  }
-
-  // ── State ───────────────────────────────────────────────────────────────────
-  var meta = null;
-  var clickCount = 0;
-  var lastScreenshot = null;
-  var timerHandle = null;
-
-  // ── Duration timer (ticks every second between refreshes) ───────────────────
-  function startTimer() {
-    if (timerHandle) clearInterval(timerHandle);
-    timerHandle = setInterval(renderDuration, 1000);
-  }
-
-  function renderDuration() {
-    if (!meta || !meta.started_at) { durationEl.textContent = "--:--"; return; }
-    var start = new Date(meta.started_at).getTime();
-    var end = meta.ended_at ? new Date(meta.ended_at).getTime() : Date.now();
-    var diff = Math.max(0, Math.floor((end - start) / 1000));
-    var m = Math.floor(diff / 60);
-    var s = diff % 60;
-    durationEl.textContent = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
-  }
-
-  // ── Status rendering ───────────────────────────────────────────────────────
-  function renderStatus() {
-    if (!meta) {
-      statusEl.innerHTML = '<span class="status-dot waiting"></span> Waiting';
-      return;
-    }
-    var st = (meta.status || "").toLowerCase();
-    if (st === "completed" || meta.ended_at) {
-      statusEl.innerHTML = '<span class="status-dot ended"></span> Ended';
-    } else if (st === "in_progress" || st === "recording") {
-      statusEl.innerHTML = '<span class="status-dot recording"></span> Recording';
-    } else {
-      statusEl.innerHTML = '<span class="status-dot waiting"></span> ' + esc(meta.status || "Waiting");
-    }
-  }
-
-  // ── Screenshot rendering ────────────────────────────────────────────────────
-  function renderScreenshot() {
-    if (!lastScreenshot) {
-      screenshotEl.innerHTML = '<span class="placeholder">No screenshots yet</span>';
-      screenshotMeta.textContent = "";
-      return;
-    }
-    var imgUrl = s3Url("sessions/" + sessionId + "/screenshots/" + lastScreenshot.file);
-    // Build img element safely (src is from our own S3 bucket, not user input)
-    screenshotEl.innerHTML = "";
-    var img = document.createElement("img");
-    img.src = imgUrl;
-    img.alt = "Last screenshot";
-    screenshotEl.appendChild(img);
-
-    var label = lastScreenshot.file;
-    if (lastScreenshot.pageTitle) label += " — " + lastScreenshot.pageTitle;
-    screenshotMeta.textContent = label;
-  }
-
-  // ── Fetch helpers ───────────────────────────────────────────────────────────
-  function fetchJson(key, cb) {
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", s3Url(key), true);
-    xhr.responseType = "json";
-    xhr.onload = function () {
-      if (xhr.status === 200) {
-        cb(null, xhr.response);
-      } else {
-        cb("HTTP " + xhr.status);
-      }
-    };
-    xhr.onerror = function () { cb("Network error"); };
-    xhr.send();
-  }
-
-  // ── Poll ────────────────────────────────────────────────────────────────────
-  function poll() {
-    // Fetch metadata
-    fetchJson("sessions/" + sessionId + "/metadata.json", function (err, data) {
-      if (err) {
-        showError("Could not load metadata: " + err);
-        return;
-      }
-      clearError();
-      meta = data;
-      nameEl.textContent = meta.visitor_name || "--";
-      seNameEl.textContent = meta.se_name ? "SE: " + meta.se_name : "";
-      renderStatus();
-      renderDuration();
-      startTimer();
-    });
-
-    // Fetch clicks — also extracts last screenshot reference
-    fetchJson("sessions/" + sessionId + "/clicks/clicks.json", function (err, data) {
-      if (err) {
-        clickCount = 0;
-        lastScreenshot = null;
-      } else {
-        var events = (data && data.events) ? data.events : [];
-        clickCount = events.length;
-
-        // Find the most recent event with a screenshot_file
-        lastScreenshot = null;
-        for (var i = events.length - 1; i >= 0; i--) {
-          if (events[i].screenshot_file) {
-            var fname = events[i].screenshot_file.replace(/^screenshots\//, "");
-            lastScreenshot = {
-              file: fname,
-              pageTitle: events[i].page_title || ""
-            };
-            break;
-          }
-        }
-      }
-      clicksEl.textContent = clickCount;
-      renderScreenshot();
-    });
-  }
+  refreshStatus();
+  setInterval(refreshStatus, REFRESH_MS);
 })();
 </script>
 </body>
