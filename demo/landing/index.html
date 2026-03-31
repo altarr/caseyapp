@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trend Micro -- Booth Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      overflow: hidden;
+      color: #fff;
+      background: #0a0a0f;
+    }
+
+    /* ── Animated gradient background ─────────────────────── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a0a1a 25%, #0a0a0f 50%, #0f0a1a 75%, #0a0a0f 100%);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* ── Red accent line at top ───────────────────────────── */
+    .accent-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #D32F2F, #ff5252, #D32F2F);
+      z-index: 10;
+    }
+
+    /* ── Content ──────────────────────────────────────────── */
+    .content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px;
+      text-align: center;
+    }
+
+    /* ── Logo ─────────────────────────────────────────────── */
+    .logo {
+      margin-bottom: 32px;
+      animation: fadeInUp 1s ease-out;
+    }
+    .logo svg { width: 80px; height: 80px; }
+
+    /* ── Heading ──────────────────────────────────────────── */
+    .heading {
+      font-size: 56px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 12px;
+      animation: fadeInUp 1s ease-out 0.2s both;
+    }
+    .heading .red { color: #D32F2F; }
+
+    .subheading {
+      font-size: 20px;
+      font-weight: 300;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 48px;
+      animation: fadeInUp 1s ease-out 0.4s both;
+    }
+
+    /* ── Stats row ────────────────────────────────────────── */
+    .stats {
+      display: flex;
+      gap: 48px;
+      margin-bottom: 48px;
+      animation: fadeInUp 1s ease-out 0.6s both;
+    }
+
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 48px;
+      font-weight: 700;
+      color: #D32F2F;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.4);
+      margin-top: 8px;
+    }
+
+    /* ── Status indicator ─────────────────────────────────── */
+    .status-area {
+      animation: fadeInUp 1s ease-out 0.8s both;
+    }
+
+    .status-idle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .pulse-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #388E3C;
+      box-shadow: 0 0 12px rgba(56,142,60,0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.6; }
+    }
+
+    .status-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Session active overlay ────────────────────────────── */
+    .session-active {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .session-active.visible { display: flex; }
+    .status-idle.hidden { display: none; }
+
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid rgba(211,47,47,0.2);
+      border-top-color: #D32F2F;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .active-label {
+      font-size: 18px; font-weight: 600; color: #D32F2F;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .active-visitor {
+      font-size: 14px; color: rgba(255,255,255,0.5);
+    }
+
+    /* ── QR placeholder ───────────────────────────────────── */
+    .qr-section {
+      position: fixed;
+      bottom: 40px;
+      right: 40px;
+      text-align: center;
+      animation: fadeInUp 1s ease-out 1s both;
+    }
+    .qr-box {
+      width: 120px; height: 120px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 8px;
+    }
+    .qr-box svg { width: 60px; height: 60px; fill: rgba(255,255,255,0.2); }
+    .qr-label { font-size: 11px; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .footer {
+      position: fixed;
+      bottom: 16px;
+      left: 0; right: 0;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.2);
+      z-index: 1;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 600px) {
+      .heading { font-size: 32px; }
+      .subheading { font-size: 14px; }
+      .stats { gap: 24px; }
+      .stat-value { font-size: 32px; }
+      .qr-section { bottom: 20px; right: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg"></div>
+  <div class="accent-bar"></div>
+
+  <div class="content">
+    <div class="logo">
+      <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <rect width="80" height="80" rx="16" fill="#D32F2F"/>
+        <path d="M16 28h48v6H44v26h-8V34H16v-6z" fill="#fff"/>
+      </svg>
+    </div>
+
+    <div class="heading">Welcome to <span class="red">Trend Micro</span></div>
+    <div class="subheading">AI-Powered Demo Experience</div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="demoCount">0</div>
+        <div class="stat-label">Demos Today</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="visitorCount">0</div>
+        <div class="stat-label">Visitors</div>
+      </div>
+    </div>
+
+    <div class="status-area">
+      <div class="status-idle" id="statusIdle">
+        <div class="pulse-dot"></div>
+        <div class="status-text">Ready for next demo</div>
+      </div>
+
+      <div class="session-active" id="sessionActive">
+        <div class="spinner"></div>
+        <div class="active-label">Session In Progress</div>
+        <div class="active-visitor" id="activeVisitor"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="qr-section">
+    <div class="qr-box">
+      <svg viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zm8-2v8h8V3h-8zm6 6h-4V5h4v4zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm13-2h-2v2h2v-2zm0 4h-2v2h2v-2zm2-4h2v4h-2v-4zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm-4 0h2v2h-2v-2z"/></svg>
+    </div>
+    <div class="qr-label">Scan to connect</div>
+  </div>
+
+  <div class="footer">Trend Micro Vision One | Smells Like Machine Learning</div>
+
+<script>
+// ── Configuration ─────────────────────────────────────────
+// S3 presigned URL or endpoint to fetch session count
+// Set to null to use static demo count
+var SESSION_COUNT_URL = null;
+
+// ── State ─────────────────────────────────────────────────
+var demoCount = 0;
+var sessionActive = false;
+
+// ── DOM ───────────────────────────────────────────────────
+var demoCountEl = document.getElementById('demoCount');
+var visitorCountEl = document.getElementById('visitorCount');
+var statusIdle = document.getElementById('statusIdle');
+var sessionActiveEl = document.getElementById('sessionActive');
+var activeVisitorEl = document.getElementById('activeVisitor');
+
+// ── Counter animation ─────────────────────────────────────
+function animateCounter(el, target) {
+  var current = parseInt(el.textContent) || 0;
+  if (current === target) return;
+  var step = target > current ? 1 : -1;
+  var interval = setInterval(function() {
+    current += step;
+    el.textContent = current;
+    if (current === target) clearInterval(interval);
+  }, 80);
+}
+
+// ── Session state ─────────────────────────────────────────
+function setSessionState(active, visitorName) {
+  sessionActive = active;
+  if (active) {
+    statusIdle.classList.add('hidden');
+    sessionActiveEl.classList.add('visible');
+    activeVisitorEl.textContent = visitorName || '';
+  } else {
+    statusIdle.classList.remove('hidden');
+    sessionActiveEl.classList.remove('visible');
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────
+function pollSessionCount() {
+  if (!SESSION_COUNT_URL) return;
+  fetch(SESSION_COUNT_URL, { mode: 'cors', cache: 'no-store' })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (data && typeof data.count === 'number') {
+        animateCounter(demoCountEl, data.count);
+        animateCounter(visitorCountEl, data.count);
+      }
+      if (data && data.active_session) {
+        setSessionState(true, data.visitor_name || 'Demo in progress');
+      } else {
+        setSessionState(false);
+      }
+    })
+    .catch(function() {});
+}
+
+// ── Init ──────────────────────────────────────────────────
+animateCounter(demoCountEl, demoCount);
+animateCounter(visitorCountEl, demoCount);
+pollSessionCount();
+setInterval(pollSessionCount, 5000);
+</script>
+</body>
+</html>

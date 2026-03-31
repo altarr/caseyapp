@@ -236,7 +236,15 @@ document.getElementById('s3DemoBtn').addEventListener('click', function() {
   document.getElementById('presignEndpoint').setAttribute('placeholder', 'Paste Lambda Function URL here');
 });
 
-// Collapsible toggle
+// Settings gear toggles S3 config panel
+document.getElementById('settingsGear').addEventListener('click', function() {
+  var body = document.getElementById('s3ConfigBody');
+  var gear = document.getElementById('settingsGear');
+  var collapsed = body.classList.toggle('collapsed');
+  gear.classList.toggle('open', !collapsed);
+});
+
+// Legacy toggle (hidden, kept for compatibility)
 document.getElementById('s3ConfigToggle').addEventListener('click', function() {
   var body = document.getElementById('s3ConfigBody');
   var arrow = document.getElementById('s3Arrow');

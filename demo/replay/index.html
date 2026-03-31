@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Replay</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --dim: #8b949e;
+      --red: #D32F2F;
+      --blue: #58a6ff;
+      --green: #3fb950;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header svg { width: 32px; height: 32px; flex-shrink: 0; }
+    .header h1 { font-size: 16px; font-weight: 600; }
+    .header .session-id { font-size: 12px; color: var(--dim); margin-left: auto; }
+
+    /* ── Timeline Scrubber ────────────────────────────────── */
+    .scrubber-wrap {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+    }
+    .scrubber-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .scrubber-time {
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      color: var(--dim);
+      min-width: 50px;
+    }
+    .scrubber-track {
+      flex: 1;
+      position: relative;
+      height: 32px;
+      cursor: pointer;
+    }
+    .scrubber-bar {
+      position: absolute;
+      top: 14px;
+      left: 0; right: 0;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .scrubber-fill {
+      height: 100%;
+      background: var(--red);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s;
+    }
+    .scrubber-handle {
+      position: absolute;
+      top: 8px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(0,0,0,0.4);
+      transform: translateX(-8px);
+      left: 0%;
+      transition: left 0.1s;
+    }
+    /* Event markers on the scrubber */
+    .scrubber-marker {
+      position: absolute;
+      top: 10px;
+      width: 6px; height: 12px;
+      border-radius: 2px;
+      transform: translateX(-3px);
+    }
+    .scrubber-marker.click { background: var(--red); opacity: 0.6; }
+    .scrubber-marker.speech { background: var(--blue); opacity: 0.4; }
+
+    /* ── Main layout ──────────────────────────────────────── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left panel: Screenshots ──────────────────────────── */
+    .panel-left {
+      width: 50%;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 12px;
+    }
+    .click-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s;
+    }
+    .click-card.active {
+      border-color: var(--red);
+      box-shadow: 0 0 8px rgba(211,47,47,0.2);
+    }
+    .click-card .cc-time {
+      font-size: 11px;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .click-card .cc-text {
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .click-card .cc-badge {
+      display: inline-block;
+      background: rgba(211,47,47,0.15);
+      color: var(--red);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-right: 6px;
+    }
+    .click-card .cc-page {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+    .click-card .cc-screenshot {
+      margin-top: 8px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #000;
+    }
+    .click-card .cc-screenshot img {
+      width: 100%;
+      display: block;
+    }
+    .cc-placeholder {
+      height: 120px;
+      background: var(--border);
+      border-radius: 6px;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* ── Right panel: Transcript ──────────────────────────── */
+    .panel-right {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .transcript-entry {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      border-left: 3px solid transparent;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .transcript-entry.active {
+      background: rgba(88,166,255,0.08);
+      border-left-color: var(--blue);
+    }
+    .transcript-entry .te-time {
+      font-size: 11px;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .transcript-entry .te-speaker {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: 6px;
+    }
+    .te-speaker.se { background: rgba(63,185,80,0.15); color: var(--green); }
+    .te-speaker.visitor { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .transcript-entry .te-text {
+      font-size: 13px;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    /* ── Bottom: Summary cards ────────────────────────────── */
+    .summary-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+    }
+    .summary-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 200px;
+      flex-shrink: 0;
+    }
+    .summary-card .sc-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 6px;
+    }
+    .summary-card .sc-value {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .summary-card .sc-items {
+      font-size: 12px;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .panel-left, .panel-right { width: 100%; border-right: none; max-height: 40vh; }
+      .summary-bar { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────── -->
+  <div class="header">
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="6" fill="#D32F2F"/>
+      <path d="M7 12h18v3h-7v9h-4V15H7v-3z" fill="#fff"/>
+    </svg>
+    <h1>Session Replay</h1>
+    <div class="session-id" id="sessionIdLabel">--</div>
+  </div>
+
+  <!-- ── Timeline Scrubber ────────────────────────────────── -->
+  <div class="scrubber-wrap">
+    <div class="scrubber-row">
+      <div class="scrubber-time" id="currentTime">0:00</div>
+      <div class="scrubber-track" id="scrubberTrack">
+        <div class="scrubber-bar"><div class="scrubber-fill" id="scrubberFill"></div></div>
+        <div class="scrubber-handle" id="scrubberHandle"></div>
+      </div>
+      <div class="scrubber-time" id="totalTime">0:00</div>
+    </div>
+  </div>
+
+  <!-- ── Main panels ──────────────────────────────────────── -->
+  <div class="main">
+    <div class="panel-left">
+      <div class="panel-title">Click Timeline</div>
+      <div id="clickList"></div>
+    </div>
+    <div class="panel-right">
+      <div class="panel-title">Transcript</div>
+      <div id="transcriptList"></div>
+    </div>
+  </div>
+
+  <!-- ── Summary bar ──────────────────────────────────────── -->
+  <div class="summary-bar" id="summaryBar"></div>
+
+  <!-- ── Sample data (for standalone testing) ─────────────── -->
+  <script src="sample-data.js"></script>
+  <script>
+// ── Configuration ─────────────────────────────────────────
+var S3_BUCKET = 'boothapp-sessions-752266476357';
+var S3_REGION = 'us-east-1';
+
+// ── State ─────────────────────────────────────────────────
+var sessionData = null;
+var totalSeconds = 0;
+var currentSeconds = 0;
+var isDragging = false;
+
+// ── Helpers ───────────────────────────────────────────────
+function formatTime(sec) {
+  var m = Math.floor(sec / 60);
+  var s = Math.floor(sec % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Load data ─────────────────────────────────────────────
+function loadData() {
+  // Try URL param ?session=<id> for S3 loading
+  var params = new URLSearchParams(window.location.search);
+  var sessionId = params.get('session');
+
+  if (sessionId && typeof fetch !== 'undefined') {
+    var base = 'https://' + S3_BUCKET + '.s3.' + S3_REGION + '.amazonaws.com/sessions/' + sessionId;
+    Promise.all([
+      fetch(base + '/clicks/clicks.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch(base + '/transcript/transcript.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
+      fetch(base + '/output/summary.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; })
+    ]).then(function(results) {
+      sessionData = {
+        clicks: results[0] || { events: [] },
+        transcript: results[1] || { duration_seconds: 0, entries: [] },
+        summary: results[2] || {}
+      };
+      init();
+    });
+    return;
+  }
+
+  // Fallback to sample data
+  if (typeof SAMPLE_DATA !== 'undefined') {
+    sessionData = SAMPLE_DATA;
+  } else {
+    sessionData = { clicks: { events: [] }, transcript: { duration_seconds: 0, entries: [] }, summary: {} };
+  }
+  init();
+}
+
+// ── Build UI ──────────────────────────────────────────────
+function init() {
+  var clicks = sessionData.clicks.events || [];
+  var entries = sessionData.transcript.entries || [];
+  var summary = sessionData.summary || {};
+
+  totalSeconds = sessionData.transcript.duration_seconds || 0;
+  if (!totalSeconds && clicks.length) {
+    totalSeconds = (clicks[clicks.length - 1].offset_seconds || 0) + 30;
+  }
+  if (!totalSeconds) totalSeconds = 1;
+
+  // Header
+  document.getElementById('sessionIdLabel').textContent = summary.session_id || sessionData.clicks.session_id || '--';
+  document.getElementById('totalTime').textContent = formatTime(totalSeconds);
+
+  // Scrubber markers
+  var track = document.getElementById('scrubberTrack');
+  clicks.forEach(function(c) {
+    var pct = ((c.offset_seconds || 0) / totalSeconds) * 100;
+    var marker = document.createElement('div');
+    marker.className = 'scrubber-marker click';
+    marker.style.left = pct + '%';
+    track.appendChild(marker);
+  });
+  entries.forEach(function(e) {
+    var pct = ((e.offset_seconds || 0) / totalSeconds) * 100;
+    var marker = document.createElement('div');
+    marker.className = 'scrubber-marker speech';
+    marker.style.left = pct + '%';
+    track.appendChild(marker);
+  });
+
+  // Click list
+  var clickList = document.getElementById('clickList');
+  clicks.forEach(function(c, i) {
+    var card = document.createElement('div');
+    card.className = 'click-card';
+    card.dataset.offset = c.offset_seconds || 0;
+    card.innerHTML =
+      '<div class="cc-time">' + formatTime(c.offset_seconds || 0) + '</div>' +
+      '<div class="cc-text"><span class="cc-badge">CLICK ' + (i + 1) + '</span>' + escapeHtml(c.element_text) + '</div>' +
+      '<div class="cc-page">' + escapeHtml(c.page_title) + '</div>' +
+      (c.screenshot_url
+        ? '<div class="cc-screenshot"><img src="' + escapeHtml(c.screenshot_url) + '" alt="Screenshot"></div>'
+        : '<div class="cc-placeholder">Screenshot</div>');
+    clickList.appendChild(card);
+  });
+
+  // Transcript list
+  var transcriptList = document.getElementById('transcriptList');
+  entries.forEach(function(e) {
+    var entry = document.createElement('div');
+    entry.className = 'transcript-entry';
+    entry.dataset.offset = e.offset_seconds || 0;
+    var speakerClass = (e.speaker || '').toLowerCase() === 'se' ? 'se' : 'visitor';
+    entry.innerHTML =
+      '<div><span class="te-time">' + escapeHtml(e.timestamp) + '</span>' +
+      '<span class="te-speaker ' + speakerClass + '">' + escapeHtml(e.speaker) + '</span></div>' +
+      '<div class="te-text">' + escapeHtml(e.text) + '</div>';
+    transcriptList.appendChild(entry);
+  });
+
+  // Summary cards
+  var summaryBar = document.getElementById('summaryBar');
+  if (summary.visitor_name) {
+    addSummaryCard(summaryBar, 'Visitor', summary.visitor_name + (summary.visitor_company ? ' / ' + summary.visitor_company : ''));
+  }
+  if (summary.products_shown && summary.products_shown.length) {
+    addSummaryCard(summaryBar, 'Products', summary.products_shown.join(', '));
+  }
+  if (summary.key_insights && summary.key_insights.length) {
+    addSummaryCard(summaryBar, 'Key Insights', summary.key_insights.slice(0, 2).join(' | '));
+  }
+  if (summary.recommended_follow_up && summary.recommended_follow_up.length) {
+    addSummaryCard(summaryBar, 'Follow-Up', summary.recommended_follow_up[0]);
+  }
+
+  // Set initial position
+  updateScrubber(0);
+}
+
+function addSummaryCard(container, label, value) {
+  var card = document.createElement('div');
+  card.className = 'summary-card';
+  card.innerHTML = '<div class="sc-label">' + escapeHtml(label) + '</div><div class="sc-value">' + escapeHtml(value) + '</div>';
+  container.appendChild(card);
+}
+
+// ── Scrubber interaction ──────────────────────────────────
+function updateScrubber(seconds) {
+  currentSeconds = Math.max(0, Math.min(seconds, totalSeconds));
+  var pct = (currentSeconds / totalSeconds) * 100;
+
+  document.getElementById('currentTime').textContent = formatTime(currentSeconds);
+  document.getElementById('scrubberFill').style.width = pct + '%';
+  document.getElementById('scrubberHandle').style.left = pct + '%';
+
+  // Highlight active click cards
+  var clickCards = document.querySelectorAll('.click-card');
+  var activeClick = null;
+  for (var i = 0; i < clickCards.length; i++) {
+    var offset = parseFloat(clickCards[i].dataset.offset);
+    clickCards[i].classList.toggle('active', offset <= currentSeconds && (i === clickCards.length - 1 || parseFloat(clickCards[i + 1].dataset.offset) > currentSeconds));
+    if (clickCards[i].classList.contains('active')) activeClick = clickCards[i];
+  }
+  if (activeClick) activeClick.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  // Highlight active transcript entries
+  var entries = document.querySelectorAll('.transcript-entry');
+  var activeEntry = null;
+  for (var j = 0; j < entries.length; j++) {
+    var tOffset = parseFloat(entries[j].dataset.offset);
+    entries[j].classList.toggle('active', tOffset <= currentSeconds && (j === entries.length - 1 || parseFloat(entries[j + 1].dataset.offset) > currentSeconds));
+    if (entries[j].classList.contains('active')) activeEntry = entries[j];
+  }
+  if (activeEntry) activeEntry.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ── Scrubber events ───────────────────────────────────────
+var track = document.getElementById('scrubberTrack');
+
+function scrubFromEvent(e) {
+  var rect = track.getBoundingClientRect();
+  var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  updateScrubber(pct * totalSeconds);
+}
+
+track.addEventListener('mousedown', function(e) {
+  isDragging = true;
+  scrubFromEvent(e);
+});
+document.addEventListener('mousemove', function(e) {
+  if (isDragging) scrubFromEvent(e);
+});
+document.addEventListener('mouseup', function() {
+  isDragging = false;
+});
+
+// Touch support
+track.addEventListener('touchstart', function(e) {
+  isDragging = true;
+  scrubFromEvent(e.touches[0]);
+});
+document.addEventListener('touchmove', function(e) {
+  if (isDragging) scrubFromEvent(e.touches[0]);
+});
+document.addEventListener('touchend', function() {
+  isDragging = false;
+});
+
+// ── Init ──────────────────────────────────────────────────
+loadData();
+  </script>
+</body>
+</html>
