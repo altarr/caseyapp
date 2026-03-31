@@ -29,8 +29,10 @@ function buildNotification({ sessionId, bucket, metadata, summary, followUp }) {
     session_id: sessionId,
     visitor_name: summary.visitor_name || metadata.visitor_name || 'Unknown',
     company: metadata.company || summary.company || null,
+    session_score: summary.session_score || null,
     score: score,
     executive_summary: followUp.sdr_notes || null,
+    products_demonstrated: summary.products_demonstrated || [],
     completed_at: new Date().toISOString(),
     report_url: `https://boothapp.trendmicro.com/sessions/${sessionId}/summary.html`,
   };
