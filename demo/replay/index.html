@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoothApp - Session Replay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="sample-data.js"></script>
+  <style>
+    /* ================================================================
+       CONFIGURATION -- S3 bucket and region
+       ================================================================ */
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #14141f;
+      --surface-alt: #1a1a2e;
+      --border: #2a2a3e;
+      --border-light: #3a3a4e;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --text-muted: #555570;
+      --accent: #00d4aa;
+      --accent-dim: #00a080;
+      --accent-glow: rgba(0, 212, 170, 0.15);
+      --accent-glow-strong: rgba(0, 212, 170, 0.3);
+      --warning: #ffaa33;
+      --se-color: #66aaff;
+      --visitor-color: #ff7799;
+      --high: #00d4aa;
+      --medium: #ffaa33;
+      --low: #8888a0;
+      --radius: 10px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header Bar ─────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header h1 span { color: var(--accent); }
+
+    .session-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-dim);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    .header-meta { display: flex; align-items: center; gap: 0.4rem; }
+    .header-meta .label { color: var(--text-muted); }
+    .header-meta .value { color: var(--text); font-weight: 500; }
+
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent-glow-strong);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    /* ── Timeline Scrubber ──────────────────────────────── */
+    .timeline-container {
+      padding: 0.75rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .timeline-bar {
+      position: relative;
+      height: 40px;
+      background: var(--surface-alt);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      overflow: visible;
+    }
+
+    .timeline-progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-glow-strong) 0%, var(--accent-glow) 100%);
+      border-radius: 8px 0 0 8px;
+      pointer-events: none;
+      transition: width 0.05s linear;
+    }
+
+    .timeline-handle {
+      position: absolute;
+      top: -4px;
+      width: 3px;
+      height: 48px;
+      background: var(--accent);
+      border-radius: 2px;
+      pointer-events: none;
+      box-shadow: 0 0 8px var(--accent-glow-strong);
+      transition: left 0.05s linear;
+    }
+
+    .click-marker {
+      position: absolute;
+      top: 6px;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      transform: translateX(-4px);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .click-marker.active { opacity: 1; box-shadow: 0 0 6px var(--accent); }
+
+    .timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.4rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .timeline-current {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Main Layout ────────────────────────────────────── */
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Left Panel: Screenshots ────────────────────────── */
+    .panel-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+
+    .panel-header {
+      padding: 0.6rem 1rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .screenshot-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    .screenshot-placeholder {
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 16 / 10;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screenshot-placeholder .mock-browser {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mock-browser-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: #1e1e2e;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .mock-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .mock-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border-light);
+    }
+
+    .mock-url {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      background: var(--surface);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mock-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      gap: 0.75rem;
+    }
+
+    .mock-page-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .mock-click-label {
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .mock-click-target {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-dim);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .mock-click-target::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: click-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes click-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.6); opacity: 0.4; }
+    }
+
+    .screenshot-meta {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    .no-click-state {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .no-click-state .icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      opacity: 0.3;
+    }
+
+    /* ── Right Panel: Transcript ────────────────────────── */
+    .panel-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .transcript-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 1rem;
+    }
+
+    .transcript-area::-webkit-scrollbar { width: 6px; }
+    .transcript-area::-webkit-scrollbar-track { background: var(--surface); }
+    .transcript-area::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+    .transcript-entry {
+      display: flex;
+      gap: 0.6rem;
+      padding: 0.6rem 0.5rem;
+      border-radius: 8px;
+      margin-bottom: 0.25rem;
+      transition: background 0.2s, opacity 0.2s;
+      opacity: 0.4;
+    }
+
+    .transcript-entry.past { opacity: 0.65; }
+    .transcript-entry.active {
+      opacity: 1;
+      background: var(--accent-glow);
+    }
+    .transcript-entry.future { opacity: 0.25; }
+
+    .transcript-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      min-width: 52px;
+      padding-top: 0.15rem;
+      flex-shrink: 0;
+    }
+
+    .transcript-speaker {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      min-width: 42px;
+      padding-top: 0.15rem;
+      flex-shrink: 0;
+    }
+
+    .transcript-speaker.se { color: var(--se-color); }
+    .transcript-speaker.visitor { color: var(--visitor-color); }
+
+    .transcript-text {
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    /* ── Bottom: Summary Cards ──────────────────────────── */
+    .summary-bar {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .summary-cards {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      min-width: max-content;
+    }
+
+    .summary-card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      min-width: 200px;
+      max-width: 280px;
+      flex-shrink: 0;
+    }
+
+    .summary-card .card-label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .summary-card .card-value {
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: var(--text);
+    }
+
+    .summary-card .card-value.executive {
+      font-weight: 500;
+    }
+
+    .interest-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      margin: 0.15rem 0.15rem;
+    }
+
+    .interest-tag.high { background: rgba(0, 212, 170, 0.15); color: var(--high); border: 1px solid rgba(0, 212, 170, 0.3); }
+    .interest-tag.medium { background: rgba(255, 170, 51, 0.15); color: var(--medium); border: 1px solid rgba(255, 170, 51, 0.3); }
+    .interest-tag.low { background: rgba(136, 136, 160, 0.15); color: var(--low); border: 1px solid rgba(136, 136, 160, 0.3); }
+
+    .product-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      margin: 0.15rem 0.15rem;
+      background: rgba(102, 170, 255, 0.12);
+      color: var(--se-color);
+      border: 1px solid rgba(102, 170, 255, 0.25);
+    }
+
+    .action-item {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      padding: 0.2rem 0;
+      line-height: 1.4;
+    }
+
+    .action-item::before {
+      content: '>';
+      color: var(--accent);
+      margin-right: 0.4rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .key-moment {
+      padding: 0.3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .key-moment:last-child { border-bottom: none; }
+
+    .key-moment-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--accent);
+    }
+
+    .key-moment-desc {
+      font-size: 0.75rem;
+      color: var(--text);
+      margin-top: 0.1rem;
+    }
+
+    .key-moment-impact {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* ── Loading state ──────────────────────────────────── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.3s;
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-text {
+      font-size: 1rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .main { flex-direction: column; }
+      .panel-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 45vh; }
+      .panel-right { max-height: 35vh; }
+      .header { flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+      .header-right { flex-wrap: wrap; gap: 0.75rem; }
+      .summary-cards { flex-direction: column; min-width: unset; }
+      .summary-card { max-width: none; }
+      .summary-bar { overflow-y: auto; max-height: 30vh; }
+    }
+
+    @media (max-width: 600px) {
+      .header h1 { font-size: 0.95rem; }
+      .timeline-container { padding: 0.5rem 0.75rem; }
+      .summary-cards { padding: 0.5rem 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-text">Loading session data...</div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <h1>BoothApp <span>Replay</span></h1>
+    <div class="session-badge" id="sessionId">--</div>
+  </div>
+  <div class="header-right">
+    <div class="header-meta">
+      <span class="label">Visitor</span>
+      <span class="value" id="visitorName">--</span>
+    </div>
+    <div class="header-meta">
+      <span class="label">SE</span>
+      <span class="value" id="seName">--</span>
+    </div>
+    <div class="header-meta">
+      <span class="label">Score</span>
+      <span class="score-badge" id="sessionScore">-</span>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<div class="timeline-container">
+  <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.4rem;">
+    <span class="timeline-current" id="currentTime">00:00</span>
+    <div style="flex:1"></div>
+    <button id="playBtn" style="background:var(--accent);color:#0a0a0f;border:none;padding:0.3rem 0.8rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:inherit;">PLAY</button>
+  </div>
+  <div class="timeline-bar" id="timelineBar">
+    <div class="timeline-progress" id="timelineProgress"></div>
+    <div class="timeline-handle" id="timelineHandle"></div>
+    <!-- Click markers injected here -->
+  </div>
+  <div class="timeline-labels">
+    <span>00:00</span>
+    <span id="totalDuration">--:--</span>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="main">
+  <!-- Left: Screenshots -->
+  <div class="panel-left">
+    <div class="panel-header">Click Screenshots</div>
+    <div class="screenshot-area" id="screenshotArea">
+      <div class="no-click-state">
+        <div class="icon">[  ]</div>
+        <div>Scrub the timeline to view click screenshots</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Transcript -->
+  <div class="panel-right">
+    <div class="panel-header">Live Transcript</div>
+    <div class="transcript-area" id="transcriptArea"></div>
+  </div>
+</div>
+
+<!-- Bottom: Summary -->
+<div class="summary-bar">
+  <div class="summary-cards" id="summaryCards"></div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURATION
+// Set your S3 bucket endpoint and region here.
+// The endpoint should be the public URL root of the bucket.
+// =====================================================================
+var S3_BUCKET = 'YOUR-BUCKET-NAME';
+var S3_REGION = 'us-east-1';
+var S3_ENDPOINT = 'https://' + S3_BUCKET + '.s3.' + S3_REGION + '.amazonaws.com';
+
+// =====================================================================
+// STATE
+// =====================================================================
+var sessionData = {
+  metadata: null,
+  clicks: null,
+  transcript: null,
+  summary: null
+};
+
+var currentSeconds = 0;
+var totalSeconds = 0;
+var sessionStartTime = null;
+var isPlaying = false;
+var playTimer = null;
+var isDragging = false;
+
+// =====================================================================
+// DATA LOADING
+// =====================================================================
+function getSessionId() {
+  var params = new URLSearchParams(window.location.search);
+  return params.get('session') || params.get('session_id') || params.get('id');
+}
+
+function fetchJson(url) {
+  return fetch(url, { mode: 'cors', cache: 'no-store' })
+    .then(function(res) { return res.ok ? res.json() : null; })
+    .catch(function() { return null; });
+}
+
+function loadSessionData(sessionId) {
+  if (!sessionId) {
+    // Use sample data
+    sessionData.metadata = SAMPLE_METADATA;
+    sessionData.clicks = SAMPLE_CLICKS;
+    sessionData.transcript = SAMPLE_TRANSCRIPT;
+    sessionData.summary = SAMPLE_SUMMARY;
+    initReplay();
+    return;
+  }
+
+  var base = S3_ENDPOINT + '/sessions/' + sessionId;
+  Promise.all([
+    fetchJson(base + '/metadata.json'),
+    fetchJson(base + '/clicks/clicks.json'),
+    fetchJson(base + '/transcript/transcript.json'),
+    fetchJson(base + '/output/summary.json')
+  ]).then(function(results) {
+    sessionData.metadata = results[0] || SAMPLE_METADATA;
+    sessionData.clicks = results[1] || SAMPLE_CLICKS;
+    sessionData.transcript = results[2] || SAMPLE_TRANSCRIPT;
+    sessionData.summary = results[3] || SAMPLE_SUMMARY;
+    initReplay();
+  });
+}
+
+// =====================================================================
+// TIMESTAMP PARSING
+// =====================================================================
+function parseTranscriptTime(ts) {
+  // "00:05:22.000" or "05:22" -> seconds
+  var parts = ts.replace(/\.\d+$/, '').split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return 0;
+}
+
+function parseClickTime(ts, startIso) {
+  // ISO timestamp -> seconds from session start
+  var clickMs = new Date(ts).getTime();
+  var startMs = new Date(startIso).getTime();
+  return Math.max(0, (clickMs - startMs) / 1000);
+}
+
+function formatTime(seconds) {
+  var m = Math.floor(seconds / 60);
+  var s = Math.floor(seconds % 60);
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+function initReplay() {
+  var meta = sessionData.metadata;
+  var clicks = sessionData.clicks;
+  var transcript = sessionData.transcript;
+  var summary = sessionData.summary;
+
+  // Session duration
+  if (meta.started_at && meta.ended_at) {
+    totalSeconds = (new Date(meta.ended_at).getTime() - new Date(meta.started_at).getTime()) / 1000;
+  } else if (transcript.duration_seconds) {
+    totalSeconds = transcript.duration_seconds;
+  } else {
+    totalSeconds = 900;
+  }
+  sessionStartTime = meta.started_at;
+
+  // Header
+  document.getElementById('sessionId').textContent = meta.session_id;
+  document.getElementById('visitorName').textContent = summary.visitor_name || meta.visitor_name || '--';
+  document.getElementById('seName').textContent = summary.se_name || meta.se_name || '--';
+  document.getElementById('sessionScore').textContent = summary.session_score || '-';
+  document.getElementById('totalDuration').textContent = formatTime(totalSeconds);
+
+  // Click markers on timeline
+  var bar = document.getElementById('timelineBar');
+  clicks.events.forEach(function(evt) {
+    var sec = parseClickTime(evt.timestamp, sessionStartTime);
+    var pct = (sec / totalSeconds) * 100;
+    var marker = document.createElement('div');
+    marker.className = 'click-marker';
+    marker.style.left = pct + '%';
+    marker.dataset.seconds = sec;
+    bar.appendChild(marker);
+  });
+
+  // Transcript entries
+  renderTranscript(transcript.entries);
+
+  // Summary cards
+  renderSummary(summary);
+
+  // Hide loading
+  document.getElementById('loadingOverlay').classList.add('hidden');
+
+  // Initial render
+  updateView(0);
+}
+
+// =====================================================================
+// TRANSCRIPT RENDERING
+// =====================================================================
+function renderTranscript(entries) {
+  var container = document.getElementById('transcriptArea');
+  container.innerHTML = '';
+  entries.forEach(function(entry, i) {
+    var div = document.createElement('div');
+    div.className = 'transcript-entry';
+    div.dataset.seconds = parseTranscriptTime(entry.timestamp);
+    div.dataset.index = i;
+
+    var speakerClass = entry.speaker === 'SE' ? 'se' : 'visitor';
+    div.innerHTML =
+      '<span class="transcript-time">' + entry.timestamp.substring(0, 8) + '</span>' +
+      '<span class="transcript-speaker ' + speakerClass + '">' + entry.speaker + '</span>' +
+      '<span class="transcript-text">' + escapeHtml(entry.text) + '</span>';
+
+    container.appendChild(div);
+  });
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// =====================================================================
+// SUMMARY CARDS
+// =====================================================================
+function renderSummary(summary) {
+  var container = document.getElementById('summaryCards');
+  container.innerHTML = '';
+
+  // Executive summary
+  addCard(container, 'Executive Summary', '<div class="card-value executive">' + escapeHtml(summary.executive_summary) + '</div>');
+
+  // Products demonstrated
+  var productsHtml = summary.products_demonstrated.map(function(p) {
+    return '<span class="product-tag">' + escapeHtml(p) + '</span>';
+  }).join('');
+  addCard(container, 'Products Demonstrated', productsHtml);
+
+  // Key interests
+  var interestsHtml = summary.key_interests.map(function(ki) {
+    return '<span class="interest-tag ' + ki.confidence + '">' + escapeHtml(ki.topic) + '</span>';
+  }).join('');
+  addCard(container, 'Key Interests', interestsHtml);
+
+  // Follow-up actions
+  var actionsHtml = summary.follow_up_actions.map(function(a) {
+    return '<div class="action-item">' + escapeHtml(a) + '</div>';
+  }).join('');
+  addCard(container, 'Follow-Up Actions', actionsHtml);
+
+  // Key moments
+  var momentsHtml = summary.key_moments.map(function(m) {
+    return '<div class="key-moment">' +
+      '<span class="key-moment-time">' + m.timestamp + '</span> ' +
+      '<div class="key-moment-desc">' + escapeHtml(m.description) + '</div>' +
+      '<div class="key-moment-impact">' + escapeHtml(m.impact) + '</div>' +
+    '</div>';
+  }).join('');
+  addCard(container, 'Key Moments', momentsHtml);
+}
+
+function addCard(container, label, contentHtml) {
+  var card = document.createElement('div');
+  card.className = 'summary-card';
+  card.innerHTML = '<div class="card-label">' + label + '</div>' + contentHtml;
+  container.appendChild(card);
+}
+
+// =====================================================================
+// VIEW UPDATE (called on scrub)
+// =====================================================================
+function updateView(seconds) {
+  currentSeconds = Math.max(0, Math.min(seconds, totalSeconds));
+  var pct = totalSeconds > 0 ? (currentSeconds / totalSeconds) * 100 : 0;
+
+  // Timeline
+  document.getElementById('timelineProgress').style.width = pct + '%';
+  document.getElementById('timelineHandle').style.left = pct + '%';
+  document.getElementById('currentTime').textContent = formatTime(currentSeconds);
+
+  // Click markers
+  var markers = document.querySelectorAll('.click-marker');
+  markers.forEach(function(m) {
+    var s = parseFloat(m.dataset.seconds);
+    m.classList.toggle('active', s <= currentSeconds && s > currentSeconds - 10);
+  });
+
+  // Screenshot panel
+  updateScreenshot(currentSeconds);
+
+  // Transcript highlighting
+  updateTranscript(currentSeconds);
+}
+
+function updateScreenshot(seconds) {
+  var area = document.getElementById('screenshotArea');
+  var clicks = sessionData.clicks.events;
+  var startIso = sessionStartTime;
+
+  // Find the most recent click before or at current time
+  var activeClick = null;
+  for (var i = clicks.length - 1; i >= 0; i--) {
+    var clickSec = parseClickTime(clicks[i].timestamp, startIso);
+    if (clickSec <= seconds) {
+      activeClick = clicks[i];
+      break;
+    }
+  }
+
+  if (!activeClick) {
+    area.innerHTML =
+      '<div class="no-click-state">' +
+        '<div class="icon">[  ]</div>' +
+        '<div>No clicks yet at this timestamp</div>' +
+      '</div>';
+    return;
+  }
+
+  var pageUrl = activeClick.page_url || '';
+  var pageTitle = activeClick.page_title || 'Unknown Page';
+  var clickText = activeClick.element ? activeClick.element.text : '';
+  var clickSec = parseClickTime(activeClick.timestamp, startIso);
+
+  area.innerHTML =
+    '<div class="screenshot-placeholder">' +
+      '<div class="mock-browser">' +
+        '<div class="mock-browser-bar">' +
+          '<div class="mock-dots"><span></span><span></span><span></span></div>' +
+          '<div class="mock-url">' + escapeHtml(pageUrl) + '</div>' +
+        '</div>' +
+        '<div class="mock-content">' +
+          '<div class="mock-page-title">' + escapeHtml(pageTitle) + '</div>' +
+          '<div class="mock-click-label">Click #' + activeClick.index + '</div>' +
+          '<div class="mock-click-target">' + escapeHtml(clickText) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="screenshot-meta">' +
+      escapeHtml(activeClick.screenshot_file) + ' @ ' + formatTime(clickSec) +
+    '</div>';
+}
+
+function updateTranscript(seconds) {
+  var entries = document.querySelectorAll('.transcript-entry');
+  var activeIndex = -1;
+
+  // Find the active entry (the last one whose timestamp <= current time)
+  entries.forEach(function(el, i) {
+    var t = parseFloat(el.dataset.seconds);
+    if (t <= seconds) activeIndex = i;
+  });
+
+  entries.forEach(function(el, i) {
+    var t = parseFloat(el.dataset.seconds);
+    el.classList.remove('past', 'active', 'future');
+    if (i < activeIndex) el.classList.add('past');
+    else if (i === activeIndex) el.classList.add('active');
+    else el.classList.add('future');
+  });
+
+  // Auto-scroll to active entry
+  if (activeIndex >= 0) {
+    var activeEl = entries[activeIndex];
+    var container = document.getElementById('transcriptArea');
+    var elTop = activeEl.offsetTop;
+    var containerH = container.clientHeight;
+    container.scrollTop = elTop - containerH / 3;
+  }
+}
+
+// =====================================================================
+// TIMELINE INTERACTION
+// =====================================================================
+(function() {
+  var bar = document.getElementById('timelineBar');
+
+  function getSecondsFromEvent(e) {
+    var rect = bar.getBoundingClientRect();
+    var x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    var pct = Math.max(0, Math.min(1, x / rect.width));
+    return pct * totalSeconds;
+  }
+
+  bar.addEventListener('mousedown', function(e) {
+    isDragging = true;
+    stopPlayback();
+    updateView(getSecondsFromEvent(e));
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (isDragging) updateView(getSecondsFromEvent(e));
+  });
+
+  document.addEventListener('mouseup', function() {
+    isDragging = false;
+  });
+
+  // Touch support
+  bar.addEventListener('touchstart', function(e) {
+    isDragging = true;
+    stopPlayback();
+    updateView(getSecondsFromEvent(e));
+    e.preventDefault();
+  });
+
+  document.addEventListener('touchmove', function(e) {
+    if (isDragging) {
+      updateView(getSecondsFromEvent(e));
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('touchend', function() {
+    isDragging = false;
+  });
+})();
+
+// =====================================================================
+// PLAY / PAUSE
+// =====================================================================
+var playBtn = document.getElementById('playBtn');
+
+playBtn.addEventListener('click', function() {
+  if (isPlaying) {
+    stopPlayback();
+  } else {
+    startPlayback();
+  }
+});
+
+function startPlayback() {
+  if (currentSeconds >= totalSeconds) currentSeconds = 0;
+  isPlaying = true;
+  playBtn.textContent = 'PAUSE';
+  playBtn.style.background = 'var(--warning)';
+  playTimer = setInterval(function() {
+    currentSeconds += 0.5;
+    if (currentSeconds >= totalSeconds) {
+      stopPlayback();
+      return;
+    }
+    updateView(currentSeconds);
+  }, 500);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  playBtn.textContent = 'PLAY';
+  playBtn.style.background = 'var(--accent)';
+  if (playTimer) {
+    clearInterval(playTimer);
+    playTimer = null;
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    playBtn.click();
+  } else if (e.code === 'ArrowRight') {
+    e.preventDefault();
+    stopPlayback();
+    updateView(currentSeconds + 5);
+  } else if (e.code === 'ArrowLeft') {
+    e.preventDefault();
+    stopPlayback();
+    updateView(currentSeconds - 5);
+  }
+});
+
+// =====================================================================
+// INIT
+// =====================================================================
+var sessionId = getSessionId();
+loadSessionData(sessionId);
+</script>
+
+</body>
+</html>
