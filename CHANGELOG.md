@@ -10,9 +10,13 @@ All notable changes to BoothApp, organized by date.
 ### Fixes
 - #114 Correlator error handling -- guard parseOffset against non-string/empty input, skip events with missing timestamps
 - #116 Fix extension manifest.json description to reflect BoothApp functionality
+- #120 Correlator error handling -- graceful skip for missing/malformed timestamps in clicks and transcripts; 8 new tests
 
 ### Docs
 - #112 Add JSDoc docstrings to top 3 exported functions in analysis/analyze.py
+
+### Chores
+- #109 Add Fleet API test 013-T001 marker to analysis/README.md
 
 ## 2026-03-30
 
