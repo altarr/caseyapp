@@ -28,6 +28,7 @@ const { correlate } = require('./lib/correlator');
 const { getJson, listObjects } = require('./lib/s3');
 const { sendNotification } = require('./lib/notify');
 const { withRetry } = require('./lib/retry');
+const { createTracker } = require('./lib/status');
 const {
   S3Client,
   PutObjectCommand,
@@ -133,7 +134,10 @@ async function run() {
 
   log('Starting analysis pipeline');
 
+  const status = createTracker(sessionId, bucket);
+
   // --- Step 1: Fetch session data from S3 ---
+  await status.update('fetching', 'Fetching session data from S3');
   let metadata, clicks, transcript, screenshots;
   try {
     checkTimeout('fetch');
@@ -161,11 +165,13 @@ async function run() {
   } catch (err) {
     errors.push({ step: 'fetch', error: err.message, timestamp: new Date().toISOString() });
     log(`FATAL: Failed to fetch session data — ${err.message}`);
+    await status.fail(`Failed to fetch session data: ${err.message}`);
     await writeErrors(errors);
     process.exit(1);
   }
 
   // --- Step 2: Correlate into unified timeline ---
+  await status.update('correlating', 'Building unified timeline from clicks and transcript');
   let timeline;
   try {
     checkTimeout('correlate');
@@ -197,6 +203,7 @@ async function run() {
   }
 
   // --- Step 4: Annotate screenshots with click markers ---
+  await status.update('annotating', 'Annotating screenshots with click markers');
   try {
     checkTimeout('annotate');
     log('Annotating screenshots (annotator.py)...');
@@ -215,6 +222,7 @@ async function run() {
   }
 
   // --- Step 5: Run Claude analysis (ana-03) ---
+  await status.update('analyzing', 'Running AI analysis with Claude');
   let analysisSucceeded = false;
   try {
     checkTimeout('analyze');
@@ -253,6 +261,7 @@ async function run() {
   }
 
   // --- Step 6: Render HTML report ---
+  await status.update('generating_report', 'Rendering HTML and email reports');
   const sessionS3Path = `s3://${bucket}/sessions/${sessionId}`;
   try {
     checkTimeout('render');
@@ -304,6 +313,7 @@ async function run() {
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  await status.complete(`Finished in ${elapsed}s with ${errors.length} error(s)`);
   log(`Pipeline finished in ${elapsed}s with ${errors.length} error(s)`);
 }
 
@@ -332,7 +342,9 @@ async function writeErrors(errors) {
   }
 }
 
-run().catch((err) => {
+run().catch(async (err) => {
   console.error(`[pipeline:${sessionId}] FATAL: ${err.message}`);
+  const status = createTracker(sessionId, bucket);
+  await status.fail(err.message).catch(() => {});
   process.exit(1);
 });
