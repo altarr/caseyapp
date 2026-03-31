@@ -1495,6 +1495,19 @@ if (!BoothAuth.requireAwsCreds()) {
     }
 
     // Transcript segments
+    // Transcript timestamps are relative (HH:MM:SS.mmm), convert to ISO using session start
+    function relTsToIso(relTs, baseIso) {
+      if (!relTs || !baseIso) return baseIso || new Date().toISOString();
+      // If already ISO, return as-is
+      if (relTs.indexOf("T") !== -1) return relTs;
+      var parts = relTs.replace(/\..*$/, "").split(":");
+      var secs = 0;
+      for (var p = 0; p < parts.length; p++) {
+        secs = secs * 60 + Number(parts[p]);
+      }
+      return new Date(new Date(baseIso).getTime() + secs * 1000).toISOString();
+    }
+
     if (transcript && transcript.entries) {
       for (var j = 0; j < transcript.entries.length; j++) {
         var entry = transcript.entries[j];
@@ -1503,7 +1516,7 @@ if (!BoothAuth.requireAwsCreds()) {
         if (textSnippet.length > 80) textSnippet = textSnippet.substring(0, 80) + "...";
         events.push({
           type: "transcript",
-          ts: entry.timestamp || (startIso || new Date().toISOString()),
+          ts: relTsToIso(entry.timestamp, startIso),
           text: speaker + ": " + textSnippet,
           meta: ""
         });
