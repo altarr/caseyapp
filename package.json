@@ -1,15 +1,24 @@
 {
   "name": "boothapp",
   "version": "1.0.0",
-  "description": "AI-powered demo capture and follow-up for trade show booths",
+  "description": "AI-Powered Trade Show Demo Capture",
   "private": true,
   "scripts": {
     "start:watcher": "node analysis/watcher.js",
-    "test": "node analysis/test/correlator-test.js && node analysis/test/render-report-test.js && node analysis/test/email-report-test.js && node audio/test-visualizer.js && bash scripts/test/verify-integration.sh",
+    "start:presenter": "node presenter/server.js",
+    "test": "bash tests/e2e/test-full-pipeline.sh",
     "demo": "bash scripts/demo-session.sh",
     "preflight": "bash scripts/preflight.sh",
     "analyze": "python3 analysis/analyze.py",
+    "export": "node analysis/export.js",
     "transcribe": "node audio/transcriber/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.x",
+    "@aws-sdk/s3-request-presigner": "^3.x",
+    "express": "^4.x",
+    "cors": "^2.x",
+    "helmet": "^7.x"
   },
   "engines": {
     "node": ">=18"
