@@ -19,7 +19,11 @@ sys.modules.setdefault("anthropic", types.ModuleType("anthropic"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from analysis.engines.analyzer import SessionAnalyzer
-from analysis.engines.validator import validate_summary, validate_summary_or_raise, ValidationError
+from analysis.engines.validator import (
+    validate_summary, validate_summary_or_raise,
+    validate_follow_up, validate_follow_up_or_raise,
+    ValidationError,
+)
 
 
 def _make_analyzer():
@@ -29,6 +33,7 @@ def _make_analyzer():
         "session_id": "TEST-001",
         "visitor_name": "Jane Doe",
         "visitor_email": "jane@example.com",
+        "se_name": "Casey Mondoux",
         "started_at": "2026-03-29T10:00:00Z",
         "ended_at": "2026-03-29T10:20:00Z",
     }
@@ -71,6 +76,9 @@ class TestBuildSummaryJson(unittest.TestCase):
 
     def test_visitor_name_present(self):
         self.assertEqual(self.summary["visitor_name"], "Jane Doe")
+
+    def test_se_name_present(self):
+        self.assertEqual(self.summary["se_name"], "Casey Mondoux")
 
     def test_products_demonstrated(self):
         self.assertEqual(self.summary["products_demonstrated"], ["Endpoint Security", "XDR"])
@@ -193,6 +201,55 @@ class TestValidator(unittest.TestCase):
 
     def test_validate_or_raise_passes(self):
         validate_summary_or_raise(self._valid_summary())
+
+    def test_missing_se_name(self):
+        summary = self._valid_summary()
+        del summary["se_name"]
+        errors = validate_summary(summary)
+        self.assertTrue(any("se_name" in e for e in errors))
+
+
+class TestFollowUpValidator(unittest.TestCase):
+    def _valid_follow_up(self):
+        analyzer = _make_analyzer()
+        return analyzer._build_follow_up_json(SAMPLE_RECOMMENDATIONS)
+
+    def test_valid_follow_up_passes(self):
+        errors = validate_follow_up(self._valid_follow_up())
+        self.assertEqual(errors, [])
+
+    def test_missing_priority(self):
+        fu = self._valid_follow_up()
+        del fu["priority"]
+        errors = validate_follow_up(fu)
+        self.assertTrue(any("priority" in e for e in errors))
+
+    def test_invalid_priority_enum(self):
+        fu = self._valid_follow_up()
+        fu["priority"] = "urgent"
+        errors = validate_follow_up(fu)
+        self.assertTrue(any("priority" in e for e in errors))
+
+    def test_missing_sdr_notes(self):
+        fu = self._valid_follow_up()
+        del fu["sdr_notes"]
+        errors = validate_follow_up(fu)
+        self.assertTrue(any("sdr_notes" in e for e in errors))
+
+    def test_tags_must_be_array(self):
+        fu = self._valid_follow_up()
+        fu["tags"] = "not an array"
+        errors = validate_follow_up(fu)
+        self.assertTrue(any("tags" in e for e in errors))
+
+    def test_validate_follow_up_or_raise(self):
+        fu = self._valid_follow_up()
+        del fu["session_id"]
+        with self.assertRaises(ValidationError):
+            validate_follow_up_or_raise(fu)
+
+    def test_validate_follow_up_or_raise_passes(self):
+        validate_follow_up_or_raise(self._valid_follow_up())
 
 
 if __name__ == "__main__":

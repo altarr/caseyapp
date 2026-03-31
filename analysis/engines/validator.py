@@ -7,6 +7,7 @@ SUMMARY_SCHEMA = {
     "required": [
         "session_id",
         "visitor_name",
+        "se_name",
         "products_demonstrated",
         "key_interests",
         "follow_up_actions",
@@ -19,6 +20,7 @@ SUMMARY_SCHEMA = {
     "properties": {
         "session_id": {"type": "string"},
         "visitor_name": {"type": "string"},
+        "se_name": {"type": "string"},
         "products_demonstrated": {
             "type": "array",
             "items": {"type": "string"},
@@ -60,6 +62,30 @@ SUMMARY_SCHEMA = {
     },
 }
 
+FOLLOW_UP_SCHEMA = {
+    "type": "object",
+    "required": [
+        "session_id",
+        "visitor_email",
+        "priority",
+        "tags",
+        "sdr_notes",
+    ],
+    "properties": {
+        "session_id": {"type": "string"},
+        "visitor_email": {"type": "string"},
+        "subject": {"type": "string"},
+        "summary_url": {"type": "string"},
+        "tenant_url": {"type": "string"},
+        "priority": {"type": "string", "enum": ["high", "medium", "low"]},
+        "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "sdr_notes": {"type": "string"},
+    },
+}
+
 
 class ValidationError(Exception):
     """Raised when output fails schema validation."""
@@ -79,6 +105,20 @@ def validate_summary(data: dict) -> list:
 def validate_summary_or_raise(data: dict):
     """Validate summary.json, raise ValidationError if invalid."""
     errors = validate_summary(data)
+    if errors:
+        raise ValidationError(errors)
+
+
+def validate_follow_up(data: dict) -> list:
+    """Validate follow-up.json against the schema. Returns list of error strings (empty = valid)."""
+    errors = []
+    _validate_object(data, FOLLOW_UP_SCHEMA, "root", errors)
+    return errors
+
+
+def validate_follow_up_or_raise(data: dict):
+    """Validate follow-up.json, raise ValidationError if invalid."""
+    errors = validate_follow_up(data)
     if errors:
         raise ValidationError(errors)
 

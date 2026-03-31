@@ -1,6 +1,10 @@
 {
   "session_id": "B291047",
   "visitor_name": "Priya Sharma",
+  "se_name": "Casey Mondoux",
+  "demo_duration_seconds": 1020,
+  "session_score": 8,
+  "executive_summary": "Priya showed strong interest in BYOD containerization and automated risk response for her 3,500-endpoint financial firm. Schedule a POC scoping call within the week to capitalize on competitive evaluation against CrowdStrike.",
   "products_demonstrated": [
     "Endpoint Security",
     "XDR",
@@ -40,9 +44,6 @@
     "Share EU data residency documentation and DPA template",
     "Connect with Splunk integration team for pre-POC architecture review"
   ],
-  "demo_duration_seconds": 1020,
-  "session_score": 8,
-  "executive_summary": "Priya showed strong interest in BYOD containerization and automated risk response for her 3,500-endpoint financial firm. Schedule a POC scoping call within the week to capitalize on competitive evaluation against CrowdStrike.",
   "key_moments": [
     {
       "timestamp": "01:20",
@@ -64,6 +65,5 @@
     }
   ],
   "v1_tenant_link": "https://portal.xdr.trendmicro.com/tenants/demo-B291047",
-  "generated_at": "2026-08-06T10:35:00Z",
-  "se_name": "Casey Mondoux"
+  "generated_at": "2026-08-06T10:35:00Z"
 }

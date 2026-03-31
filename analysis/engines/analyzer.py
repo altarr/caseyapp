@@ -15,7 +15,7 @@ from .prompts import (
     RECOMMENDATIONS_PROMPT,
     render_html_report,
 )
-from .validator import validate_summary_or_raise
+from .validator import validate_summary_or_raise, validate_follow_up_or_raise
 
 MODEL = os.environ.get("ANALYSIS_MODEL", "claude-sonnet-4-6")
 MAX_TOKENS = 4096
@@ -90,6 +90,7 @@ class SessionAnalyzer:
         summary = self._build_summary_json(factual, recommendations)
         validate_summary_or_raise(summary)
         follow_up = self._build_follow_up_json(recommendations)
+        validate_follow_up_or_raise(follow_up)
         html = render_html_report(summary, follow_up, factual)
         return {
             "summary": summary,
@@ -100,9 +101,11 @@ class SessionAnalyzer:
     def _build_fallback_result(self, error_msg: str) -> dict:
         session_id = self._metadata.get("session_id", "unknown")
         visitor_name = self._metadata.get("visitor_name", "Unknown Visitor")
+        se_name = self._metadata.get("se_name", "")
         summary = {
             "session_id": session_id,
             "visitor_name": visitor_name,
+            "se_name": se_name,
             "demo_duration_seconds": 0,
             "session_score": 0,
             "executive_summary": f"AI analysis unavailable: {error_msg}",
@@ -328,6 +331,7 @@ class SessionAnalyzer:
     def _build_summary_json(self, factual: dict, recommendations: dict) -> dict:
         session_id = self._metadata.get("session_id", "unknown")
         visitor_name = self._metadata.get("visitor_name", "Unknown Visitor")
+        se_name = self._metadata.get("se_name", "")
 
         started = self._metadata.get("started_at", "")
         ended = self._metadata.get("ended_at", "")
@@ -345,6 +349,7 @@ class SessionAnalyzer:
         return {
             "session_id": session_id,
             "visitor_name": visitor_name,
+            "se_name": se_name,
             "products_demonstrated": factual.get("products_demonstrated", factual.get("products_shown", [])),
             "key_interests": recommendations.get("key_interests", recommendations.get("visitor_interests", [])),
             "follow_up_actions": recommendations.get("follow_up_actions", recommendations.get("recommended_follow_up", [])),
