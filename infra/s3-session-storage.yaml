@@ -55,6 +55,17 @@ Resources:
             ExposedHeaders:
               - ETag
             MaxAge: 3600
+          # Production web UI access
+          - Id: ProductionWebAccess
+            AllowedOrigins:
+              - "https://boothapp.trendcyberrange.com"
+            AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            MaxAge: 3600
           # Local dev / web UI access
           - Id: LocalDevAccess
             AllowedOrigins:

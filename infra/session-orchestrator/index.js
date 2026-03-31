@@ -26,37 +26,37 @@ const ROUTES = [
   { method: 'GET',  pattern: /^\/sessions\/([^/]+)$/,        handler: handleGetSession },
 ];
 
-async function handleHealth() {
-  return respond(200, { status: 'ok', service: 'session-orchestrator' });
+async function handleHealth(_body, _matches, origin) {
+  return respond(200, { status: 'ok', service: 'session-orchestrator' }, origin);
 }
 
-async function handleCreateSession(body) {
+async function handleCreateSession(body, _matches, origin) {
   const result = await createSession(body);
-  return respond(201, result);
+  return respond(201, result, origin);
 }
 
-async function handleEndSession(body, matches) {
+async function handleEndSession(body, matches, origin) {
   const result = await endSession(matches[1], body);
-  return respond(200, result);
+  return respond(200, result, origin);
 }
 
-async function handleGetSession(_body, matches) {
+async function handleGetSession(_body, matches, origin) {
   const result = await getSession(matches[1]);
-  return respond(200, result);
+  return respond(200, result, origin);
 }
 
-async function handleGetState(_body, matches) {
+async function handleGetState(_body, matches, origin) {
   const result = await getSessionState(matches[1]);
-  return respond(200, result);
+  return respond(200, result, origin);
 }
 
-async function handleTransitionState(body, matches) {
+async function handleTransitionState(body, matches, origin) {
   const { state, context } = body;
   if (!state) {
-    return respond(400, { error: 'Missing required field: state' });
+    return respond(400, { error: 'Missing required field: state' }, origin);
   }
   const result = await transitionState(matches[1], state, context || {});
-  return respond(200, result);
+  return respond(200, result, origin);
 }
 
 // ── Lambda handler ─────────────────────────────────────────────────────────
@@ -64,9 +64,15 @@ async function handleTransitionState(body, matches) {
 async function handler(event) {
   const method = event.httpMethod || event.requestContext?.http?.method || 'GET';
   const path   = (event.path || event.rawPath || '/').split('?')[0];
+  const origin = event.headers?.origin || event.headers?.Origin || '';
   let body     = {};
   if (event.body) {
     try { body = JSON.parse(event.body); } catch (_) {}
+  }
+
+  // CORS preflight
+  if (method === 'OPTIONS') {
+    return respond(204, '', origin);
   }
 
   for (const route of ROUTES) {
@@ -74,27 +80,38 @@ async function handler(event) {
     const m = path.match(route.pattern);
     if (!m) continue;
     try {
-      return await route.handler(body, m);
+      return await route.handler(body, m, origin);
     } catch (err) {
-      return errorResponse(err);
+      return errorResponse(err, origin);
     }
   }
 
-  return respond(404, { error: 'Not found', path, method });
+  return respond(404, { error: 'Not found', path, method }, origin);
 }
 
-function respond(statusCode, body) {
+const ALLOWED_ORIGINS = [
+  'https://boothapp.trendcyberrange.com',
+  'http://localhost:3000',
+];
+
+function respond(statusCode, body, origin) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type';
+  }
   return {
     statusCode,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   };
 }
 
-function errorResponse(err) {
+function errorResponse(err, origin) {
   const status = err.statusCode || 500;
   console.error(`[orchestrator] ${err.message}`, err.stack);
-  return respond(status, { error: err.message });
+  return respond(status, { error: err.message }, origin);
 }
 
 // ── Local HTTP server (dev / smoke-test) ───────────────────────────────────
@@ -107,12 +124,12 @@ if (require.main === module) {
     let raw = '';
     req.on('data', chunk => { raw += chunk; });
     req.on('end', async () => {
-      const event = { httpMethod: req.method, path: req.url, body: raw || null };
+      const event = { httpMethod: req.method, path: req.url, body: raw || null, headers: req.headers };
       const result = await handler(event).catch(err => errorResponse(err));
       res.writeHead(result.statusCode, result.headers);
       res.end(result.body);
     });
-  }).listen(PORT, () => console.log(`Session orchestrator listening on :${PORT}`));
+  }).listen(PORT, '0.0.0.0', () => console.log(`Session orchestrator listening on :${PORT}`));
 }
 
 module.exports = { handler };
