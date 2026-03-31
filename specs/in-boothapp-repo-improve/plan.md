@@ -1,3 +1,10 @@
-All 73 TODO.md tasks are complete, zero pending. The plan.md I just wrote is the deliverable for this session -- it's done.
+# Improvement Plan: E2E Pipeline Test
 
-No remaining tasks to pick up, and the plan is already written with actionable detail. Nothing else to do here.
+## Potential Enhancements
+1. Add timing metrics (total pipeline latency)
+2. Validate field values more deeply (array lengths, string formats)
+3. Add --dry-run mode that generates data but skips upload
+4. Add negative test: verify graceful failure when watcher is not running
+
+## Status
+Placeholder for future improvements. No tasks currently assigned.
