@@ -8,8 +8,9 @@
 //   1. Fetch clicks + transcript from S3
 //   2. Correlate into unified timeline
 //   3. Write timeline.json to S3
-//   4. Run Claude analysis (analyze.py)
-//   5. Render HTML report
+//   4. Annotate screenshots with click markers (annotator.py)
+//   5. Run Claude analysis (analyze.py)
+//   6. Render HTML report
 //
 // Error handling:
 //   - Each step wrapped in try-catch
@@ -167,7 +168,24 @@ async function run() {
     // Non-fatal: continue to analysis
   }
 
-  // --- Step 4: Run Claude analysis (ana-03) ---
+  // --- Step 4: Annotate screenshots with click markers ---
+  try {
+    checkTimeout('annotate');
+    log('Annotating screenshots (annotator.py)...');
+    const annotatorScript = path.join(__dirname, 'engines', 'annotator.py');
+    const annotateSessionPath = `s3://${bucket}/sessions/${sessionId}`;
+    execFileSync('python3', [annotatorScript, annotateSessionPath], {
+      stdio: 'inherit',
+      timeout: STAGE_TIMEOUT_MS,
+    });
+    log('Screenshot annotation complete — annotated images in output/annotated/');
+  } catch (err) {
+    errors.push({ step: 'annotate', error: err.message, timestamp: new Date().toISOString() });
+    log(`WARNING: Screenshot annotation failed: ${err.message}`);
+    // Non-fatal: continue to analysis
+  }
+
+  // --- Step 5: Run Claude analysis (ana-03) ---
   let analysisSucceeded = false;
   try {
     checkTimeout('analyze');
@@ -185,7 +203,7 @@ async function run() {
     log(`WARNING: Claude analysis failed: ${err.message}`);
   }
 
-  // --- Step 4b: Write fallback summary if analysis failed ---
+  // --- Step 5b: Write fallback summary if analysis failed ---
   if (!analysisSucceeded) {
     try {
       log('Writing fallback summary...');
@@ -204,7 +222,7 @@ async function run() {
     }
   }
 
-  // --- Step 5: Render HTML report ---
+  // --- Step 6: Render HTML report ---
   const sessionS3Path = `s3://${bucket}/sessions/${sessionId}`;
   try {
     checkTimeout('render');
@@ -220,7 +238,7 @@ async function run() {
     log(`WARNING: HTML report rendering failed: ${err.message}`);
   }
 
-  // --- Step 5b: Generate email-ready HTML ---
+  // --- Step 6b: Generate email-ready HTML ---
   log('Generating email-ready HTML (email-report.js)...');
   const emailScript = path.join(__dirname, 'email-report.js');
   try {
@@ -233,7 +251,7 @@ async function run() {
     log(`WARNING: Email report generation failed: ${err.message}`);
   }
 
-  // --- Step 6: Send completion notification ---
+  // --- Step 7: Send completion notification ---
   try {
     checkTimeout('notify');
     log('Sending completion notification...');
