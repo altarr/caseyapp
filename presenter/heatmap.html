@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="components/error-boundary.js"></script>
+<script src="components/nav.js"></script>
+<title>BoothApp -- Engagement Heatmap</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="auth.js"></script>
+<link rel="stylesheet" href="styles/mobile.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #f78166;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .container { max-width: 1000px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+  .header-right a { color: var(--text2); text-decoration: none; }
+  .header-right a:hover { color: var(--text); }
+  .user-badge { color: var(--text2); font-family: monospace; }
+
+  /* -- Mode selector -- */
+  .mode-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .mode-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-btn.active { background: #58a6ff22; border-color: var(--accent); color: var(--accent); }
+
+  .session-select {
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    max-width: 300px;
+  }
+
+  /* -- Stats row -- */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: monospace;
+  }
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.25rem;
+  }
+
+  /* -- Heatmap chart -- */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .chart-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text2);
+  }
+  .chart-body { padding: 20px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 80px 80px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .bar-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    height: 28px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    min-width: 2px;
+  }
+  .bar-fill.heat-5 { background: linear-gradient(90deg, #f85149, #da3633); }
+  .bar-fill.heat-4 { background: linear-gradient(90deg, #f78166, #e06040); }
+  .bar-fill.heat-3 { background: linear-gradient(90deg, #d29922, #b88a1a); }
+  .bar-fill.heat-2 { background: linear-gradient(90deg, #58a6ff, #388bfd); }
+  .bar-fill.heat-1 { background: linear-gradient(90deg, #3fb950, #2ea043); }
+  .bar-fill.heat-0 { background: linear-gradient(90deg, #484f58, #3a4048); }
+
+  .bar-clicks {
+    font-size: 0.85rem;
+    font-family: monospace;
+    color: var(--text2);
+    text-align: right;
+  }
+  .bar-time {
+    font-size: 0.85rem;
+    font-family: monospace;
+    color: var(--text3);
+    text-align: right;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 1rem;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text3);
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  /* -- Empty / Loading / Error states -- */
+  .state-msg {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text3);
+    font-size: 1rem;
+  }
+  .state-msg .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { color: var(--red); }
+
+  /* -- Detail table -- */
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .detail-table th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text3);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+  }
+  .detail-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .detail-table tr:hover td { background: var(--surface2); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Engagement Heatmap</h1>
+    <div class="header-right">
+      <span class="user-badge" id="user-badge"></span>
+      <a href="sessions.html">All Sessions</a>
+    </div>
+  </header>
+
+  <div class="mode-bar">
+    <button class="mode-btn active" id="btn-aggregate" onclick="switchMode('aggregate')">All Sessions</button>
+    <button class="mode-btn" id="btn-single" onclick="switchMode('single')">Single Session</button>
+    <select class="session-select" id="session-select" style="display:none" onchange="loadSingleSession(this.value)">
+      <option value="">-- Select Session --</option>
+    </select>
+  </div>
+
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-value" id="stat-sessions">--</div><div class="stat-label">Sessions</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-clicks">--</div><div class="stat-label">Total Clicks</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-modules">--</div><div class="stat-label">Modules Visited</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-top">--</div><div class="stat-label">Top Module</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">Click Count by V1 Module</div>
+    <div class="chart-body" id="clicks-chart">
+      <div class="state-msg"><div class="spinner"></div><br>Loading session data...</div>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#f85149"></div> Hot (most clicks)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#d29922"></div> Warm</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#58a6ff"></div> Cool</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#484f58"></div> Cold (fewest)</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">Estimated Dwell Time by V1 Module</div>
+    <div class="chart-body" id="time-chart">
+      <div class="state-msg"><div class="spinner"></div><br>Loading...</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">Click Detail Breakdown</div>
+    <div class="chart-body" id="detail-section">
+      <div class="state-msg">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+  var s3 = null;
+
+  // ── V1 Module Classification ──────────────────────────────────────
+  // Each module has patterns matched against page_url, page_title, element text, dom_path
+  var V1_MODULES = [
+    {
+      name: "Dashboard",
+      patterns: [/dashboard/i, /overview/i, /cyber.?risk/i, /risk.?overview/i, /home/i]
+    },
+    {
+      name: "XDR",
+      patterns: [/xdr/i, /detection.?(?:&|and)?.?response/i, /workbench/i, /observed.?attack/i, /oat/i, /search/i, /threat.?hunting/i, /siem/i]
+    },
+    {
+      name: "Endpoint",
+      patterns: [/endpoint/i, /epp/i, /edr/i, /workload/i, /server.?protect/i, /deep.?security/i, /agent/i, /policy.*endpoint/i]
+    },
+    {
+      name: "Email",
+      patterns: [/email/i, /mail/i, /messaging/i, /cloud.?app/i, /cas\b/i, /collaboration/i, /phish/i]
+    },
+    {
+      name: "Risk Insights",
+      patterns: [/risk.?insight/i, /attack.?surface/i, /exposure/i, /vulnerabilit/i, /compliance/i, /risk.?score/i, /zero.?trust/i, /ztsa/i, /identity/i]
+    },
+    {
+      name: "Threat Intel",
+      patterns: [/threat.?intel/i, /campaign/i, /intelligence/i, /ioc/i, /sandbox/i, /suspicious.?object/i, /sweeping/i, /deep.?discover/i, /ddi\b/i, /ddan\b/i]
+    },
+    {
+      name: "Network",
+      patterns: [/network/i, /firewall/i, /tippingpoint/i, /ips\b/i, /ids\b/i, /intrusion/i, /gateway/i]
+    },
+    {
+      name: "Cloud",
+      patterns: [/cloud/i, /container/i, /kubernetes/i, /k8s/i, /conformity/i, /serverless/i, /file.?storage/i]
+    },
+    {
+      name: "Response",
+      patterns: [/\bresponse\b/i, /playbook/i, /\bisolat/i, /\bcollect\b/i, /\bcontain\b/i, /remedia/i, /\baction\b/i, /\btask\b/i, /custom.?script/i]
+    }
+  ];
+
+  function classifyClick(ev) {
+    var haystack = [
+      ev.page_url || "",
+      ev.page_title || "",
+      ev.dom_path || "",
+      (ev.element && ev.element.text) || "",
+      (ev.element && ev.element.href) || "",
+      (ev.element && ev.element.class) || "",
+      (ev.element && ev.element.id) || ""
+    ].join(" ");
+
+    for (var i = 0; i < V1_MODULES.length; i++) {
+      var mod = V1_MODULES[i];
+      for (var j = 0; j < mod.patterns.length; j++) {
+        if (mod.patterns[j].test(haystack)) {
+          return mod.name;
+        }
+      }
+    }
+    return "Other";
+  }
+
+  // ── Dwell Time Estimation ─────────────────────────────────────────
+  // Time between consecutive clicks is attributed to the module of the first click.
+  // Cap at 120s to avoid counting idle time.
+  var MAX_DWELL_MS = 120000;
+
+  function computeModuleStats(events) {
+    var clickCounts = {};
+    var dwellMs = {};
+
+    // Initialize all modules
+    for (var m = 0; m < V1_MODULES.length; m++) {
+      clickCounts[V1_MODULES[m].name] = 0;
+      dwellMs[V1_MODULES[m].name] = 0;
+    }
+    clickCounts["Other"] = 0;
+    dwellMs["Other"] = 0;
+
+    // Sort events by timestamp
+    var sorted = events.slice().sort(function (a, b) {
+      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    });
+
+    for (var i = 0; i < sorted.length; i++) {
+      var mod = classifyClick(sorted[i]);
+      clickCounts[mod] = (clickCounts[mod] || 0) + 1;
+
+      // Dwell: time until next click, capped
+      if (i < sorted.length - 1) {
+        var dt = new Date(sorted[i + 1].timestamp).getTime() - new Date(sorted[i].timestamp).getTime();
+        if (dt > 0 && dt < MAX_DWELL_MS) {
+          dwellMs[mod] = (dwellMs[mod] || 0) + dt;
+        }
+      }
+    }
+
+    return { clickCounts: clickCounts, dwellMs: dwellMs };
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function formatTime(ms) {
+    var secs = Math.round(ms / 1000);
+    if (secs < 60) return secs + "s";
+    var mins = Math.floor(secs / 60);
+    var remainder = secs % 60;
+    return mins + "m " + remainder + "s";
+  }
+
+  function getHeatClass(value, max) {
+    if (max === 0) return "heat-0";
+    var ratio = value / max;
+    if (ratio >= 0.8) return "heat-5";
+    if (ratio >= 0.6) return "heat-4";
+    if (ratio >= 0.3) return "heat-3";
+    if (ratio >= 0.1) return "heat-2";
+    if (ratio > 0) return "heat-1";
+    return "heat-0";
+  }
+
+  function renderBarChart(containerId, data, formatter) {
+    var container = document.getElementById(containerId);
+
+    // Sort by value descending
+    var entries = [];
+    for (var key in data) {
+      if (data.hasOwnProperty(key)) {
+        entries.push({ label: key, value: data[key] });
+      }
+    }
+    entries.sort(function (a, b) { return b.value - a.value; });
+
+    // Filter out zero entries
+    var nonZero = entries.filter(function (e) { return e.value > 0; });
+    if (nonZero.length === 0) {
+      container.innerHTML = '<div class="state-msg">No data for this view</div>';
+      return;
+    }
+
+    var maxVal = nonZero[0].value;
+    var html = "";
+
+    // Column headers
+    html += '<div class="bar-row" style="margin-bottom:8px">';
+    html += '<div style="text-align:right;font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Module</div>';
+    html += '<div></div>';
+    html += '<div style="text-align:right;font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">' +
+      (formatter === formatTime ? 'Time' : 'Clicks') + '</div>';
+    html += '<div style="text-align:right;font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">%</div>';
+    html += '</div>';
+
+    var total = entries.reduce(function (s, e) { return s + e.value; }, 0);
+
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      var pct = maxVal > 0 ? Math.round((e.value / maxVal) * 100) : 0;
+      var totalPct = total > 0 ? Math.round((e.value / total) * 100) : 0;
+      var heatClass = getHeatClass(e.value, maxVal);
+
+      html += '<div class="bar-row">';
+      html += '<div class="bar-label">' + esc(e.label) + '</div>';
+      html += '<div class="bar-track"><div class="bar-fill ' + heatClass + '" style="width:' + pct + '%"></div></div>';
+      html += '<div class="bar-clicks">' + (formatter ? formatter(e.value) : e.value) + '</div>';
+      html += '<div class="bar-time">' + totalPct + '%</div>';
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderDetailTable(containerId, events) {
+    var container = document.getElementById(containerId);
+    if (!events || events.length === 0) {
+      container.innerHTML = '<div class="state-msg">No click events</div>';
+      return;
+    }
+
+    // Group by module with sample clicks
+    var groups = {};
+    for (var i = 0; i < events.length; i++) {
+      var mod = classifyClick(events[i]);
+      if (!groups[mod]) groups[mod] = [];
+      groups[mod].push(events[i]);
+    }
+
+    var html = '<table class="detail-table">';
+    html += '<thead><tr><th>Module</th><th>Element Clicked</th><th>Page</th><th>Count</th></tr></thead><tbody>';
+
+    // Build sub-groups by element text within each module
+    var rows = [];
+    for (var modName in groups) {
+      if (!groups.hasOwnProperty(modName)) continue;
+      var elCounts = {};
+      var elPages = {};
+      for (var j = 0; j < groups[modName].length; j++) {
+        var ev = groups[modName][j];
+        var label = (ev.element && ev.element.text) || ev.dom_path || "(unknown)";
+        label = label.substring(0, 60);
+        elCounts[label] = (elCounts[label] || 0) + 1;
+        if (!elPages[label]) elPages[label] = ev.page_title || ev.page_url || "";
+      }
+      for (var el in elCounts) {
+        if (elCounts.hasOwnProperty(el)) {
+          rows.push({ module: modName, element: el, page: elPages[el], count: elCounts[el] });
+        }
+      }
+    }
+    rows.sort(function (a, b) { return b.count - a.count; });
+
+    // Show top 30
+    var limit = Math.min(rows.length, 30);
+    for (var k = 0; k < limit; k++) {
+      var r = rows[k];
+      html += '<tr>';
+      html += '<td style="color:var(--accent);font-weight:600">' + esc(r.module) + '</td>';
+      html += '<td>' + esc(r.element) + '</td>';
+      html += '<td style="font-size:0.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.page) + '</td>';
+      html += '<td style="font-family:monospace;text-align:right">' + r.count + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  function updateStats(sessionCount, events, stats) {
+    document.getElementById("stat-sessions").textContent = sessionCount;
+    document.getElementById("stat-clicks").textContent = events.length;
+
+    var activeModules = 0;
+    var topModule = "--";
+    var topCount = 0;
+    for (var mod in stats.clickCounts) {
+      if (stats.clickCounts[mod] > 0) activeModules++;
+      if (stats.clickCounts[mod] > topCount) {
+        topCount = stats.clickCounts[mod];
+        topModule = mod;
+      }
+    }
+    document.getElementById("stat-modules").textContent = activeModules;
+    document.getElementById("stat-top").textContent = topModule;
+  }
+
+  // ── S3 Data Loading ───────────────────────────────────────────────
+  function initS3() {
+    var ak = localStorage.getItem("boothapp_aws_ak");
+    var sk = localStorage.getItem("boothapp_aws_sk");
+    if (!ak || !sk) return null;
+    AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+    s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+    return s3;
+  }
+
+  function fetchS3Json(key) {
+    return new Promise(function (resolve, reject) {
+      s3.getObject({ Key: key }, function (err, data) {
+        if (err) { reject(err); return; }
+        try { resolve(JSON.parse(data.Body.toString())); }
+        catch (e) { reject(e); }
+      });
+    });
+  }
+
+  function listSessions() {
+    return new Promise(function (resolve, reject) {
+      s3.listObjectsV2({ Prefix: "sessions/", Delimiter: "/" }, function (err, data) {
+        if (err) { reject(err); return; }
+        var ids = [];
+        var prefixes = data.CommonPrefixes || [];
+        for (var i = 0; i < prefixes.length; i++) {
+          var p = prefixes[i].Prefix;
+          // sessions/ABC123/ -> ABC123
+          var id = p.replace(/^sessions\//, "").replace(/\/$/, "");
+          if (id) ids.push(id);
+        }
+        resolve(ids);
+      });
+    });
+  }
+
+  // ── Mode Switching ────────────────────────────────────────────────
+  var currentMode = "aggregate";
+  var sessionList = [];
+  var allEventsCache = {};
+
+  window.switchMode = function (mode) {
+    currentMode = mode;
+    document.getElementById("btn-aggregate").className = "mode-btn" + (mode === "aggregate" ? " active" : "");
+    document.getElementById("btn-single").className = "mode-btn" + (mode === "single" ? " active" : "");
+    document.getElementById("session-select").style.display = mode === "single" ? "inline-block" : "none";
+
+    if (mode === "aggregate") {
+      loadAggregate();
+    }
+  };
+
+  window.loadSingleSession = function (sessionId) {
+    if (!sessionId) return;
+    showLoading();
+    fetchS3Json("sessions/" + sessionId + "/clicks/clicks.json")
+      .then(function (data) {
+        var events = (data && data.events) ? data.events : [];
+        renderAll(1, events);
+      })
+      .catch(function () {
+        renderAll(1, []);
+      });
+  };
+
+  function showLoading() {
+    document.getElementById("clicks-chart").innerHTML = '<div class="state-msg"><div class="spinner"></div><br>Loading...</div>';
+    document.getElementById("time-chart").innerHTML = '<div class="state-msg"><div class="spinner"></div><br>Loading...</div>';
+    document.getElementById("detail-section").innerHTML = '<div class="state-msg">Loading...</div>';
+  }
+
+  function renderAll(sessionCount, allEvents) {
+    var stats = computeModuleStats(allEvents);
+    updateStats(sessionCount, allEvents, stats);
+    renderBarChart("clicks-chart", stats.clickCounts, null);
+    renderBarChart("time-chart", stats.dwellMs, formatTime);
+    renderDetailTable("detail-section", allEvents);
+  }
+
+  function loadAggregate() {
+    showLoading();
+    var allEvents = [];
+    var loaded = 0;
+
+    if (sessionList.length === 0) {
+      renderAll(0, []);
+      return;
+    }
+
+    var errors = 0;
+    for (var i = 0; i < sessionList.length; i++) {
+      (function (sid) {
+        if (allEventsCache[sid]) {
+          allEvents = allEvents.concat(allEventsCache[sid]);
+          loaded++;
+          if (loaded === sessionList.length) renderAll(sessionList.length, allEvents);
+          return;
+        }
+        fetchS3Json("sessions/" + sid + "/clicks/clicks.json")
+          .then(function (data) {
+            var events = (data && data.events) ? data.events : [];
+            allEventsCache[sid] = events;
+            allEvents = allEvents.concat(events);
+          })
+          .catch(function () {
+            allEventsCache[sid] = [];
+            errors++;
+          })
+          .then(function () {
+            loaded++;
+            if (loaded === sessionList.length) renderAll(sessionList.length - errors, allEvents);
+          });
+      })(sessionList[i]);
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────
+  function init() {
+    if (!BoothAuth.requireLogin()) return;
+
+    var user = BoothAuth.currentUser();
+    document.getElementById("user-badge").textContent = user || "";
+
+    if (!initS3()) {
+      document.getElementById("clicks-chart").innerHTML =
+        '<div class="state-msg error-msg">AWS credentials not configured. Go to <a href="sessions.html" style="color:var(--accent)">Sessions</a> to set up.</div>';
+      return;
+    }
+
+    listSessions()
+      .then(function (ids) {
+        sessionList = ids;
+
+        // Populate session dropdown
+        var sel = document.getElementById("session-select");
+        for (var i = 0; i < ids.length; i++) {
+          var opt = document.createElement("option");
+          opt.value = ids[i];
+          opt.textContent = ids[i];
+          sel.appendChild(opt);
+        }
+
+        loadAggregate();
+      })
+      .catch(function (err) {
+        document.getElementById("clicks-chart").innerHTML =
+          '<div class="state-msg error-msg">Error listing sessions: ' + esc(err.message || String(err)) + '</div>';
+      });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

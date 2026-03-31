@@ -5,6 +5,7 @@
     { label: 'Home', href: '/' },
     { label: 'Sessions', href: '/sessions.html' },
     { label: 'Analytics', href: '/analytics.html' },
+    { label: 'Heatmap', href: '/heatmap.html' },
     { label: 'Live Monitor', href: '/live-dashboard.html' },
     { label: 'Highlights', href: '/highlights.html' },
     { label: 'Admin', href: '/admin.html' },
