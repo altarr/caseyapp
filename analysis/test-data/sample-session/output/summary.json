@@ -1,15 +1,17 @@
 {
   "session_id": "B291047",
   "visitor_name": "Priya Sharma",
-  "demo_duration_minutes": 17,
-  "session_score": 8,
+  "demo_duration_seconds": 1020,
+  "engagement_rating": 5,
+  "session_score": 5,
+  "visitor_technical_level": "technical",
   "executive_summary": "Priya showed strong interest in BYOD containerization and automated risk response for her 3,500-endpoint financial firm. Schedule a POC scoping call within the week to capitalize on competitive evaluation against CrowdStrike.",
-  "products_shown": [
+  "products_demonstrated": [
     "Endpoint Security",
     "XDR",
-    "Risk Insights"
+    "Attack Surface Risk Management"
   ],
-  "visitor_interests": [
+  "key_interests": [
     {
       "topic": "BYOD Container Policy",
       "confidence": "high",
@@ -36,12 +38,32 @@
       "evidence": "Brief question about regulatory requirements at end of session"
     }
   ],
-  "recommended_follow_up": [
-    "Send BYOD container deployment guide with iOS/Android comparison matrix",
-    "Schedule POC scoping call for 3,500-endpoint environment within 5 business days",
-    "Provide competitive comparison: V1 BYOD vs CrowdStrike Falcon Go mobile coverage",
-    "Share EU data residency documentation and DPA template",
-    "Connect with Splunk integration team for pre-POC architecture review"
+  "follow_up_actions": [
+    {
+      "action": "Send BYOD container deployment guide with iOS/Android comparison matrix",
+      "owner": "SE",
+      "deadline": "within 48 hours"
+    },
+    {
+      "action": "Schedule POC scoping call for 3,500-endpoint environment",
+      "owner": "SDR",
+      "deadline": "within 5 business days"
+    },
+    {
+      "action": "Provide competitive comparison: V1 BYOD vs CrowdStrike Falcon Go mobile coverage",
+      "owner": "SE",
+      "deadline": "within 48 hours"
+    },
+    {
+      "action": "Share EU data residency documentation and DPA template",
+      "owner": "SE",
+      "deadline": "next week"
+    },
+    {
+      "action": "Connect with Splunk integration team for pre-POC architecture review",
+      "owner": "SDR",
+      "deadline": "next week"
+    }
   ],
   "key_moments": [
     {

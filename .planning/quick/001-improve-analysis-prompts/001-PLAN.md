@@ -1,12 +1,14 @@
-# Plan: Improve Analysis Prompts
+# Improve Analysis Prompts
 
 ## Goal
-Improve `analysis/engines/prompts.py` to produce better Claude analysis output with structured V1 feature identification, visitor technical level assessment, engagement rating, and actionable follow-up items with owners.
+Enhance analysis/engines/prompts.py to produce better Claude analysis output with V1 feature taxonomy, visitor technical level classification, structured follow-up actions with owners, and 1-5 engagement rating.
 
 ## Success Criteria
-- [ ] System prompt instructs Claude to identify specific V1 features (XDR, Endpoint Security, Cloud Security, Email Security, etc.)
-- [ ] System prompt instructs Claude to note visitor technical level (executive/technical/hands-on)
-- [ ] System prompt instructs Claude to rate engagement 1-5
-- [ ] System prompt instructs Claude to list specific follow-up actions with owners
-- [ ] Response must be valid JSON
-- [ ] Branch created, committed, pushed, PR to main
+- [x] System prompt includes V1 feature taxonomy (XDR, Endpoint Security, Cloud Security, Email Security, etc.)
+- [x] Visitor technical level classification (executive/technical/hands-on) with evidence
+- [x] Engagement rating on 1-5 scale (not 1-10)
+- [x] Follow-up actions are structured objects with action, owner (SE/SDR/visitor), and deadline
+- [x] All responses must be valid JSON (explicit instruction in prompts)
+- [x] HTML report renders new fields (owner badges, deadline, visitor level, 5-step gauge)
+- [x] All existing tests pass with updated sample data
+- [x] Branch created, committed, pushed
