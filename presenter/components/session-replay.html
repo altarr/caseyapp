@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Session Replay</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="../auth.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --accent: #58a6ff;
+    --red: #f85149;
+    --green: #3fb950;
+    --yellow: #d29922;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .header-left a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+  }
+  .header-left a:hover { color: var(--accent); }
+  .header h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .session-label {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    background: var(--bg);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  /* ── Setup prompt ───────────────────────────────────── */
+  .setup {
+    max-width: 400px;
+    margin: 8rem auto;
+    text-align: center;
+  }
+  .setup h2 {
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+  .setup input {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: monospace;
+    margin-bottom: 0.8rem;
+  }
+  .setup input:focus { outline: 2px solid var(--accent); }
+  .setup button {
+    font-size: 1rem;
+    padding: 0.6rem 2rem;
+    border-radius: 8px;
+    border: none;
+    background: #238636;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .setup button:hover { background: #2ea043; }
+
+  /* ── Loading / Error ────────────────────────────────── */
+  .status-msg {
+    text-align: center;
+    padding: 6rem 2rem;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+  .status-msg.error { color: var(--red); }
+  .spinner::after {
+    content: "";
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Main viewer ────────────────────────────────────── */
+  .viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Screenshot area */
+  .screenshot-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    min-height: 0;
+  }
+  .screenshot-container {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .screenshot-container img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 200px);
+    object-fit: contain;
+  }
+
+  /* Click indicator overlay */
+  .click-indicator {
+    position: absolute;
+    pointer-events: none;
+  }
+  .click-circle {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--red);
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    animation: pulse-ring 1.5s ease-out infinite;
+    box-shadow: 0 0 12px rgba(248, 81, 73, 0.5);
+  }
+  .click-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--red);
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px rgba(248, 81, 73, 0.8);
+  }
+  @keyframes pulse-ring {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+  }
+
+  /* Info overlay */
+  .info-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 2rem 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .info-dom-path {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .info-element {
+    font-size: 0.9rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .info-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .info-meta span { white-space: nowrap; }
+
+  /* ── Controls bar ───────────────────────────────────── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.8rem 1.5rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .controls button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .controls button:hover {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.1);
+  }
+  .controls button.active {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .controls .step-label {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    min-width: 6em;
+    text-align: center;
+  }
+  .controls .spacer { flex: 1; }
+  .controls .page-url {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 400px;
+    font-family: monospace;
+  }
+
+  /* ── Progress bar ───────────────────────────────────── */
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-bar:hover { height: 8px; }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+    border-radius: 0 2px 2px 0;
+  }
+  .progress-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+  }
+  .progress-marker {
+    position: absolute;
+    top: -2px;
+    width: 2px;
+    height: calc(100% + 4px);
+    background: rgba(255,255,255,0.2);
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<script>
+  if (!BoothAuth.requireAwsCreds()) { window.location.href = "../login.html?redirect=" + encodeURIComponent(window.location.href); }
+  else if (!BoothAuth.requireLogin()) { /* redirects */ }
+</script>
+
+<!-- Setup: session ID prompt -->
+<div id="setup" class="setup hidden">
+  <h2>Session Replay</h2>
+  <input id="session-input" type="text" placeholder="Enter session ID (e.g. A726594)">
+  <button id="load-btn">Load Session</button>
+</div>
+
+<!-- Loading state -->
+<div id="loading" class="status-msg hidden">
+  Loading session data <span class="spinner"></span>
+</div>
+
+<!-- Error state -->
+<div id="error" class="status-msg error hidden"></div>
+
+<!-- Main viewer -->
+<div id="viewer" class="viewer hidden">
+  <div class="header">
+    <div class="header-left">
+      <a href="../sessions.html">&larr; Sessions</a>
+      <h1>Session Replay</h1>
+      <span class="session-label" id="sid-label"></span>
+    </div>
+    <div class="header-right">
+      <span id="visitor-name"></span>
+      <span id="auth-user"></span>
+    </div>
+  </div>
+
+  <div class="screenshot-wrap" id="screenshot-wrap">
+    <div class="screenshot-container" id="screenshot-container">
+      <img id="screenshot-img" src="" alt="Screenshot">
+      <div class="click-indicator" id="click-indicator">
+        <div class="click-circle" id="click-circle"></div>
+        <div class="click-dot" id="click-dot"></div>
+      </div>
+    </div>
+    <div class="info-overlay">
+      <div class="info-dom-path" id="info-dom-path"></div>
+      <div class="info-element" id="info-element"></div>
+      <div class="info-meta">
+        <span id="info-timestamp"></span>
+        <span id="info-page-title"></span>
+        <span id="info-coords"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress-bar" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+    <div class="progress-markers" id="progress-markers"></div>
+  </div>
+
+  <div class="controls">
+    <button id="btn-prev" title="Previous (Left arrow)">&#9664; Prev</button>
+    <button id="btn-play" title="Play/Pause (Space)">&#9654; Play</button>
+    <button id="btn-next" title="Next (Right arrow)">Next &#9654;</button>
+    <span class="step-label" id="step-label">0 / 0</span>
+    <span class="spacer"></span>
+    <span class="page-url" id="info-url"></span>
+  </div>
+</div>
+
+<script>
+(function () {
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+  var AUTO_INTERVAL = 3000;
+
+  // ── S3 client ─────────────────────────────────────────────────────────────
+  var s3 = null;
+  function getS3() {
+    if (s3) return s3;
+    var ak = localStorage.getItem("boothapp_aws_ak");
+    var sk = localStorage.getItem("boothapp_aws_sk");
+    if (!ak || !sk) return null;
+    AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+    s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+    return s3;
+  }
+
+  // ── Elements ──────────────────────────────────────────────────────────────
+  var setupEl       = document.getElementById("setup");
+  var loadingEl     = document.getElementById("loading");
+  var errorEl       = document.getElementById("error");
+  var viewerEl      = document.getElementById("viewer");
+  var sessionInput  = document.getElementById("session-input");
+  var loadBtn       = document.getElementById("load-btn");
+  var sidLabel      = document.getElementById("sid-label");
+  var visitorName   = document.getElementById("visitor-name");
+  var imgEl         = document.getElementById("screenshot-img");
+  var containerEl   = document.getElementById("screenshot-container");
+  var indicatorEl   = document.getElementById("click-indicator");
+  var circleEl      = document.getElementById("click-circle");
+  var dotEl         = document.getElementById("click-dot");
+  var domPathEl     = document.getElementById("info-dom-path");
+  var elementEl     = document.getElementById("info-element");
+  var timestampEl   = document.getElementById("info-timestamp");
+  var pageTitleEl   = document.getElementById("info-page-title");
+  var coordsEl      = document.getElementById("info-coords");
+  var urlEl         = document.getElementById("info-url");
+  var progressFill  = document.getElementById("progress-fill");
+  var progressBar   = document.getElementById("progress-bar");
+  var markersEl     = document.getElementById("progress-markers");
+  var stepLabel     = document.getElementById("step-label");
+  var btnPrev       = document.getElementById("btn-prev");
+  var btnPlay       = document.getElementById("btn-play");
+  var btnNext       = document.getElementById("btn-next");
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  var sessionId     = null;
+  var events        = [];
+  var currentIndex  = 0;
+  var playing       = false;
+  var playTimer     = null;
+  var screenshotCache = {};  // url -> blob URL
+  var metadata      = null;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  var sid = params.get("session");
+  if (sid) {
+    startLoad(sid);
+  } else {
+    setupEl.classList.remove("hidden");
+  }
+
+  loadBtn.addEventListener("click", function () {
+    var val = sessionInput.value.trim();
+    if (val) startLoad(val);
+  });
+  sessionInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      var val = sessionInput.value.trim();
+      if (val) startLoad(val);
+    }
+  });
+
+  // ── Load session data ─────────────────────────────────────────────────────
+  function startLoad(sid) {
+    sessionId = sid;
+    setupEl.classList.add("hidden");
+    errorEl.classList.add("hidden");
+    loadingEl.classList.remove("hidden");
+
+    var client = getS3();
+    if (!client) { showError("No AWS credentials configured"); return; }
+
+    // Load clicks.json and metadata.json in parallel
+    var prefix = "sessions/" + sessionId + "/";
+
+    Promise.all([
+      s3GetJson(client, prefix + "clicks/clicks.json"),
+      s3GetJson(client, prefix + "metadata.json").catch(function () { return null; })
+    ]).then(function (results) {
+      var clicksData = results[0];
+      metadata = results[1];
+
+      if (!clicksData || !clicksData.events || clicksData.events.length === 0) {
+        showError("No click events found for session " + sessionId);
+        return;
+      }
+
+      events = clicksData.events;
+
+      // Preload first screenshot, then show viewer
+      preloadScreenshot(0).then(function () {
+        loadingEl.classList.add("hidden");
+        viewerEl.classList.remove("hidden");
+        sidLabel.textContent = sessionId;
+        if (metadata && metadata.visitor_name) {
+          visitorName.textContent = metadata.visitor_name;
+        }
+        document.getElementById("auth-user").textContent = BoothAuth.currentUser() || "";
+        renderMarkers();
+        showEvent(0);
+        startPlaying();
+      });
+    }).catch(function (err) {
+      showError("Failed to load session: " + err.message);
+    });
+  }
+
+  function s3GetJson(client, key) {
+    return new Promise(function (resolve, reject) {
+      client.getObject({ Key: key }, function (err, data) {
+        if (err) { reject(err); return; }
+        try {
+          resolve(JSON.parse(data.Body.toString()));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  }
+
+  function s3GetBlob(client, key) {
+    return new Promise(function (resolve, reject) {
+      client.getObject({ Key: key }, function (err, data) {
+        if (err) { reject(err); return; }
+        var blob = new Blob([data.Body], { type: "image/jpeg" });
+        resolve(URL.createObjectURL(blob));
+      });
+    });
+  }
+
+  function showError(msg) {
+    loadingEl.classList.add("hidden");
+    setupEl.classList.add("hidden");
+    errorEl.textContent = msg;
+    errorEl.classList.remove("hidden");
+  }
+
+  // ── Screenshot loading ────────────────────────────────────────────────────
+  function screenshotKey(idx) {
+    var evt = events[idx];
+    if (!evt || !evt.screenshot_file) return null;
+    return "sessions/" + sessionId + "/" + evt.screenshot_file;
+  }
+
+  function preloadScreenshot(idx) {
+    var key = screenshotKey(idx);
+    if (!key) return Promise.resolve(null);
+    if (screenshotCache[key]) return Promise.resolve(screenshotCache[key]);
+
+    var client = getS3();
+    return s3GetBlob(client, key).then(function (blobUrl) {
+      screenshotCache[key] = blobUrl;
+      return blobUrl;
+    }).catch(function () {
+      return null;
+    });
+  }
+
+  // Preload adjacent screenshots for smooth transitions
+  function preloadAdjacent(idx) {
+    if (idx + 1 < events.length) preloadScreenshot(idx + 1);
+    if (idx + 2 < events.length) preloadScreenshot(idx + 2);
+  }
+
+  // ── Display event ─────────────────────────────────────────────────────────
+  function showEvent(idx) {
+    if (idx < 0 || idx >= events.length) return;
+    currentIndex = idx;
+
+    var evt = events[idx];
+
+    // Update screenshot
+    var key = screenshotKey(idx);
+    if (key && screenshotCache[key]) {
+      imgEl.src = screenshotCache[key];
+      imgEl.style.display = "block";
+    } else {
+      // Try to load it now
+      preloadScreenshot(idx).then(function (url) {
+        if (url && currentIndex === idx) {
+          imgEl.src = url;
+          imgEl.style.display = "block";
+          positionClickIndicator(evt);
+        }
+      });
+    }
+
+    // Position click indicator after image loads
+    if (imgEl.complete && imgEl.naturalWidth > 0) {
+      positionClickIndicator(evt);
+    } else {
+      imgEl.onload = function () {
+        if (currentIndex === idx) positionClickIndicator(evt);
+      };
+    }
+
+    // Update info overlay
+    domPathEl.textContent = evt.dom_path || "";
+    var elText = "";
+    if (evt.element) {
+      elText = "<" + (evt.element.tag || "?") + ">";
+      if (evt.element.text) elText += " " + evt.element.text;
+    }
+    elementEl.textContent = elText;
+    timestampEl.textContent = formatTimestamp(evt.timestamp);
+    pageTitleEl.textContent = evt.page_title || "";
+    coordsEl.textContent = evt.coordinates
+      ? "(" + evt.coordinates.x + ", " + evt.coordinates.y + ")"
+      : "";
+    urlEl.textContent = evt.page_url || "";
+
+    // Update controls
+    stepLabel.textContent = (idx + 1) + " / " + events.length;
+    var pct = events.length > 1
+      ? ((idx / (events.length - 1)) * 100)
+      : 100;
+    progressFill.style.width = pct + "%";
+
+    // Preload next screenshots
+    preloadAdjacent(idx);
+  }
+
+  function positionClickIndicator(evt) {
+    if (!evt.coordinates) {
+      indicatorEl.style.display = "none";
+      return;
+    }
+    indicatorEl.style.display = "block";
+
+    // Map original coordinates to displayed image size
+    var imgW = imgEl.naturalWidth || 1;
+    var imgH = imgEl.naturalHeight || 1;
+    var dispW = imgEl.clientWidth;
+    var dispH = imgEl.clientHeight;
+    var scaleX = dispW / imgW;
+    var scaleY = dispH / imgH;
+
+    var cx = evt.coordinates.x * scaleX;
+    var cy = evt.coordinates.y * scaleY;
+
+    circleEl.style.left = cx + "px";
+    circleEl.style.top = cy + "px";
+    dotEl.style.left = cx + "px";
+    dotEl.style.top = cy + "px";
+
+    // Restart pulse animation
+    circleEl.style.animation = "none";
+    circleEl.offsetHeight; // reflow
+    circleEl.style.animation = "pulse-ring 1.5s ease-out infinite";
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return "";
+    try {
+      var d = new Date(ts);
+      var h = d.getHours().toString().padStart(2, "0");
+      var m = d.getMinutes().toString().padStart(2, "0");
+      var s = d.getSeconds().toString().padStart(2, "0");
+      return h + ":" + m + ":" + s;
+    } catch (e) {
+      return ts;
+    }
+  }
+
+  // ── Progress markers ──────────────────────────────────────────────────────
+  function renderMarkers() {
+    markersEl.innerHTML = "";
+    for (var i = 0; i < events.length; i++) {
+      var pct = events.length > 1 ? (i / (events.length - 1)) * 100 : 0;
+      var marker = document.createElement("div");
+      marker.className = "progress-marker";
+      marker.style.left = pct + "%";
+      markersEl.appendChild(marker);
+    }
+  }
+
+  // ── Playback controls ─────────────────────────────────────────────────────
+  function startPlaying() {
+    playing = true;
+    btnPlay.innerHTML = "&#9646;&#9646; Pause";
+    btnPlay.classList.add("active");
+    clearInterval(playTimer);
+    playTimer = setInterval(function () {
+      if (currentIndex < events.length - 1) {
+        showEvent(currentIndex + 1);
+      } else {
+        stopPlaying();
+      }
+    }, AUTO_INTERVAL);
+  }
+
+  function stopPlaying() {
+    playing = false;
+    btnPlay.innerHTML = "&#9654; Play";
+    btnPlay.classList.remove("active");
+    clearInterval(playTimer);
+  }
+
+  function togglePlay() {
+    if (playing) stopPlaying();
+    else startPlaying();
+  }
+
+  btnPlay.addEventListener("click", togglePlay);
+  btnPrev.addEventListener("click", function () {
+    stopPlaying();
+    if (currentIndex > 0) showEvent(currentIndex - 1);
+  });
+  btnNext.addEventListener("click", function () {
+    stopPlaying();
+    if (currentIndex < events.length - 1) showEvent(currentIndex + 1);
+  });
+
+  // Click on progress bar to seek
+  progressBar.addEventListener("click", function (e) {
+    var rect = progressBar.getBoundingClientRect();
+    var pct = (e.clientX - rect.left) / rect.width;
+    var idx = Math.round(pct * (events.length - 1));
+    idx = Math.max(0, Math.min(events.length - 1, idx));
+    stopPlaying();
+    showEvent(idx);
+  });
+
+  // Keyboard controls
+  document.addEventListener("keydown", function (e) {
+    if (events.length === 0) return;
+    if (e.target.tagName === "INPUT") return;
+
+    switch (e.key) {
+      case " ":
+        e.preventDefault();
+        togglePlay();
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        stopPlaying();
+        if (currentIndex > 0) showEvent(currentIndex - 1);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        stopPlaying();
+        if (currentIndex < events.length - 1) showEvent(currentIndex + 1);
+        break;
+      case "Home":
+        e.preventDefault();
+        stopPlaying();
+        showEvent(0);
+        break;
+      case "End":
+        e.preventDefault();
+        stopPlaying();
+        showEvent(events.length - 1);
+        break;
+    }
+  });
+
+  // Reposition click indicator on window resize
+  window.addEventListener("resize", function () {
+    if (events.length > 0) positionClickIndicator(events[currentIndex]);
+  });
+
+})();
+</script>
+</body>
+</html>
