@@ -205,11 +205,11 @@ async function run() {
   }
 
   // --- Step 5: Render HTML report ---
+  const sessionS3Path = `s3://${bucket}/sessions/${sessionId}`;
   try {
     checkTimeout('render');
     log('Rendering HTML report (render-report.js)...');
     const renderScript = path.join(__dirname, 'render-report.js');
-    const sessionS3Path = `s3://${bucket}/sessions/${sessionId}`;
     execFileSync('node', [renderScript, sessionS3Path], {
       stdio: 'inherit',
       timeout: STAGE_TIMEOUT_MS,
