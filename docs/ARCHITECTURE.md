@@ -1,7 +1,7 @@
 # BoothApp System Architecture
 
 BoothApp captures booth demo interactions and produces AI-driven session reports.
-Four components communicate through S3 as the shared data plane.
+Five components communicate through S3 as the shared data plane.
 
 ## Components
 
@@ -20,25 +20,23 @@ AWS Lambda that manages session lifecycle (start, stop, status). Writes
 `active-session.json` to S3 so capture components know which session is
 live. Session metadata (timestamps, participant info) is stored as JSON.
 
-### Analysis Pipeline (`analysis/`)
-Runs after a session ends:
-1. Loads the click timeline, screenshots, and audio transcript from S3.
-2. Correlates events into a unified time-ordered transcript.
-3. Sends correlated data to Claude for qualitative analysis.
-4. Writes the final report back to S3.
-
-Supports both direct Anthropic API and AWS Bedrock invocation.
+### Session Watcher & Analysis Pipeline (`analysis/`)
+The watcher polls S3 every 30s for completed sessions. When one is
+found it triggers the pipeline: correlator merges clicks, screenshots,
+and transcript by timestamp, then Claude analyzes the unified timeline
+and generates a personalized HTML report with follow-up recommendations.
+Output artifacts are written back to the session's S3 prefix.
 
 ## Data Flow
 
 ```
 Browser (clicks + screenshots) --\
-                                  +--> S3 session prefix --> Pipeline --> Claude --> Report
-Microphone (audio segments) ----/
-                 ^
-                 |
-         Session Orchestrator (Lambda)
-         creates / manages session metadata
+                                  +--> S3 session prefix
+Microphone (audio segments) ----/          |
+                 ^                    Watcher (polls)
+                 |                         |
+         Session Orchestrator         Pipeline --> Claude --> Report
+         (Lambda lifecycle)
 ```
 
 ## Key Design Decisions
