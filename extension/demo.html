@@ -457,6 +457,12 @@
         .catch(function() { return null; });
     }
 
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
     function flashPoll(ok) {
       dom.pollDot.className = 'poll-dot ' + (ok ? 'ok' : 'err');
       setTimeout(function() { dom.pollDot.className = 'poll-dot'; }, 600);
@@ -504,13 +510,13 @@
       // Meta chips
       var chips = '';
       if (data.demo_duration_minutes) {
-        chips += '<span class="chip"><strong>' + data.demo_duration_minutes + ' min</strong> demo</span>';
+        chips += '<span class="chip"><strong>' + esc('' + data.demo_duration_minutes) + ' min</strong> demo</span>';
       }
       if (data.session_score) {
-        chips += '<span class="chip">Score: <strong>' + data.session_score + '/10</strong></span>';
+        chips += '<span class="chip">Score: <strong>' + esc('' + data.session_score) + '/10</strong></span>';
       }
       if (data.products_shown && data.products_shown.length) {
-        chips += '<span class="chip"><strong>' + data.products_shown.length + '</strong> products shown</span>';
+        chips += '<span class="chip"><strong>' + esc('' + data.products_shown.length) + '</strong> products shown</span>';
       }
       dom.summaryMeta.innerHTML = chips;
 
@@ -518,10 +524,11 @@
       var items = '';
       if (data.visitor_interests && data.visitor_interests.length) {
         data.visitor_interests.forEach(function(interest) {
-          var conf = (interest.confidence || 'medium').toLowerCase();
+          var rawConf = (interest.confidence || 'medium').toLowerCase();
+          var conf = rawConf === 'high' ? 'high' : rawConf === 'low' ? 'low' : 'medium';
           items += '<div class="interest-item">' +
-            '<span class="conf ' + conf + '">' + conf + '</span>' +
-            '<span>' + (interest.topic || '') + '</span>' +
+            '<span class="conf ' + conf + '">' + esc(conf) + '</span>' +
+            '<span>' + esc(interest.topic || '') + '</span>' +
             '</div>';
         });
       }
