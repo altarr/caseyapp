@@ -1,0 +1,967 @@
+<!-- BoothApp Presenter - Session Comparison - Hackathon 2026 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Session Compare</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="auth.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --accent-blue: #58a6ff;
+    --accent-red: #f85149;
+    --accent-orange: #f78166;
+    --accent-green: #3fb950;
+    --accent-yellow: #d29922;
+    --accent-purple: #a371f7;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  header {
+    max-width: 1200px;
+    margin: 0 auto 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    letter-spacing: 0.02em;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1.2rem;
+    font-size: 0.85rem;
+  }
+
+  .nav-links a {
+    color: var(--accent-blue);
+    text-decoration: none;
+  }
+
+  .nav-links a:hover { text-decoration: underline; }
+
+  /* -- Setup form -- */
+  .setup {
+    max-width: 500px;
+    margin: 4rem auto;
+    text-align: center;
+  }
+
+  .setup label {
+    display: block;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .setup input {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    width: 180px;
+    margin: 0 0.5rem 1rem;
+    font-family: monospace;
+  }
+
+  .setup button {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.6rem 2rem;
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  .setup button:hover { opacity: 0.85; }
+
+  .hidden { display: none !important; }
+
+  /* -- Error / loading -- */
+  .error-banner {
+    max-width: 1200px;
+    margin: 0 auto 1rem;
+    padding: 0.8rem 1.2rem;
+    background: rgba(248, 81, 73, 0.15);
+    border: 1px solid var(--accent-red);
+    border-radius: 8px;
+    color: var(--accent-red);
+    display: none;
+  }
+
+  .loading {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 3rem;
+    font-size: 1.1rem;
+  }
+
+  /* -- Main comparison grid -- */
+  .compare-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .vs-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .vs-header .vs-ids {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+  }
+
+  .vs-header .vs-ids .vs { color: var(--accent-orange); margin: 0 1rem; font-weight: 700; }
+
+  /* -- Side-by-side cards -- */
+  .side-by-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+  }
+
+  .card.side-a { border-top: 3px solid var(--accent-blue); }
+  .card.side-b { border-top: 3px solid var(--accent-purple); }
+
+  .card-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.6rem;
+  }
+
+  .card .visitor-name {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .card .visitor-meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .card .visitor-meta span { color: var(--text-primary); }
+
+  /* -- Comparison bars -- */
+  .compare-section {
+    margin-bottom: 2rem;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .bar-compare {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .bar-compare .bar-label {
+    width: 100px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .bar-compare .bar-track {
+    flex: 1;
+    height: 28px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .bar-compare .bar-fill-a {
+    height: 100%;
+    background: var(--accent-blue);
+    border-radius: 6px 0 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    min-width: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .bar-compare .bar-fill-b {
+    height: 100%;
+    background: var(--accent-purple);
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    min-width: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .bar-compare .bar-divider {
+    width: 2px;
+    height: 100%;
+    background: var(--bg-primary);
+  }
+
+  /* -- Products overlap -- */
+  .products-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+  }
+
+  .product-list {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .product-list.side-a { border-top: 3px solid var(--accent-blue); }
+  .product-list.side-b { border-top: 3px solid var(--accent-purple); }
+  .product-list.shared { border-top: 3px solid var(--accent-green); }
+
+  .product-list h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 0.8rem;
+  }
+
+  .product-list ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .product-list li {
+    padding: 0.35rem 0;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .product-list li:last-child { border-bottom: none; }
+
+  .product-list .empty {
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 0.85rem;
+  }
+
+  /* -- Score comparison -- */
+  .scores-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .score-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+
+  .score-card h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .score-pair {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    align-items: flex-end;
+  }
+
+  .score-item {
+    text-align: center;
+  }
+
+  .score-item .score-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .score-item .score-label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .score-item.side-a .score-value { color: var(--accent-blue); }
+  .score-item.side-b .score-value { color: var(--accent-purple); }
+
+  .winner { position: relative; }
+  .winner::after {
+    content: "^";
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--accent-green);
+  }
+
+  /* -- Word clouds -- */
+  .wordcloud-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .wordcloud-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    min-height: 200px;
+  }
+
+  .wordcloud-box.side-a { border-top: 3px solid var(--accent-blue); }
+  .wordcloud-box.side-b { border-top: 3px solid var(--accent-purple); }
+
+  .wordcloud-box h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .wordcloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wordcloud .word {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.04);
+    white-space: nowrap;
+    transition: transform 0.2s;
+  }
+
+  .wordcloud .word:hover { transform: scale(1.1); }
+
+  /* Size classes for word cloud */
+  .word.s1 { font-size: 0.7rem; color: var(--text-dim); }
+  .word.s2 { font-size: 0.85rem; color: var(--text-muted); }
+  .word.s3 { font-size: 1.05rem; color: var(--text-primary); }
+  .word.s4 { font-size: 1.3rem; color: var(--accent-blue); font-weight: 600; }
+  .word.s5 { font-size: 1.6rem; color: var(--accent-blue); font-weight: 700; }
+
+  .wordcloud-box.side-b .word.s4,
+  .wordcloud-box.side-b .word.s5 { color: var(--accent-purple); }
+
+  /* -- Footer -- */
+  .site-footer {
+    text-align: center;
+    padding: 2rem 0 1rem;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  .site-footer .team-name { color: var(--accent-blue); font-weight: 600; }
+
+  /* -- Responsive -- */
+  @media (max-width: 768px) {
+    .side-by-side,
+    .wordcloud-grid { grid-template-columns: 1fr; }
+    .products-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Session Compare</h1>
+  <div class="nav-links">
+    <a href="sessions.html">All Sessions</a>
+    <a href="live.html">Live Monitor</a>
+    <a href="index.html">Home</a>
+  </div>
+</header>
+
+<div class="error-banner" id="error-banner"></div>
+
+<!-- Setup: enter two session IDs -->
+<div id="setup" class="setup">
+  <h2 style="color:var(--text-primary);margin-bottom:1.5rem;">Compare Two Sessions</h2>
+  <div>
+    <label for="input-a">Session A</label>
+    <input id="input-a" type="text" placeholder="A726594">
+  </div>
+  <div>
+    <label for="input-b">Session B</label>
+    <input id="input-b" type="text" placeholder="B103847">
+  </div>
+  <button id="go-btn">Compare</button>
+</div>
+
+<!-- Main comparison view -->
+<div id="dashboard" class="compare-container hidden">
+
+  <div class="vs-header">
+    <div class="vs-ids">
+      <span id="vs-id-a"></span>
+      <span class="vs">VS</span>
+      <span id="vs-id-b"></span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="loading">Loading session data...</div>
+
+  <!-- Content (hidden until loaded) -->
+  <div id="content" class="hidden">
+
+    <!-- 1. Visitor info cards -->
+    <div class="compare-section">
+      <div class="section-title">Visitor Information</div>
+      <div class="side-by-side">
+        <div class="card side-a">
+          <div class="card-label">Session A</div>
+          <div class="visitor-name" id="name-a">--</div>
+          <div class="visitor-meta">
+            Company: <span id="company-a">--</span><br>
+            SE: <span id="se-a">--</span><br>
+            Status: <span id="status-a">--</span>
+          </div>
+        </div>
+        <div class="card side-b">
+          <div class="card-label">Session B</div>
+          <div class="visitor-name" id="name-b">--</div>
+          <div class="visitor-meta">
+            Company: <span id="company-b">--</span><br>
+            SE: <span id="se-b">--</span><br>
+            Status: <span id="status-b">--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Duration + Clicks bar chart -->
+    <div class="compare-section">
+      <div class="section-title">Duration &amp; Engagement</div>
+      <div class="bar-compare">
+        <div class="bar-label">Duration</div>
+        <div class="bar-track" id="bar-duration"></div>
+      </div>
+      <div class="bar-compare">
+        <div class="bar-label">Clicks</div>
+        <div class="bar-track" id="bar-clicks"></div>
+      </div>
+      <div class="bar-compare">
+        <div class="bar-label">Products</div>
+        <div class="bar-track" id="bar-products"></div>
+      </div>
+    </div>
+
+    <!-- 3. Products demonstrated -->
+    <div class="compare-section">
+      <div class="section-title">Products Demonstrated</div>
+      <div class="products-grid">
+        <div class="product-list side-a">
+          <h3>Only in A</h3>
+          <ul id="products-only-a"><li class="empty">None</li></ul>
+        </div>
+        <div class="product-list shared">
+          <h3>Shared</h3>
+          <ul id="products-shared"><li class="empty">None</li></ul>
+        </div>
+        <div class="product-list side-b">
+          <h3>Only in B</h3>
+          <ul id="products-only-b"><li class="empty">None</li></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Analysis scores -->
+    <div class="compare-section">
+      <div class="section-title">Analysis Scores</div>
+      <div class="scores-grid" id="scores-grid">
+        <div class="score-card">
+          <h3>Session Score</h3>
+          <div class="score-pair">
+            <div class="score-item side-a"><div class="score-value" id="score-session-a">--</div><div class="score-label">A</div></div>
+            <div class="score-item side-b"><div class="score-value" id="score-session-b">--</div><div class="score-label">B</div></div>
+          </div>
+        </div>
+        <div class="score-card">
+          <h3>Engagement</h3>
+          <div class="score-pair">
+            <div class="score-item side-a"><div class="score-value" id="score-engage-a">--</div><div class="score-label">A</div></div>
+            <div class="score-item side-b"><div class="score-value" id="score-engage-b">--</div><div class="score-label">B</div></div>
+          </div>
+        </div>
+        <div class="score-card">
+          <h3>Coverage</h3>
+          <div class="score-pair">
+            <div class="score-item side-a"><div class="score-value" id="score-cover-a">--</div><div class="score-label">A</div></div>
+            <div class="score-item side-b"><div class="score-value" id="score-cover-b">--</div><div class="score-label">B</div></div>
+          </div>
+        </div>
+        <div class="score-card">
+          <h3>Follow-up</h3>
+          <div class="score-pair">
+            <div class="score-item side-a"><div class="score-value" id="score-followup-a">--</div><div class="score-label">A</div></div>
+            <div class="score-item side-b"><div class="score-value" id="score-followup-b">--</div><div class="score-label">B</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Word clouds -->
+    <div class="compare-section">
+      <div class="section-title">Transcript Word Clouds</div>
+      <div class="wordcloud-grid">
+        <div class="wordcloud-box side-a">
+          <h3>Session A</h3>
+          <div class="wordcloud" id="wordcloud-a"><span class="word s2">No transcript</span></div>
+        </div>
+        <div class="wordcloud-box side-b">
+          <h3>Session B</h3>
+          <div class="wordcloud" id="wordcloud-b"><span class="word s2">No transcript</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /dashboard -->
+
+<footer class="site-footer">
+  <span class="team-name">Smells Like Machine Learning</span> &mdash; Hackathon 2026
+</footer>
+
+<script>
+(function () {
+  // ── Config ──────────────────────────────────────────────────────────────────
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+
+  function s3Url(key) {
+    return "https://" + BUCKET + ".s3." + REGION + ".amazonaws.com/" + key;
+  }
+
+  // ── Auth gate ───────────────────────────────────────────────────────────────
+  if (typeof BoothAuth !== "undefined") {
+    BoothAuth.requireLogin();
+  }
+
+  // ── DOM refs ────────────────────────────────────────────────────────────────
+  var setupEl     = document.getElementById("setup");
+  var dashboardEl = document.getElementById("dashboard");
+  var loadingEl   = document.getElementById("loading");
+  var contentEl   = document.getElementById("content");
+  var errorBanner = document.getElementById("error-banner");
+  var inputA      = document.getElementById("input-a");
+  var inputB      = document.getElementById("input-b");
+  var goBtn       = document.getElementById("go-btn");
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = "block";
+  }
+  function clearError() {
+    errorBanner.style.display = "none";
+  }
+
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ── URL params ──────────────────────────────────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  var idA = (params.get("a") || "").trim();
+  var idB = (params.get("b") || "").trim();
+
+  if (idA && idB) {
+    activate(idA, idB);
+  } else {
+    goBtn.addEventListener("click", function () {
+      activate(inputA.value.trim(), inputB.value.trim());
+    });
+    inputB.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") activate(inputA.value.trim(), inputB.value.trim());
+    });
+  }
+
+  function activate(a, b) {
+    if (!a || !b) { showError("Please enter two session IDs."); return; }
+    idA = a;
+    idB = b;
+    params.set("a", idA);
+    params.set("b", idB);
+    window.history.replaceState({}, "", "?" + params.toString());
+    setupEl.classList.add("hidden");
+    dashboardEl.classList.remove("hidden");
+    document.getElementById("vs-id-a").textContent = idA;
+    document.getElementById("vs-id-b").textContent = idB;
+    loadBothSessions();
+  }
+
+  // ── Data holders ────────────────────────────────────────────────────────────
+  var dataA = { meta: null, clicks: null, summary: null, transcript: null };
+  var dataB = { meta: null, clicks: null, summary: null, transcript: null };
+
+  // ── Fetch JSON from S3 ──────────────────────────────────────────────────────
+  function fetchJson(key) {
+    return fetch(s3Url(key))
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status + " for " + key);
+        return res.json();
+      });
+  }
+
+  // ── Load both sessions in parallel ──────────────────────────────────────────
+  function loadBothSessions() {
+    loadingEl.classList.remove("hidden");
+    contentEl.classList.add("hidden");
+    clearError();
+
+    var prefix = "sessions/";
+    var fetches = [
+      fetchJson(prefix + idA + "/metadata.json").then(function (d) { dataA.meta = d; }).catch(function () { dataA.meta = null; }),
+      fetchJson(prefix + idB + "/metadata.json").then(function (d) { dataB.meta = d; }).catch(function () { dataB.meta = null; }),
+      fetchJson(prefix + idA + "/clicks/clicks.json").then(function (d) { dataA.clicks = d; }).catch(function () { dataA.clicks = null; }),
+      fetchJson(prefix + idB + "/clicks/clicks.json").then(function (d) { dataB.clicks = d; }).catch(function () { dataB.clicks = null; }),
+      fetchJson(prefix + idA + "/output/summary.json").then(function (d) { dataA.summary = d; }).catch(function () { dataA.summary = null; }),
+      fetchJson(prefix + idB + "/output/summary.json").then(function (d) { dataB.summary = d; }).catch(function () { dataB.summary = null; }),
+      fetchJson(prefix + idA + "/transcript/transcript.json").then(function (d) { dataA.transcript = d; }).catch(function () { dataA.transcript = null; }),
+      fetchJson(prefix + idB + "/transcript/transcript.json").then(function (d) { dataB.transcript = d; }).catch(function () { dataB.transcript = null; })
+    ];
+
+    Promise.all(fetches).then(function () {
+      if (!dataA.meta && !dataB.meta) {
+        showError("Could not load either session. Check that session IDs exist in S3.");
+        loadingEl.classList.add("hidden");
+        return;
+      }
+      loadingEl.classList.add("hidden");
+      contentEl.classList.remove("hidden");
+      renderAll();
+    });
+  }
+
+  // ── Render everything ───────────────────────────────────────────────────────
+  function renderAll() {
+    renderVisitorCards();
+    renderBars();
+    renderProducts();
+    renderScores();
+    renderWordClouds();
+  }
+
+  // ── 1. Visitor cards ────────────────────────────────────────────────────────
+  function renderVisitorCards() {
+    var ma = dataA.meta || {};
+    var mb = dataB.meta || {};
+
+    document.getElementById("name-a").textContent = ma.visitor_name || "Unknown";
+    document.getElementById("company-a").textContent = ma.visitor_company || "--";
+    document.getElementById("se-a").textContent = ma.se_name || "--";
+    document.getElementById("status-a").textContent = ma.status || "--";
+
+    document.getElementById("name-b").textContent = mb.visitor_name || "Unknown";
+    document.getElementById("company-b").textContent = mb.visitor_company || "--";
+    document.getElementById("se-b").textContent = mb.se_name || "--";
+    document.getElementById("status-b").textContent = mb.status || "--";
+  }
+
+  // ── 2. Duration + Clicks bars ───────────────────────────────────────────────
+  function getDurationSec(meta) {
+    if (!meta || !meta.started_at) return 0;
+    var start = new Date(meta.started_at).getTime();
+    var end = meta.ended_at ? new Date(meta.ended_at).getTime() : Date.now();
+    return Math.max(0, Math.floor((end - start) / 1000));
+  }
+
+  function getClickCount(clicks) {
+    if (!clicks || !clicks.events) return 0;
+    return clicks.events.length;
+  }
+
+  function getProducts(summary) {
+    if (!summary || !summary.products_demonstrated) return [];
+    return summary.products_demonstrated;
+  }
+
+  function fmtDuration(sec) {
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function renderBar(containerId, valA, valB, fmtFn) {
+    var container = document.getElementById(containerId);
+    var total = valA + valB;
+    if (total === 0) total = 1;
+    var pctA = Math.round((valA / total) * 100);
+    var pctB = 100 - pctA;
+
+    var labelA = fmtFn ? fmtFn(valA) : String(valA);
+    var labelB = fmtFn ? fmtFn(valB) : String(valB);
+
+    container.innerHTML =
+      '<div class="bar-fill-a" style="width:' + pctA + '%">' + esc(labelA) + '</div>' +
+      '<div class="bar-divider"></div>' +
+      '<div class="bar-fill-b" style="width:' + pctB + '%">' + esc(labelB) + '</div>';
+  }
+
+  function renderBars() {
+    var durA = getDurationSec(dataA.meta);
+    var durB = getDurationSec(dataB.meta);
+    var clicksA = getClickCount(dataA.clicks);
+    var clicksB = getClickCount(dataB.clicks);
+    var prodsA = getProducts(dataA.summary).length;
+    var prodsB = getProducts(dataB.summary).length;
+
+    renderBar("bar-duration", durA, durB, fmtDuration);
+    renderBar("bar-clicks", clicksA, clicksB);
+    renderBar("bar-products", prodsA, prodsB);
+  }
+
+  // ── 3. Products overlap ─────────────────────────────────────────────────────
+  function renderProducts() {
+    var prodsA = getProducts(dataA.summary);
+    var prodsB = getProducts(dataB.summary);
+    var setA = {};
+    var setB = {};
+    prodsA.forEach(function (p) { setA[p.toLowerCase()] = p; });
+    prodsB.forEach(function (p) { setB[p.toLowerCase()] = p; });
+
+    var shared = [];
+    var onlyA = [];
+    var onlyB = [];
+
+    Object.keys(setA).forEach(function (k) {
+      if (setB[k]) {
+        shared.push(setA[k]);
+      } else {
+        onlyA.push(setA[k]);
+      }
+    });
+    Object.keys(setB).forEach(function (k) {
+      if (!setA[k]) {
+        onlyB.push(setB[k]);
+      }
+    });
+
+    renderList("products-only-a", onlyA);
+    renderList("products-shared", shared);
+    renderList("products-only-b", onlyB);
+  }
+
+  function renderList(elId, items) {
+    var ul = document.getElementById(elId);
+    if (items.length === 0) {
+      ul.innerHTML = '<li class="empty">None</li>';
+      return;
+    }
+    ul.innerHTML = "";
+    items.forEach(function (item) {
+      var li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+  }
+
+  // ── 4. Analysis scores ──────────────────────────────────────────────────────
+  function renderScores() {
+    var sa = dataA.summary || {};
+    var sb = dataB.summary || {};
+
+    setScorePair("score-session", sa.session_score, sb.session_score);
+
+    // Engagement: derived from click density (clicks per minute)
+    var engA = computeEngagement(dataA);
+    var engB = computeEngagement(dataB);
+    setScorePair("score-engage", engA, engB);
+
+    // Coverage: number of products demonstrated
+    var covA = getProducts(dataA.summary).length;
+    var covB = getProducts(dataB.summary).length;
+    setScorePair("score-cover", covA, covB);
+
+    // Follow-up: number of follow-up actions
+    var fuA = sa.follow_up_actions ? sa.follow_up_actions.length : 0;
+    var fuB = sb.follow_up_actions ? sb.follow_up_actions.length : 0;
+    setScorePair("score-followup", fuA, fuB);
+  }
+
+  function computeEngagement(data) {
+    var clicks = getClickCount(data.clicks);
+    var dur = getDurationSec(data.meta);
+    if (dur === 0) return 0;
+    // clicks per minute, rounded to 1 decimal
+    return Math.round((clicks / (dur / 60)) * 10) / 10;
+  }
+
+  function setScorePair(prefix, valA, valB) {
+    var elA = document.getElementById(prefix + "-a");
+    var elB = document.getElementById(prefix + "-b");
+    var displayA = (valA != null && valA !== undefined) ? valA : "--";
+    var displayB = (valB != null && valB !== undefined) ? valB : "--";
+    elA.textContent = displayA;
+    elB.textContent = displayB;
+
+    // Highlight winner
+    var parentA = elA.parentElement;
+    var parentB = elB.parentElement;
+    parentA.classList.remove("winner");
+    parentB.classList.remove("winner");
+
+    if (typeof valA === "number" && typeof valB === "number") {
+      if (valA > valB) parentA.classList.add("winner");
+      else if (valB > valA) parentB.classList.add("winner");
+    }
+  }
+
+  // ── 5. Word clouds ─────────────────────────────────────────────────────────
+  var STOP_WORDS = new Set([
+    "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
+    "from","is","it","that","this","was","are","be","has","had","have","not",
+    "we","you","i","they","he","she","so","can","will","do","does","did","just",
+    "about","up","out","if","my","your","what","all","there","their","been",
+    "would","could","should","which","when","how","than","then","them","its",
+    "into","also","like","more","some","very","here","where","much","each",
+    "going","see","let","me","us","our","one","two","know","right","well",
+    "yeah","yes","no","okay","ok","um","uh","actually","basically","really",
+    "thing","things","kind","want","need","think","look","looking","gonna",
+    "get","got","say","said","make","take","come","go","back","over","through"
+  ]);
+
+  function buildWordFreqs(transcript) {
+    if (!transcript || !transcript.entries) return [];
+    var freq = {};
+    transcript.entries.forEach(function (entry) {
+      var words = (entry.text || "").toLowerCase().replace(/[^a-z0-9\s-]/g, "").split(/\s+/);
+      words.forEach(function (w) {
+        if (w.length < 3 || STOP_WORDS.has(w)) return;
+        freq[w] = (freq[w] || 0) + 1;
+      });
+    });
+
+    // Sort by frequency, take top 40
+    var sorted = Object.keys(freq).map(function (w) { return { word: w, count: freq[w] }; });
+    sorted.sort(function (a, b) { return b.count - a.count; });
+    return sorted.slice(0, 40);
+  }
+
+  function renderWordCloud(containerId, words) {
+    var el = document.getElementById(containerId);
+    if (words.length === 0) {
+      el.innerHTML = '<span class="word s2">No transcript data</span>';
+      return;
+    }
+
+    var maxCount = words[0].count;
+    // Shuffle for visual variety
+    var shuffled = words.slice();
+    for (var i = shuffled.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = temp;
+    }
+
+    el.innerHTML = "";
+    shuffled.forEach(function (w) {
+      var ratio = w.count / maxCount;
+      var sizeClass;
+      if (ratio > 0.8) sizeClass = "s5";
+      else if (ratio > 0.5) sizeClass = "s4";
+      else if (ratio > 0.3) sizeClass = "s3";
+      else if (ratio > 0.15) sizeClass = "s2";
+      else sizeClass = "s1";
+
+      var span = document.createElement("span");
+      span.className = "word " + sizeClass;
+      span.textContent = w.word;
+      span.title = w.word + " (" + w.count + ")";
+      el.appendChild(span);
+    });
+  }
+
+  function renderWordClouds() {
+    var wordsA = buildWordFreqs(dataA.transcript);
+    var wordsB = buildWordFreqs(dataB.transcript);
+    renderWordCloud("wordcloud-a", wordsA);
+    renderWordCloud("wordcloud-b", wordsB);
+  }
+
+})();
+</script>
+</body>
+</html>
