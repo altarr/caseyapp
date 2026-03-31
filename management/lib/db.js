@@ -58,19 +58,33 @@ function initSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS demo_pcs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER,
+      name TEXT NOT NULL,
+      registered_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(event_id, name)
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT UNIQUE NOT NULL,
       event_id INTEGER REFERENCES events(id),
       visitor_name TEXT,
       visitor_company TEXT,
-      status TEXT DEFAULT 'imported',
+      visitor_title TEXT,
+      visitor_email TEXT,
+      visitor_phone TEXT,
+      demo_pc TEXT,
+      se_name TEXT,
+      status TEXT DEFAULT 'active',
       zip_key TEXT,
       screenshot_count INTEGER DEFAULT 0,
       has_audio INTEGER DEFAULT 0,
       audio_opted_out INTEGER DEFAULT 0,
       local_path TEXT,
-      imported_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      imported_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS contacts (
@@ -223,18 +237,24 @@ function getSession(sessionId) {
 
 function upsertSession(data) {
   getDb().prepare(`
-    INSERT INTO sessions (session_id, event_id, visitor_name, visitor_company, status,
+    INSERT INTO sessions (session_id, event_id, visitor_name, visitor_company, visitor_title,
+                          visitor_email, visitor_phone, demo_pc, se_name, status,
                           zip_key, screenshot_count, has_audio, audio_opted_out, local_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(session_id) DO UPDATE SET
       event_id=excluded.event_id, visitor_name=excluded.visitor_name,
-      visitor_company=excluded.visitor_company, status=excluded.status,
+      visitor_company=excluded.visitor_company, visitor_title=excluded.visitor_title,
+      visitor_email=excluded.visitor_email, visitor_phone=excluded.visitor_phone,
+      demo_pc=excluded.demo_pc, se_name=excluded.se_name, status=excluded.status,
       zip_key=excluded.zip_key, screenshot_count=excluded.screenshot_count,
       has_audio=excluded.has_audio, audio_opted_out=excluded.audio_opted_out,
       local_path=excluded.local_path
   `).run(
     data.session_id, data.event_id || null, data.visitor_name || 'Unknown',
-    data.visitor_company || null, data.status || 'imported',
+    data.visitor_company || null, data.visitor_title || null,
+    data.visitor_email || null, data.visitor_phone || null,
+    data.demo_pc || null, data.se_name || null,
+    data.status || 'active',
     data.zip_key || null, data.screenshot_count || 0,
     data.has_audio ? 1 : 0, data.audio_opted_out ? 1 : 0,
     data.local_path || null
@@ -319,6 +339,24 @@ function unmatchedSessions(eventId) {
   `).all(eventId);
 }
 
+// ── Demo PCs ────────────────────────────────────────────────────────────────
+
+function listDemoPcs(eventId) {
+  if (eventId) return getDb().prepare('SELECT * FROM demo_pcs WHERE event_id = ?').all(eventId);
+  return getDb().prepare('SELECT * FROM demo_pcs').all();
+}
+
+function registerDemoPc(eventId, name) {
+  getDb().prepare(
+    'INSERT OR IGNORE INTO demo_pcs (event_id, name) VALUES (?, ?)'
+  ).run(eventId, name);
+  return getDb().prepare('SELECT * FROM demo_pcs WHERE event_id = ? AND name = ?').get(eventId, name);
+}
+
+function getDemoPc(id) {
+  return getDb().prepare('SELECT * FROM demo_pcs WHERE id = ?').get(id);
+}
+
 module.exports = {
   getDb, listEvents, getEvent, createEvent, updateEvent, deleteEvent,
   getActiveEvent, setActiveEvent,
@@ -326,4 +364,5 @@ module.exports = {
   listSessions, getSession, upsertSession,
   listContacts, getContact, insertContact, contactCount,
   createMatch, getMatchesForSession, getMatchesForContact, unmatchedSessions,
+  listDemoPcs, registerDemoPc, getDemoPc,
 };

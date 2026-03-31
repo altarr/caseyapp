@@ -368,6 +368,241 @@ app.put('/api/contacts/:id/session', (req, res) => {
   res.json({ linked: true });
 });
 
+// ── Badge Scan (AI extraction using event profile) ──────────────────────────
+
+app.post('/api/badges/scan', badgeUpload.single('badge'), async (req, res) => {
+  try {
+    const { analyzeBadge } = require('./lib/badge-trainer');
+    const imagePath = req.file ? req.file.path : req.body.image_path;
+    if (!imagePath) return res.status(400).json({ error: 'No badge image' });
+
+    const eventId = req.body.event_id;
+    let profile = null;
+    if (eventId) {
+      const event = db.getEvent(eventId);
+      if (event && event.badge_profile_id) profile = db.getProfile(event.badge_profile_id);
+    }
+
+    const result = await analyzeBadge(imagePath, profile);
+
+    // Map extracted fields to a flat object matching the profile's field types
+    const fields = {};
+    if (result.fields) {
+      for (const f of result.fields) {
+        if (f.field_type && f.value) fields[f.field_type] = f.value;
+      }
+    }
+
+    res.json({ fields, raw: result });
+  } catch (err) {
+    console.error('[badge-scan] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Event Config (full config for clients) ──────────────────────────────────
+
+app.get('/api/events/:id/config', (req, res) => {
+  const event = db.getEvent(req.params.id);
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+
+  let badge_profile = null;
+  let badge_fields = [];
+  if (event.badge_profile_id) {
+    badge_profile = db.getProfile(event.badge_profile_id);
+    if (badge_profile) {
+      const mappings = typeof badge_profile.field_mappings === 'string'
+        ? JSON.parse(badge_profile.field_mappings) : badge_profile.field_mappings;
+      badge_fields = mappings.map(m => ({
+        field_type: m.field_type,
+        label: m.label || m.field_type,
+        required: m.required !== false,
+      }));
+    }
+  }
+
+  const demo_pcs = db.listDemoPcs(event.id);
+
+  res.json({ event, badge_profile, badge_fields, demo_pcs });
+});
+
+// ── Demo PC Registration ────────────────────────────────────────────────────
+
+app.get('/api/demo-pcs', (req, res) => {
+  res.json({ demo_pcs: db.listDemoPcs(req.query.event_id) });
+});
+
+app.post('/api/demo-pcs/register', (req, res) => {
+  const { event_id, demo_pc_name } = req.body;
+  if (!event_id || !demo_pc_name) return res.status(400).json({ error: 'event_id and demo_pc_name required' });
+  const pc = db.registerDemoPc(event_id, demo_pc_name);
+  res.json({ demo_pc: pc });
+});
+
+app.get('/api/demo-pcs/:id/qr-payload', (req, res) => {
+  const pc = db.getDemoPc(req.params.id);
+  if (!pc) return res.status(404).json({ error: 'Demo PC not found' });
+
+  const event = db.getEvent(pc.event_id);
+  let badgeFields = ['name', 'company'];
+  if (event && event.badge_profile_id) {
+    const profile = db.getProfile(event.badge_profile_id);
+    if (profile) {
+      const mappings = typeof profile.field_mappings === 'string'
+        ? JSON.parse(profile.field_mappings) : profile.field_mappings;
+      badgeFields = mappings.map(m => m.field_type);
+    }
+  }
+
+  const baseUrl = process.env.MANAGEMENT_URL || `${req.protocol}://${req.get('host')}`;
+
+  res.json({
+    type: 'caseyapp-pair',
+    v: 2,
+    managementUrl: baseUrl,
+    eventId: pc.event_id,
+    demoPcId: pc.name,
+    demoPcDbId: pc.id,
+    badgeFields,
+    eventName: event ? event.name : null,
+  });
+});
+
+// ── Session Lifecycle (control plane) ───────────────────────────────────────
+
+const { S3Client: MgmtS3Client, PutObjectCommand: MgmtPutCmd, DeleteObjectCommand: MgmtDelCmd, GetObjectCommand: MgmtGetCmd } = require('@aws-sdk/client-s3');
+const mgmtS3 = new MgmtS3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+
+async function s3Put(key, body) {
+  await mgmtS3.send(new MgmtPutCmd({
+    Bucket: S3_BUCKET, Key: key,
+    Body: JSON.stringify(body, null, 2),
+    ContentType: 'application/json',
+  }));
+}
+
+async function s3Del(key) {
+  await mgmtS3.send(new MgmtDelCmd({ Bucket: S3_BUCKET, Key: key }));
+}
+
+async function s3Get(key) {
+  try {
+    const resp = await mgmtS3.send(new MgmtGetCmd({ Bucket: S3_BUCKET, Key: key }));
+    return JSON.parse(await resp.Body.transformToString());
+  } catch (_) { return null; }
+}
+
+function genSessionId() {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+app.post('/api/sessions/create', async (req, res) => {
+  try {
+    const { event_id, visitor_name, visitor_company, visitor_title,
+            visitor_email, visitor_phone, demo_pc, se_name } = req.body;
+    if (!visitor_name) return res.status(400).json({ error: 'visitor_name required' });
+
+    const pc = demo_pc || 'booth-pc-1';
+    const session_id = genSessionId();
+    const now = new Date().toISOString();
+
+    const metadata = {
+      session_id, visitor_name,
+      visitor_company: visitor_company || null,
+      visitor_title: visitor_title || null,
+      visitor_email: visitor_email || null,
+      visitor_phone: visitor_phone || null,
+      badge_photo: null,
+      started_at: now, ended_at: null,
+      demo_pc: pc, se_name: se_name || null,
+      event_id: event_id || null,
+      audio_consent: true, status: 'active',
+    };
+
+    await Promise.all([
+      s3Put(`sessions/${session_id}/metadata.json`, metadata),
+      s3Put(`sessions/${session_id}/state.json`, {
+        session_id, current_state: 'active', updated_at: now,
+        history: [{ from: null, to: 'active', at: now }],
+      }),
+      s3Put(`commands/${pc}/start.json`, { session_id, demo_pc: pc, started_at: now }),
+      s3Put('active-session.json', {
+        session_id, active: true, started_at: now,
+        visitor_name, stop_audio: false,
+      }),
+    ]);
+
+    // Store in management DB
+    db.upsertSession({
+      session_id, event_id: event_id || null,
+      visitor_name, visitor_company, visitor_title,
+      visitor_email, visitor_phone, demo_pc: pc, se_name,
+      status: 'active',
+    });
+
+    console.log(`[session] created ${session_id} for ${visitor_name} (event ${event_id})`);
+    res.json({ session_id, metadata });
+  } catch (err) {
+    console.error('[session] create error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sessions/:id/end', async (req, res) => {
+  try {
+    const session_id = req.params.id;
+    const now = new Date().toISOString();
+    const session = db.getSession(session_id);
+    const pc = req.body.demo_pc || session?.demo_pc || 'booth-pc-1';
+
+    // Read existing metadata to preserve fields
+    const existing = await s3Get(`sessions/${session_id}/metadata.json`) || {};
+
+    await Promise.all([
+      s3Put(`sessions/${session_id}/metadata.json`, {
+        ...existing, ended_at: now, status: 'completed', upload_complete: true,
+      }),
+      s3Put(`commands/${pc}/end.json`, { session_id, demo_pc: pc, ended_at: now }),
+      s3Del('active-session.json'),
+    ]);
+
+    if (session) db.upsertSession({ ...session, status: 'completed' });
+
+    res.json({ session_id, status: 'completed', ended_at: now });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sessions/:id/stop-audio', async (req, res) => {
+  try {
+    const session_id = req.params.id;
+    const now = new Date().toISOString();
+
+    await s3Put(`sessions/${session_id}/commands/stop-audio`, {
+      session_id, stopped_at: now,
+    });
+    await s3Put('active-session.json', {
+      session_id, active: true, stop_audio: true,
+    });
+
+    res.json({ session_id, audio_stopped: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Active session polling (for extension)
+app.get('/api/sessions/active', async (req, res) => {
+  try {
+    const data = await s3Get('active-session.json');
+    if (!data) return res.json({ active: false });
+    res.json(data);
+  } catch (_) {
+    res.json({ active: false });
+  }
+});
+
 // ── Serve badge sample images ───────────────────────────────────────────────
 app.use('/badge-samples', express.static(path.join(__dirname, 'data', 'badge-samples')));
 
