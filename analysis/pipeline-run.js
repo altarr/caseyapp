@@ -86,12 +86,12 @@ function buildFallbackSummary(metadata, timeline) {
   return {
     session_id: sessionId,
     visitor_name: (metadata && metadata.visitor_name) || 'Unknown Visitor',
-    demo_duration_minutes: timeline
-      ? Math.round((timeline.duration_seconds || 0) / 60)
+    demo_duration_seconds: timeline
+      ? (timeline.duration_seconds || 0)
       : 0,
-    products_shown: [],
-    visitor_interests: [],
-    recommended_follow_up: ['Review session recording manually'],
+    products_demonstrated: [],
+    key_interests: [],
+    follow_up_actions: ['Review session recording manually'],
     key_moments: [],
     generated_at: new Date().toISOString(),
     fallback: true,

@@ -190,10 +190,10 @@ function buildFollowUpCards(actions, priority) {
 function computeScore(summary, followUp) {
   // Score 0-100 based on session richness
   let score = 50; // baseline
-  const interests = summary.visitor_interests || [];
-  const products = summary.products_shown || [];
+  const interests = summary.key_interests || [];
+  const products = summary.products_demonstrated || [];
   const moments = summary.key_moments || [];
-  const actions = summary.recommended_follow_up || [];
+  const actions = summary.follow_up_actions || [];
 
   // High-confidence interests boost score
   score += interests.filter(i => i.confidence === 'high').length * 10;
@@ -209,8 +209,8 @@ function computeScore(summary, followUp) {
   if ((followUp.priority || '').toLowerCase() === 'high') score += 10;
 
   // Duration bonus (longer demos = more engaged)
-  if (summary.demo_duration_minutes > 15) score += 5;
-  if (summary.demo_duration_minutes > 25) score += 5;
+  if (Math.round((summary.demo_duration_seconds || 0) / 60) > 15) score += 5;
+  if (Math.round((summary.demo_duration_seconds || 0) / 60) > 25) score += 5;
 
   return Math.min(Math.max(score, 0), 100);
 }
@@ -281,7 +281,7 @@ function renderTemplate(template, summary, followUp, timeline) {
     visitor_company:      escapeHtml(followUp.visitor_company || summary.visitor_company || '—'),
     visitor_email:        escapeHtml(followUp.visitor_email || ''),
     se_name:              escapeHtml(summary.se_name || '—'),
-    demo_duration_minutes: escapeHtml(String(summary.demo_duration_minutes || 0)),
+    demo_duration_minutes: escapeHtml(String(Math.round((summary.demo_duration_seconds || 0) / 60) || 0)),
     session_date:         formatDate(summary.generated_at),
     generated_at:         formatDate(summary.generated_at),
     session_score:        String(score),
@@ -294,11 +294,11 @@ function renderTemplate(template, summary, followUp, timeline) {
     tag_chips:            buildTagChips(followUp.tags),
     executive_summary:    escapeHtml(followUp.sdr_notes || 'No executive summary available.'),
     sdr_notes:            escapeHtml(followUp.sdr_notes || 'No SDR notes recorded.'),
-    products_shown:       buildProductBadges(summary.products_shown),
-    visitor_interests:    buildInterestsRows(summary.visitor_interests),
-    pain_points:          buildPainPointRows(summary.visitor_interests),
+    products_shown:       buildProductBadges(summary.products_demonstrated),
+    visitor_interests:    buildInterestsRows(summary.key_interests),
+    pain_points:          buildPainPointRows(summary.key_interests),
     timeline_events:      buildTimelineEvents(timeline, summary.key_moments),
-    follow_up_cards:      buildFollowUpCards(summary.recommended_follow_up, followUp.priority),
+    follow_up_cards:      buildFollowUpCards(summary.follow_up_actions, followUp.priority),
   };
 
   let html = template;
@@ -338,10 +338,10 @@ async function run() {
   for (const key of ['se_name', 'visitor_name', 'demo_pc']) {
     if (!summary[key] && metadata[key]) summary[key] = metadata[key];
   }
-  // Compute demo_duration_minutes from metadata timestamps if not in summary
-  if (!summary.demo_duration_minutes && metadata.started_at && metadata.ended_at) {
+  // Compute demo_duration_seconds from metadata timestamps if not in summary
+  if (!summary.demo_duration_seconds && metadata.started_at && metadata.ended_at) {
     const ms = new Date(metadata.ended_at) - new Date(metadata.started_at);
-    if (ms > 0) summary.demo_duration_minutes = Math.round(ms / 60000);
+    if (ms > 0) summary.demo_duration_seconds = Math.round(ms / 1000);
   }
 
   try {
