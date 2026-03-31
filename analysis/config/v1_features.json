@@ -1,0 +1,40 @@
+{
+  "path_patterns": {
+    "/app/xdr": "XDR Investigation",
+    "/app/xdr/workbench": "XDR Workbench",
+    "/app/endpoint-security": "Endpoint Security",
+    "/app/endpoint-security/policies": "Endpoint Policy Management",
+    "/app/emailsecurity": "Email Security",
+    "/app/email-security": "Email Security",
+    "/app/risk-insights": "Risk Insights",
+    "/app/risk-insights/byod": "BYOD Risk Assessment",
+    "/app/network-security": "Network Security",
+    "/app/cloud-security": "Cloud Security",
+    "/app/zero-trust": "Zero Trust Secure Access",
+    "/app/dashboard": "Dashboard",
+    "/app/threat-intelligence": "Threat Intelligence",
+    "/app/detection-model": "Detection Model Management",
+    "/app/response-management": "Response Management",
+    "/app/search": "Search & Investigation"
+  },
+  "keyword_patterns": {
+    "xdr": "XDR Investigation",
+    "workbench": "XDR Workbench",
+    "endpoint": "Endpoint Security",
+    "byod": "BYOD Risk Assessment",
+    "email security": "Email Security",
+    "risk": "Risk Insights",
+    "attack surface": "Risk Insights",
+    "network security": "Network Security",
+    "cloud security": "Cloud Security",
+    "zero trust": "Zero Trust Secure Access",
+    "threat intelligence": "Threat Intelligence",
+    "detection": "Detection Model Management",
+    "response": "Response Management",
+    "remediation": "Response Management",
+    "policy": "Endpoint Policy Management",
+    "enrollment": "Endpoint Security",
+    "splunk": "Third-Party Integration",
+    "siem": "Third-Party Integration"
+  }
+}
