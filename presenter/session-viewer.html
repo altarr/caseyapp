@@ -10,6 +10,7 @@
 <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
 <script src="auth.js"></script>
 <link rel="stylesheet" href="styles/mobile.css">
+<link rel="stylesheet" href="styles/quality-badges.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -705,7 +706,6 @@
     .event-feed { width: 100vw; }
     body.feed-open .layout { margin-right: 0; }
     body.feed-open .topbar { margin-right: 0; }
-  }
 </style>
 </head>
 <body>
@@ -764,6 +764,7 @@ if (!BoothAuth.requireAwsCreds()) {
           <div class="score-badge" id="score-badge" class="hidden">
             <div class="score-value" id="score-value">--</div>
             <div class="score-label">Engagement</div>
+            <div id="quality-badge-slot"></div>
           </div>
         </div>
       </div>
@@ -1040,6 +1041,21 @@ if (!BoothAuth.requireAwsCreds()) {
       if (scoreNum >= 7) scoreEl.style.color = "var(--green)";
       else if (scoreNum >= 4) scoreEl.style.color = "var(--yellow)";
       else scoreEl.style.color = "var(--red)";
+
+      // Quality badge
+      var qSlot = document.getElementById("quality-badge-slot");
+      if (qSlot) {
+        var pc = Array.isArray(summary.products_demonstrated) ? summary.products_demonstrated.length : 0;
+        var fc = Array.isArray(summary.follow_up_actions) ? summary.follow_up_actions.length : 0;
+        var tier = null;
+        if (scoreNum >= 8 && pc >= 5 && fc >= 5) tier = "gold";
+        else if (scoreNum >= 6 && pc >= 3) tier = "silver";
+        else if (scoreNum >= 4) tier = "bronze";
+        if (tier) {
+          var labels = { gold: "GOLD", silver: "SILVER", bronze: "BRONZE" };
+          qSlot.innerHTML = '<span class="quality-badge quality-badge-lg quality-badge-' + tier + '">' + labels[tier] + '</span>';
+        }
+      }
     }
   }
 

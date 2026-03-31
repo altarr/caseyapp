@@ -9,6 +9,7 @@
 <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
 <script src="auth.js"></script>
 <link rel="stylesheet" href="styles/mobile.css">
+<link rel="stylesheet" href="styles/quality-badges.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -384,6 +385,7 @@
     .detail-panel { grid-template-columns: 1fr; }
     .score-track { width: 40px; }
   }
+
 </style>
 </head>
 <body>
@@ -438,6 +440,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
           <th data-col="status">Status <span class="sort-arrow"></span></th>
           <th data-col="tags">Tags</th>
           <th data-col="score">Engagement <span class="sort-arrow"></span></th>
+          <th data-col="quality">Quality</th>
         </tr>
       </thead>
       <tbody id="session-body"></tbody>
@@ -580,7 +583,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
   // ── API: list sessions ────────────────────────────────────────────────────
   function loadSessions() {
     startCountdown();
-    fetch(apiUrl + "/sessions")
+    fetch(apiUrl + "/sessions?include=analysis")
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -618,8 +621,29 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
       company: s.visitor_company || "",
       endedAt: s.ended_at || "",
       hasAnalysis: s.has_analysis || false,
-      tags: Array.isArray(s.tags) ? s.tags : []
+      tags: Array.isArray(s.tags) ? s.tags : [],
+      sessionScore: s.session_score != null ? Number(s.session_score) : null,
+      productsCount: s.products_count || 0,
+      followUpCount: s.follow_up_count || 0
     };
+  }
+
+  // ── Quality badge computation ──────────────────────────────────────────
+  function computeQualityBadge(row) {
+    if (row.sessionScore == null) return null;
+    var sc = row.sessionScore;
+    var pc = row.productsCount;
+    var fc = row.followUpCount;
+    if (sc >= 8 && pc >= 5 && fc >= 5) return "gold";
+    if (sc >= 6 && pc >= 3) return "silver";
+    if (sc >= 4) return "bronze";
+    return null;
+  }
+
+  function renderQualityBadge(tier) {
+    if (!tier) return '';
+    var labels = { gold: "GOLD", silver: "SILVER", bronze: "BRONZE" };
+    return '<span class="quality-badge quality-badge-' + tier + '">' + labels[tier] + '</span>';
   }
 
   function computeScore(s) {
@@ -789,7 +813,8 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
             '<div class="score-track"><div class="score-fill ' + scoreColor(s.score) + '" style="width:' + s.score + '%"></div></div>' +
             '<span class="score-label">' + s.score + '</span>' +
           '</div>' +
-        '</td>';
+        '</td>' +
+        '<td>' + renderQualityBadge(computeQualityBadge(s)) + '</td>';
 
       // Bind tag remove buttons
       tr.querySelectorAll(".tag-remove").forEach(function (btn) {
@@ -818,7 +843,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
         var detailTr = document.createElement("tr");
         detailTr.classList.add("detail-row");
         var detailTd = document.createElement("td");
-        detailTd.setAttribute("colspan", "6");
+        detailTd.setAttribute("colspan", "7");
         detailTd.innerHTML =
           '<div class="detail-panel">' +
             '<div class="detail-item"><label>SE</label><span>' + esc(s.se || "--") + '</span></div>' +
