@@ -1,0 +1,674 @@
+<!-- BoothApp Presenter - Hackathon 2026 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Presenter Dashboard</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --accent-blue: #58a6ff;
+    --accent-red: #f85149;
+    --accent-orange: #f78166;
+    --accent-green: #3fb950;
+    --accent-yellow: #d29922;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+  }
+
+  /* -- Logo header -- */
+  .logo-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-top: 0.5rem;
+  }
+
+  .logo-header .logo-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 0.6rem;
+    background: linear-gradient(135deg, var(--accent-blue), #a371f7);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 24px rgba(88, 166, 255, 0.2);
+  }
+
+  .logo-header .logo-icon svg {
+    width: 44px;
+    height: 44px;
+    fill: #fff;
+  }
+
+  .logo-header .logo-title {
+    font-size: 2.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .logo-header .logo-title span {
+    color: var(--accent-blue);
+  }
+
+  .logo-header .logo-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+  }
+
+  /* -- Session counter bar -- */
+  .session-counter {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .counter-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .counter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .counter-dot.active    { background: var(--accent-red); animation: pulse 1.5s infinite; }
+  .counter-dot.completed { background: var(--accent-green); }
+  .counter-dot.total     { background: var(--accent-blue); }
+
+  .counter-chip .count {
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--text-primary);
+  }
+
+  .counter-chip .count-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.02em;
+  }
+
+  .session-id {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    font-family: monospace;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    text-align: center;
+  }
+
+  .card-label {
+    font-size: 1.4rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.8rem;
+  }
+
+  .card-value {
+    font-size: 4.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    word-break: break-word;
+  }
+
+  .card-value.name   { color: #f0f6fc; font-size: 3.5rem; }
+  .card-value.timer  { color: var(--accent-blue); font-family: monospace; }
+  .card-value.clicks { color: var(--accent-orange); }
+
+  .status-dot {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  .status-dot.recording { background: var(--accent-red); animation: pulse 1.5s infinite; }
+  .status-dot.ended     { background: var(--text-muted); }
+  .status-dot.waiting   { background: var(--accent-yellow); animation: pulse 2s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+
+  .card-value.status { font-size: 2.5rem; }
+
+  .card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .se-name {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+  }
+
+  /* -- Screenshot thumbnail -- */
+  .screenshot-wrap {
+    width: 100%;
+    max-height: 340px;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+  }
+  .screenshot-wrap img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+  }
+  .screenshot-wrap .placeholder {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    font-style: italic;
+  }
+  .screenshot-meta {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  .error-banner {
+    background: #f8514922;
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+    display: none;
+    width: 100%;
+    max-width: 900px;
+    text-align: center;
+  }
+
+  .refresh-indicator {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+  }
+
+  /* -- Footer -- */
+  .site-footer {
+    margin-top: auto;
+    padding-top: 2.5rem;
+    padding-bottom: 0.5rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+  }
+
+  .site-footer .team-name {
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  /* -- Setup screen -- */
+  .setup {
+    text-align: center;
+    margin-top: 2rem;
+  }
+  .setup label {
+    display: block;
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+  .setup input {
+    font-size: 2rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    text-align: center;
+    font-family: monospace;
+    width: 320px;
+  }
+  .setup input:focus { outline: 2px solid var(--accent-blue); }
+  .setup button {
+    display: block;
+    margin: 1.5rem auto 0;
+    font-size: 1.4rem;
+    padding: 0.7rem 2.5rem;
+    border-radius: 8px;
+    border: none;
+    background: #238636;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .setup button:hover { background: #2ea043; }
+
+  .hidden { display: none !important; }
+
+  /* -- Responsive: tablet (< 768px) -- */
+  @media (max-width: 768px) {
+    body { padding: 1rem; }
+    .logo-header .logo-title { font-size: 2rem; }
+    .logo-header .logo-icon { width: 56px; height: 56px; border-radius: 14px; }
+    .logo-header .logo-icon svg { width: 34px; height: 34px; }
+    h1 { font-size: 1.6rem; }
+    .grid { gap: 1rem; }
+    .card { padding: 1.2rem 1.5rem; }
+    .card-label { font-size: 1.1rem; }
+    .card-value { font-size: 3.5rem; }
+    .card-value.name { font-size: 2.5rem; }
+    .card-value.status { font-size: 2rem; }
+    .screenshot-wrap { max-height: 260px; min-height: 140px; }
+    .session-counter { gap: 0.6rem; }
+  }
+
+  /* -- Responsive: phone (< 480px) -- */
+  @media (max-width: 480px) {
+    body { padding: 0.75rem; }
+    .logo-header .logo-title { font-size: 1.6rem; }
+    .logo-header .logo-icon { width: 48px; height: 48px; border-radius: 12px; }
+    .logo-header .logo-icon svg { width: 28px; height: 28px; }
+    h1 { font-size: 1.3rem; }
+    .session-id { font-size: 0.95rem; margin-bottom: 1rem; }
+    .grid { grid-template-columns: 1fr; gap: 0.75rem; }
+    .card { padding: 1rem; }
+    .card-label { font-size: 1rem; margin-bottom: 0.4rem; }
+    .card-value { font-size: 3rem; }
+    .card-value.name { font-size: 2rem; }
+    .card-value.status { font-size: 1.6rem; }
+    .setup input { width: 100%; font-size: 1.5rem; }
+    .screenshot-wrap { max-height: 200px; min-height: 120px; }
+    .session-counter { gap: 0.5rem; }
+    .counter-chip { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  }
+</style>
+</head>
+<body>
+<script src="auth.js"></script>
+<script>if (!BoothAuth.requireAwsCreds()) { window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href); }
+else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
+
+<!-- Logo header -->
+<div class="logo-header">
+  <div class="logo-icon">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" opacity="0.3"/>
+      <path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z"/>
+      <circle cx="17" cy="8" r="2"/>
+      <path d="M7.5 14l2.5-3 2 2.5 2.5-3.2L18 14z"/>
+    </svg>
+  </div>
+  <div class="logo-title">Booth<span>App</span></div>
+  <div class="logo-subtitle">Presenter Dashboard</div>
+</div>
+
+<!-- Session counter (populated by JS) -->
+<div class="session-counter" id="session-counter">
+  <div class="counter-chip">
+    <span class="counter-dot active"></span>
+    <span class="count" id="cnt-active">-</span>
+    <span class="count-label">Active</span>
+  </div>
+  <div class="counter-chip">
+    <span class="counter-dot completed"></span>
+    <span class="count" id="cnt-completed">-</span>
+    <span class="count-label">Completed</span>
+  </div>
+  <div class="counter-chip">
+    <span class="counter-dot total"></span>
+    <span class="count" id="cnt-total">-</span>
+    <span class="count-label">Total</span>
+  </div>
+</div>
+
+<div style="max-width:900px;margin:0 auto 1rem;display:flex;justify-content:flex-end;gap:1rem;font-size:0.85rem;">
+  <span id="auth-user" style="color:var(--text-muted);font-family:monospace;"></span>
+  <a href="sessions.html" style="color:var(--text-muted);text-decoration:none;">Sessions</a>
+  <a href="admin.html" id="admin-link" style="color:var(--text-muted);text-decoration:none;display:none;">Admin</a>
+  <a href="#" id="logout-link" style="color:var(--text-muted);text-decoration:none;">Logout</a>
+</div>
+<script>
+  document.getElementById("auth-user").textContent = BoothAuth.currentUser() || "";
+  if (BoothAuth.isAdmin()) document.getElementById("admin-link").style.display = "";
+  document.getElementById("logout-link").addEventListener("click", function(e) { e.preventDefault(); BoothAuth.logout(); });
+</script>
+
+<!-- Setup: enter session ID if not in URL -->
+<div id="setup" class="setup">
+  <label for="session-input">Enter Session ID</label>
+  <input id="session-input" type="text" placeholder="A726594" autofocus>
+  <button id="go-btn">Go</button>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="hidden">
+  <div class="session-id" id="sid-display"></div>
+  <div class="error-banner" id="error-banner"></div>
+
+  <div class="grid">
+    <div class="card full-width">
+      <div class="card-label">Visitor</div>
+      <div class="card-value name" id="visitor-name">--</div>
+      <div class="se-name" id="se-name"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Duration</div>
+      <div class="card-value timer" id="duration">00:00</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Clicks</div>
+      <div class="card-value clicks" id="click-count">0</div>
+    </div>
+    <div class="card full-width">
+      <div class="card-label">Status</div>
+      <div class="card-value status" id="rec-status">
+        <span class="status-dot waiting"></span> Waiting
+      </div>
+    </div>
+    <div class="card full-width">
+      <div class="card-label">Last Screenshot</div>
+      <div class="screenshot-wrap" id="screenshot-wrap">
+        <span class="placeholder">No screenshots yet</span>
+      </div>
+      <div class="screenshot-meta" id="screenshot-meta"></div>
+    </div>
+  </div>
+
+  <div class="refresh-indicator" id="refresh-indicator">Auto-refresh: 5s</div>
+  <div style="margin-top:1rem;text-align:center">
+    <a href="sessions.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;margin-right:1.5rem;">All Sessions</a>
+    <a href="live.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;margin-right:1.5rem;">Live Monitor</a>
+    <a href="workers.html" style="color:var(--accent-blue);text-decoration:none;font-size:0.9rem;">Worker Status</a>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <span class="team-name">Smells Like Machine Learning</span> &mdash; Hackathon 2026
+</footer>
+
+<script>
+(function () {
+  // ── Config (mirrors infra/config.js) ────────────────────────────────────────
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+  var REFRESH_MS = 5000;
+  var COUNTER_REFRESH_MS = 15000;
+
+  function s3Url(key) {
+    return "https://" + BUCKET + ".s3." + REGION + ".amazonaws.com/" + key;
+  }
+
+  // ── Session counter ─────────────────────────────────────────────────────────
+  var cntActiveEl    = document.getElementById("cnt-active");
+  var cntCompletedEl = document.getElementById("cnt-completed");
+  var cntTotalEl     = document.getElementById("cnt-total");
+
+  function refreshSessionCounts() {
+    var apiUrl = (localStorage.getItem("boothapp_api_url") || "").replace(/\/+$/, "");
+    if (!apiUrl) return;
+    fetch(apiUrl + "/sessions")
+      .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+      .then(function (data) {
+        if (!Array.isArray(data)) return;
+        var active = 0;
+        var completed = 0;
+        data.forEach(function (s) {
+          var st = (s.status || "").toLowerCase();
+          if (st === "recording" || st === "active" || st === "in_progress") {
+            active++;
+          } else if (st === "completed" || st === "ended" || st === "analyzed" || st === "reviewed" || st === "sent") {
+            completed++;
+          }
+        });
+        cntActiveEl.textContent = active;
+        cntCompletedEl.textContent = completed;
+        cntTotalEl.textContent = data.length;
+      })
+      .catch(function () {
+        cntActiveEl.textContent = "-";
+        cntCompletedEl.textContent = "-";
+        cntTotalEl.textContent = "-";
+      });
+  }
+
+  refreshSessionCounts();
+  setInterval(refreshSessionCounts, COUNTER_REFRESH_MS);
+
+  // ── URL param ───────────────────────────────────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  var sessionId = params.get("session") || "";
+
+  var setupEl        = document.getElementById("setup");
+  var dashboardEl    = document.getElementById("dashboard");
+  var sidDisplay     = document.getElementById("sid-display");
+  var errorBanner    = document.getElementById("error-banner");
+  var nameEl         = document.getElementById("visitor-name");
+  var seNameEl       = document.getElementById("se-name");
+  var durationEl     = document.getElementById("duration");
+  var clicksEl       = document.getElementById("click-count");
+  var statusEl       = document.getElementById("rec-status");
+  var screenshotEl   = document.getElementById("screenshot-wrap");
+  var screenshotMeta = document.getElementById("screenshot-meta");
+  var sessionInput   = document.getElementById("session-input");
+  var goBtn          = document.getElementById("go-btn");
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = "block";
+  }
+  function clearError() {
+    errorBanner.style.display = "none";
+  }
+
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ── Setup screen ────────────────────────────────────────────────────────────
+  function activate(sid) {
+    sessionId = sid.trim();
+    if (!sessionId) return;
+    params.set("session", sessionId);
+    window.history.replaceState({}, "", "?" + params.toString());
+    setupEl.classList.add("hidden");
+    dashboardEl.classList.remove("hidden");
+    sidDisplay.textContent = "Session: " + sessionId;
+    poll();
+    setInterval(poll, REFRESH_MS);
+  }
+
+  if (sessionId) {
+    activate(sessionId);
+  } else {
+    goBtn.addEventListener("click", function () { activate(sessionInput.value); });
+    sessionInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") activate(sessionInput.value);
+    });
+  }
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  var meta = null;
+  var clickCount = 0;
+  var lastScreenshot = null;
+  var timerHandle = null;
+
+  // ── Duration timer (ticks every second between refreshes) ───────────────────
+  function startTimer() {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = setInterval(renderDuration, 1000);
+  }
+
+  function renderDuration() {
+    if (!meta || !meta.started_at) { durationEl.textContent = "--:--"; return; }
+    var start = new Date(meta.started_at).getTime();
+    var end = meta.ended_at ? new Date(meta.ended_at).getTime() : Date.now();
+    var diff = Math.max(0, Math.floor((end - start) / 1000));
+    var m = Math.floor(diff / 60);
+    var s = diff % 60;
+    durationEl.textContent = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  // ── Status rendering ───────────────────────────────────────────────────────
+  function renderStatus() {
+    if (!meta) {
+      statusEl.innerHTML = '<span class="status-dot waiting"></span> Waiting';
+      return;
+    }
+    var st = (meta.status || "").toLowerCase();
+    if (st === "completed" || meta.ended_at) {
+      statusEl.innerHTML = '<span class="status-dot ended"></span> Ended';
+    } else if (st === "in_progress" || st === "recording") {
+      statusEl.innerHTML = '<span class="status-dot recording"></span> Recording';
+    } else {
+      statusEl.innerHTML = '<span class="status-dot waiting"></span> ' + esc(meta.status || "Waiting");
+    }
+  }
+
+  // ── Screenshot rendering ────────────────────────────────────────────────────
+  function renderScreenshot() {
+    if (!lastScreenshot) {
+      screenshotEl.innerHTML = '<span class="placeholder">No screenshots yet</span>';
+      screenshotMeta.textContent = "";
+      return;
+    }
+    var imgUrl = s3Url("sessions/" + sessionId + "/screenshots/" + lastScreenshot.file);
+    // Build img element safely (src is from our own S3 bucket, not user input)
+    screenshotEl.innerHTML = "";
+    var img = document.createElement("img");
+    img.src = imgUrl;
+    img.alt = "Last screenshot";
+    screenshotEl.appendChild(img);
+
+    var label = lastScreenshot.file;
+    if (lastScreenshot.pageTitle) label += " — " + lastScreenshot.pageTitle;
+    screenshotMeta.textContent = label;
+  }
+
+  // ── Fetch helpers ───────────────────────────────────────────────────────────
+  function fetchJson(key, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", s3Url(key), true);
+    xhr.responseType = "json";
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        cb(null, xhr.response);
+      } else {
+        cb("HTTP " + xhr.status);
+      }
+    };
+    xhr.onerror = function () { cb("Network error"); };
+    xhr.send();
+  }
+
+  // ── Poll ────────────────────────────────────────────────────────────────────
+  function poll() {
+    // Fetch metadata
+    fetchJson("sessions/" + sessionId + "/metadata.json", function (err, data) {
+      if (err) {
+        showError("Could not load metadata: " + err);
+        return;
+      }
+      clearError();
+      meta = data;
+      nameEl.textContent = meta.visitor_name || "--";
+      seNameEl.textContent = meta.se_name ? "SE: " + meta.se_name : "";
+      renderStatus();
+      renderDuration();
+      startTimer();
+    });
+
+    // Fetch clicks — also extracts last screenshot reference
+    fetchJson("sessions/" + sessionId + "/clicks/clicks.json", function (err, data) {
+      if (err) {
+        clickCount = 0;
+        lastScreenshot = null;
+      } else {
+        var events = (data && data.events) ? data.events : [];
+        clickCount = events.length;
+
+        // Find the most recent event with a screenshot_file
+        lastScreenshot = null;
+        for (var i = events.length - 1; i >= 0; i--) {
+          if (events[i].screenshot_file) {
+            var fname = events[i].screenshot_file.replace(/^screenshots\//, "");
+            lastScreenshot = {
+              file: fname,
+              pageTitle: events[i].page_title || ""
+            };
+            break;
+          }
+        }
+      }
+      clicksEl.textContent = clickCount;
+      renderScreenshot();
+    });
+  }
+})();
+</script>
+</body>
+</html>
