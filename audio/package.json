@@ -5,10 +5,13 @@
   "main": "recorder.js",
   "scripts": {
     "start": "node recorder.js",
+    "upload": "node upload.js",
+    "test-upload": "node test-upload.js",
     "list-devices": "node -e \"require('./lib/device-detect').listDevices().then(d => d.forEach(x => console.log(x))).catch(e => { console.error(e.message); process.exit(1); })\""
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.0.0"
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/lib-storage": "^3.0.0"
   },
   "engines": {
     "node": ">=18"

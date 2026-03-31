@@ -4,9 +4,17 @@
   "title": "Upload audio + transcript to S3 session folder",
   "description": "After recording stops and transcription completes, upload recording.wav to sessions/<id>/audio/ and transcript.json to sessions/<id>/transcript/. Must use hackathon AWS profile. Handle upload failures with retry (3 attempts). Mark session audio as 'uploaded' in metadata. Large file upload should use multipart for WAV files over 100MB.",
   "priority": 3,
-  "status": "pending",
-  "assigned_worker": null,
-  "substeps": [],
+  "status": "in_progress",
+  "assigned_worker": "ccc-worker-local",
+  "substeps": [
+    {
+      "id": "upload-module",
+      "title": "Create s3-upload.js lib with retry + multipart support",
+      "status": "completed",
+      "pr": null,
+      "notes": "audio/lib/s3-upload.js + audio/upload.js CLI + audio/test-upload.js (7/7 tests pass)"
+    }
+  ],
   "depends_on": ["aud-02-transcriber"],
   "tests": [
     "Upload 100MB WAV -> completes within 60s on decent connection",
