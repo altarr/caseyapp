@@ -4,15 +4,19 @@
   "title": "Add click tracking to V1-Helper extension",
   "description": "Add a content script that intercepts every click event in the browser. For each click, capture: timestamp (ISO-8601 UTC), DOM path (CSS selector), element info (tag, id, class, innerText preview, href), coordinates (x,y), page URL, page title. Store events in memory buffer. Reference V1EGO source for click interception patterns. Must work inside V1 iframes. Output format must match clicks.json schema in DATA-CONTRACT.md.",
   "priority": 2,
-  "status": "pending",
+  "status": "completed",
   "assigned_worker": null,
   "substeps": [],
-  "depends_on": ["ext-01-fork-blueprint"],
+  "depends_on": [
+    "ext-01-fork-blueprint"
+  ],
   "source_project": "ProjectsCL1/v1ego/src/",
   "tests": [
     "Click on a V1 page element -> verify event captured with correct DOM path",
     "Click inside an iframe -> verify click still captured",
     "Rapid clicks (10 in 2 seconds) -> verify all captured, no drops",
     "Verify clicks.json output matches DATA-CONTRACT.md schema exactly"
-  ]
+  ],
+  "completed_at": "2026-03-30T00:00:00Z",
+  "notes": "Marked complete - code verified in repo on main branch"
 }

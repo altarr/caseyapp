@@ -6,7 +6,9 @@
   "scripts": {
     "start:watcher": "node analysis/watcher.js",
     "test": "node analysis/test/correlator-test.js && node analysis/test/render-report-test.js && node analysis/test/email-report-test.js && bash scripts/test/verify-integration.sh",
-    "demo": "bash scripts/demo-session.sh",
+    "setup": "bash scripts/setup-demo-pc.sh",
+    "demo": "bash scripts/run-demo-simulation.sh",
+    "checklist": "bash scripts/demo-checklist.sh",
     "preflight": "bash scripts/preflight.sh",
     "analyze": "python3 analysis/analyze.py",
     "transcribe": "node audio/transcriber/index.js"
