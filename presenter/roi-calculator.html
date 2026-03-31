@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="components/error-boundary.js"></script>
+<script src="components/nav.js"></script>
+<title>BoothApp — XDR ROI Calculator</title>
+<link rel="stylesheet" href="styles/mobile.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #f78166;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* -- Header -- */
+  .page-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #58a6ff, #a371f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.25rem;
+  }
+
+  .page-subtitle {
+    color: var(--text2);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+  }
+
+  /* -- Team size input -- */
+  .input-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .input-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .slider-group {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .slider-group input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+  }
+
+  .slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
+  }
+
+  .slider-group input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .team-count {
+    font-family: "SF Mono", "Cascadia Code", monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 3ch;
+    text-align: right;
+  }
+
+  .team-unit {
+    color: var(--text3);
+    font-size: 0.85rem;
+  }
+
+  /* -- Benchmark context bar -- */
+  .benchmark-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .benchmark-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .benchmark-pill .src {
+    color: var(--text3);
+    font-style: italic;
+  }
+
+  /* -- Total savings banner -- */
+  .total-banner {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.08), rgba(163, 113, 247, 0.08));
+    border: 1px solid rgba(88, 166, 255, 0.25);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .total-label {
+    font-size: 0.85rem;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+  }
+
+  .total-amount {
+    font-family: "SF Mono", "Cascadia Code", monospace;
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--green);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .total-period {
+    color: var(--text3);
+    font-size: 0.85rem;
+  }
+
+  /* -- ROI cards grid -- */
+  .roi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .roi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .roi-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+
+  .roi-card .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .roi-card .card-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .roi-card .card-icon.blue { background: rgba(88, 166, 255, 0.12); color: var(--accent); }
+  .roi-card .card-icon.green { background: rgba(63, 185, 80, 0.12); color: var(--green); }
+  .roi-card .card-icon.purple { background: rgba(188, 140, 255, 0.12); color: var(--purple); }
+
+  .roi-card .card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .roi-card .card-amount {
+    font-family: "SF Mono", "Cascadia Code", monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .roi-card .card-amount.blue { color: var(--accent); }
+  .roi-card .card-amount.green { color: var(--green); }
+  .roi-card .card-amount.purple { color: var(--purple); }
+
+  .roi-card .card-detail {
+    font-size: 0.85rem;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* -- Comparison bars -- */
+  .compare-section {
+    margin-top: 0.5rem;
+  }
+
+  .compare-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .compare-label {
+    font-size: 0.75rem;
+    color: var(--text3);
+    width: 55px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .compare-bar-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(48, 54, 61, 0.5);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .compare-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+
+  .compare-bar-fill.manual { background: var(--red); }
+  .compare-bar-fill.xdr { background: var(--green); }
+
+  .compare-value {
+    font-family: "SF Mono", "Cascadia Code", monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    width: 65px;
+    flex-shrink: 0;
+  }
+
+  /* -- Assumptions section -- */
+  .assumptions {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .assumptions summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text2);
+    list-style: none;
+  }
+
+  .assumptions summary::-webkit-details-marker { display: none; }
+  .assumptions summary::before { content: "+ "; color: var(--accent); }
+  .assumptions[open] summary::before { content: "- "; }
+
+  .assumptions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem 2rem;
+    margin-top: 1rem;
+  }
+
+  .assumption-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+  }
+
+  .assumption-item .a-label { color: var(--text2); }
+  .assumption-item .a-value { color: var(--text); font-family: "SF Mono", "Cascadia Code", monospace; }
+
+  /* -- Responsive -- */
+  @media (max-width: 768px) {
+    body { padding: 1rem; }
+    .page-title { font-size: 1.4rem; }
+    .roi-grid { grid-template-columns: 1fr; }
+    .input-section { flex-direction: column; align-items: stretch; }
+    .total-amount { font-size: 2.2rem; }
+    .roi-card .card-amount { font-size: 1.6rem; }
+    .assumptions-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1 class="page-title">XDR ROI Calculator</h1>
+  <p class="page-subtitle">Estimated annual savings from Vision One XDR vs manual security operations</p>
+
+  <!-- Benchmark sources -->
+  <div class="benchmark-bar">
+    <div class="benchmark-pill">Investigation: 45min manual vs 5min XDR <span class="src">Ponemon 2024</span></div>
+    <div class="benchmark-pill">MTTR: 287hrs manual vs 24hrs XDR <span class="src">IBM X-Force</span></div>
+    <div class="benchmark-pill">Avg breach cost: $4.88M <span class="src">IBM Cost of a Data Breach 2024</span></div>
+  </div>
+
+  <!-- Team size input -->
+  <div class="input-section">
+    <span class="input-label">Security Team Size</span>
+    <div class="slider-group">
+      <input type="range" id="team-slider" min="1" max="50" value="10" step="1">
+      <span class="team-count" id="team-display">10</span>
+      <span class="team-unit">analysts</span>
+    </div>
+  </div>
+
+  <!-- Total savings banner -->
+  <div class="total-banner">
+    <div class="total-label">Estimated Annual Savings</div>
+    <div class="total-amount" id="total-savings">$0</div>
+    <div class="total-period">per year with Vision One XDR</div>
+  </div>
+
+  <!-- Three ROI cards -->
+  <div class="roi-grid">
+
+    <!-- Card 1: Investigation Time -->
+    <div class="roi-card">
+      <div class="card-icon blue">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div class="card-title">Investigation Time Saved</div>
+      <div class="card-amount blue" id="invest-amount">$0</div>
+      <div class="card-detail" id="invest-detail"></div>
+      <div class="compare-section">
+        <div class="compare-row">
+          <span class="compare-label">Manual</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill manual" id="invest-bar-manual" style="width:0%"></div></div>
+          <span class="compare-value" id="invest-val-manual">45 min</span>
+        </div>
+        <div class="compare-row">
+          <span class="compare-label">XDR</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill xdr" id="invest-bar-xdr" style="width:0%"></div></div>
+          <span class="compare-value" id="invest-val-xdr">5 min</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: MTTR Reduction -->
+    <div class="roi-card">
+      <div class="card-icon green">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="card-title">MTTR Reduction</div>
+      <div class="card-amount green" id="mttr-amount">$0</div>
+      <div class="card-detail" id="mttr-detail"></div>
+      <div class="compare-section">
+        <div class="compare-row">
+          <span class="compare-label">Manual</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill manual" id="mttr-bar-manual" style="width:0%"></div></div>
+          <span class="compare-value" id="mttr-val-manual">287 hrs</span>
+        </div>
+        <div class="compare-row">
+          <span class="compare-label">XDR</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill xdr" id="mttr-bar-xdr" style="width:0%"></div></div>
+          <span class="compare-value" id="mttr-val-xdr">24 hrs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Breach Prevention -->
+    <div class="roi-card">
+      <div class="card-icon purple">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="card-title">Breach Prevention</div>
+      <div class="card-amount purple" id="breach-amount">$0</div>
+      <div class="card-detail" id="breach-detail"></div>
+      <div class="compare-section">
+        <div class="compare-row">
+          <span class="compare-label">Without</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill manual" id="breach-bar-without" style="width:0%"></div></div>
+          <span class="compare-value" id="breach-val-without">--</span>
+        </div>
+        <div class="compare-row">
+          <span class="compare-label">With XDR</span>
+          <div class="compare-bar-track"><div class="compare-bar-fill xdr" id="breach-bar-with" style="width:0%"></div></div>
+          <span class="compare-value" id="breach-val-with">--</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Assumptions -->
+  <details class="assumptions">
+    <summary>Calculation Assumptions</summary>
+    <div class="assumptions-grid" id="assumptions-grid"></div>
+  </details>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Industry Benchmarks ──────────────────────────────────────
+  var BENCHMARKS = {
+    // Investigation time (minutes per investigation)
+    manualInvestMin: 45,
+    xdrInvestMin: 5,
+    investigationsPerAnalystPerDay: 8,
+
+    // MTTR (hours)
+    manualMttrHrs: 287,
+    xdrMttrHrs: 24,
+    incidentsPerYear: 4,  // per analyst (scaled)
+
+    // Breach costs
+    avgBreachCost: 4880000,    // $4.88M — IBM 2024
+    breachProbManual: 0.27,    // 27% chance without XDR (Ponemon)
+    breachProbXdr: 0.08,       // 8% with automated playbooks
+
+    // Analyst costs
+    analystHourlyCost: 75,     // fully loaded SOC analyst
+    workDaysPerYear: 260
+  };
+
+  var slider = document.getElementById('team-slider');
+  var teamDisplay = document.getElementById('team-display');
+
+  function formatMoney(val) {
+    if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
+    if (val >= 1000) return '$' + Math.round(val / 1000) + 'K';
+    return '$' + Math.round(val);
+  }
+
+  function formatMoneyFull(val) {
+    return '$' + Math.round(val).toLocaleString();
+  }
+
+  function calculate(teamSize) {
+    var B = BENCHMARKS;
+
+    // -- 1. Investigation time savings --
+    var timeSavedPerInvestMin = B.manualInvestMin - B.xdrInvestMin;        // 40 min saved
+    var investigationsPerYear = B.investigationsPerAnalystPerDay * B.workDaysPerYear * teamSize;
+    var hoursSavedInvest = (timeSavedPerInvestMin * investigationsPerYear) / 60;
+    var investSavings = hoursSavedInvest * B.analystHourlyCost;
+
+    // -- 2. MTTR reduction savings --
+    var mttrSavedHrs = B.manualMttrHrs - B.xdrMttrHrs;                   // 263 hrs
+    var incidentsPerYear = B.incidentsPerYear * teamSize;
+    var mttrHoursSaved = mttrSavedHrs * incidentsPerYear;
+    var mttrSavings = mttrHoursSaved * B.analystHourlyCost;
+
+    // -- 3. Breach prevention savings --
+    // Expected breach cost = probability x avg cost
+    // Scale probability slightly with team size (larger orgs = more exposure)
+    var scaleFactor = 1 + (teamSize - 1) * 0.02;  // +2% per analyst above 1
+    var expectedCostManual = B.avgBreachCost * B.breachProbManual * scaleFactor;
+    var expectedCostXdr = B.avgBreachCost * B.breachProbXdr * scaleFactor;
+    var breachSavings = expectedCostManual - expectedCostXdr;
+
+    var total = investSavings + mttrSavings + breachSavings;
+
+    return {
+      investSavings: investSavings,
+      hoursSavedInvest: hoursSavedInvest,
+      investigationsPerYear: investigationsPerYear,
+      mttrSavings: mttrSavings,
+      mttrHoursSaved: mttrHoursSaved,
+      incidentsPerYear: incidentsPerYear,
+      breachSavings: breachSavings,
+      expectedCostManual: expectedCostManual,
+      expectedCostXdr: expectedCostXdr,
+      total: total
+    };
+  }
+
+  function render(teamSize) {
+    var r = calculate(teamSize);
+    var B = BENCHMARKS;
+
+    // Team display
+    teamDisplay.textContent = teamSize;
+
+    // Total
+    document.getElementById('total-savings').textContent = formatMoney(r.total);
+
+    // Investigation card
+    document.getElementById('invest-amount').textContent = formatMoney(r.investSavings);
+    document.getElementById('invest-detail').textContent =
+      Math.round(r.hoursSavedInvest).toLocaleString() + ' analyst-hours saved across ' +
+      r.investigationsPerYear.toLocaleString() + ' investigations/year';
+    document.getElementById('invest-bar-manual').style.width = '100%';
+    document.getElementById('invest-bar-xdr').style.width = Math.round((B.xdrInvestMin / B.manualInvestMin) * 100) + '%';
+    document.getElementById('invest-val-manual').textContent = B.manualInvestMin + ' min';
+    document.getElementById('invest-val-xdr').textContent = B.xdrInvestMin + ' min';
+
+    // MTTR card
+    document.getElementById('mttr-amount').textContent = formatMoney(r.mttrSavings);
+    document.getElementById('mttr-detail').textContent =
+      Math.round(r.mttrHoursSaved).toLocaleString() + ' hours faster remediation across ' +
+      r.incidentsPerYear + ' incidents/year';
+    document.getElementById('mttr-bar-manual').style.width = '100%';
+    document.getElementById('mttr-bar-xdr').style.width = Math.round((B.xdrMttrHrs / B.manualMttrHrs) * 100) + '%';
+    document.getElementById('mttr-val-manual').textContent = B.manualMttrHrs + ' hrs';
+    document.getElementById('mttr-val-xdr').textContent = B.xdrMttrHrs + ' hrs';
+
+    // Breach card
+    document.getElementById('breach-amount').textContent = formatMoney(r.breachSavings);
+    document.getElementById('breach-detail').textContent =
+      'Risk-adjusted savings: ' + formatMoneyFull(r.expectedCostManual) + ' exposure reduced to ' + formatMoneyFull(r.expectedCostXdr);
+    var maxBreach = r.expectedCostManual;
+    document.getElementById('breach-bar-without').style.width = '100%';
+    document.getElementById('breach-bar-with').style.width = maxBreach > 0 ? Math.round((r.expectedCostXdr / maxBreach) * 100) + '%' : '0%';
+    document.getElementById('breach-val-without').textContent = formatMoney(r.expectedCostManual);
+    document.getElementById('breach-val-with').textContent = formatMoney(r.expectedCostXdr);
+
+    // Assumptions table
+    var grid = document.getElementById('assumptions-grid');
+    grid.innerHTML = [
+      ['Avg investigation (manual)', B.manualInvestMin + ' min'],
+      ['Avg investigation (XDR)', B.xdrInvestMin + ' min'],
+      ['Investigations/analyst/day', B.investigationsPerAnalystPerDay],
+      ['Working days/year', B.workDaysPerYear],
+      ['Manual MTTR', B.manualMttrHrs + ' hours'],
+      ['XDR MTTR', B.xdrMttrHrs + ' hours'],
+      ['Incidents/analyst/year', B.incidentsPerYear],
+      ['Analyst hourly cost (loaded)', '$' + B.analystHourlyCost],
+      ['Avg breach cost', '$' + (B.avgBreachCost / 1000000).toFixed(2) + 'M'],
+      ['Breach probability (no XDR)', (B.breachProbManual * 100) + '%'],
+      ['Breach probability (with XDR)', (B.breachProbXdr * 100) + '%']
+    ].map(function(pair) {
+      return '<div class="assumption-item"><span class="a-label">' + pair[0] + '</span><span class="a-value">' + pair[1] + '</span></div>';
+    }).join('');
+  }
+
+  // Slider events
+  slider.addEventListener('input', function() {
+    render(parseInt(slider.value, 10));
+  });
+
+  // Initial render
+  render(parseInt(slider.value, 10));
+})();
+</script>
+<script src="lib/shortcuts.js"></script>
+</body>
+</html>

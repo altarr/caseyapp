@@ -8,6 +8,7 @@
     { label: 'Heatmap', href: '/heatmap.html' },
     { label: 'Live Monitor', href: '/live-dashboard.html' },
     { label: 'Highlights', href: '/highlights.html' },
+    { label: 'ROI Calculator', href: '/roi-calculator.html' },
     { label: 'Admin', href: '/admin.html' },
     { label: 'API Docs', href: '/api-docs.html' },
     { label: 'Setup', href: '/quick-setup.html' }
