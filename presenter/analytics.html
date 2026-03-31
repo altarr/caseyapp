@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoothApp — Session Analytics</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="auth.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  header {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #58a6ff;
+    letter-spacing: 0.02em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+  .header-right a { color: #8b949e; text-decoration: none; }
+  .header-right a:hover { color: #e6edf3; }
+  .user-badge { color: #8b949e; font-family: monospace; }
+
+  /* -- Filter bar -- */
+  .filter-bar {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #8b949e;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: #58a6ff; color: #e6edf3; }
+  .filter-btn.active { background: #58a6ff22; border-color: #58a6ff; color: #58a6ff; }
+
+  /* -- KPI cards -- */
+  .kpi-row {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+
+  .kpi-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 1.2rem;
+    text-align: center;
+  }
+  .kpi-card .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8b949e;
+    margin-bottom: 0.4rem;
+  }
+  .kpi-card .value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-family: monospace;
+    color: #e6edf3;
+  }
+  .kpi-card .value.green { color: #3fb950; }
+  .kpi-card .value.blue { color: #58a6ff; }
+  .kpi-card .value.orange { color: #f78166; }
+
+  /* -- Chart containers -- */
+  .charts-grid {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .chart-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .chart-card.full-width {
+    grid-column: 1 / -1;
+  }
+  .chart-card h2 {
+    font-size: 1rem;
+    color: #e6edf3;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #21262d;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  /* -- Table styles -- */
+  .table-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .table-card h2 {
+    font-size: 1rem;
+    color: #e6edf3;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #21262d;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead th {
+    text-align: left;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8b949e;
+    border-bottom: 1px solid #30363d;
+  }
+  tbody td {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #21262d;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .rank { color: #484f58; font-family: monospace; font-size: 0.8rem; }
+
+  /* -- Score bars -- */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+  }
+  .score-row:last-child { margin-bottom: 0; }
+  .score-label-text {
+    width: 90px;
+    font-size: 0.8rem;
+    color: #8b949e;
+    text-align: right;
+  }
+  .score-track {
+    flex: 1;
+    height: 8px;
+    background: #30363d;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s;
+  }
+  .score-value {
+    width: 40px;
+    font-size: 0.85rem;
+    font-family: monospace;
+    color: #e6edf3;
+  }
+
+  /* -- Loading / Error -- */
+  .loading {
+    text-align: center;
+    padding: 4rem;
+    color: #8b949e;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .loading::after {
+    content: "";
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #30363d;
+    border-top-color: #58a6ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-left: 0.6rem;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-banner {
+    max-width: 1200px;
+    margin: 0 auto 1rem;
+    background: #f8514922;
+    border: 1px solid #f85149;
+    color: #f85149;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    display: none;
+  }
+
+  .hidden { display: none !important; }
+
+  .progress-text {
+    max-width: 1200px;
+    margin: -0.5rem auto 1rem;
+    font-size: 0.8rem;
+    color: #484f58;
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    body { padding: 1rem; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<script>if (!BoothAuth.requireAwsCreds()) { window.location.href = "login.html?redirect=" + encodeURIComponent(window.location.href); }
+else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
+
+<header>
+  <h1>Session Analytics</h1>
+  <div class="header-right">
+    <a href="sessions.html">Sessions</a>
+    <a href="admin.html">Admin</a>
+    <a href="index.html">Home</a>
+    <span class="user-badge" id="auth-user"></span>
+    <a href="#" id="logout-link">[logout]</a>
+  </div>
+</header>
+<script>
+  document.getElementById("auth-user").textContent = BoothAuth.currentUser() || "";
+  document.getElementById("logout-link").addEventListener("click", function(e) {
+    e.preventDefault(); BoothAuth.logout();
+  });
+</script>
+
+<div class="error-banner" id="error-banner"></div>
+
+<!-- Date range filter -->
+<div class="filter-bar" id="filter-bar">
+  <button class="filter-btn active" data-range="all">All Time</button>
+  <button class="filter-btn" data-range="week">This Week</button>
+  <button class="filter-btn" data-range="today">Today</button>
+</div>
+
+<div class="loading" id="loading">Loading session data</div>
+<div class="progress-text hidden" id="progress-text"></div>
+
+<!-- Dashboard content (hidden until data loads) -->
+<div id="dashboard" class="hidden">
+
+  <!-- KPI cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Total Sessions</div>
+      <div class="value blue" id="kpi-total">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg Duration</div>
+      <div class="value" id="kpi-duration">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Success Rate</div>
+      <div class="value green" id="kpi-success">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg Score</div>
+      <div class="value orange" id="kpi-avg-score">--</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Unique Companies</div>
+      <div class="value" id="kpi-companies">--</div>
+    </div>
+  </div>
+
+  <!-- Charts row 1: sessions by day + peak hours -->
+  <div class="charts-grid">
+    <div class="chart-card full-width">
+      <h2>Sessions by Day</h2>
+      <div class="chart-wrap"><canvas id="chart-sessions-day"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h2>Peak Hours</h2>
+      <div class="chart-wrap"><canvas id="chart-peak-hours"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h2>Most Demonstrated Products</h2>
+      <div class="chart-wrap"><canvas id="chart-products"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Avg scores -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h2>Average Scores</h2>
+      <div id="scores-container">
+        <div class="score-row">
+          <span class="score-label-text">Engagement</span>
+          <div class="score-track"><div class="score-fill" id="score-engagement" style="width:0%;background:#58a6ff;"></div></div>
+          <span class="score-value" id="score-engagement-val">--</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label-text">Coverage</span>
+          <div class="score-track"><div class="score-fill" id="score-coverage" style="width:0%;background:#3fb950;"></div></div>
+          <span class="score-value" id="score-coverage-val">--</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label-text">Follow-up</span>
+          <div class="score-track"><div class="score-fill" id="score-followup" style="width:0%;background:#f78166;"></div></div>
+          <span class="score-value" id="score-followup-val">--</span>
+        </div>
+      </div>
+    </div>
+    <div class="table-card">
+      <h2>Top Visitor Companies</h2>
+      <table>
+        <thead><tr><th></th><th>Company</th><th>Sessions</th></tr></thead>
+        <tbody id="companies-body">
+          <tr><td colspan="3" style="color:#484f58;text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+  var HIGH_ENGAGEMENT_THRESHOLD = 7; // session_score >= 7 = "success"
+
+  var ak = localStorage.getItem("boothapp_aws_ak");
+  var sk = localStorage.getItem("boothapp_aws_sk");
+  AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+  var s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+
+  var allSessions = []; // [{metadata, summary}]
+  var activeRange = "all";
+  var chartSessionsDay = null;
+  var chartPeakHours = null;
+  var chartProducts = null;
+
+  // ── S3 data loading ───────────────────────────────────────────────────────
+
+  function loadAllSessions() {
+    var allKeys = [];
+    function listAll(token) {
+      var params = { Prefix: "sessions/", Delimiter: "/", MaxKeys: 1000 };
+      if (token) params.ContinuationToken = token;
+      s3.listObjectsV2(params, function (err, data) {
+        if (err) {
+          showError("S3 error: " + err.message);
+          document.getElementById("loading").classList.add("hidden");
+          return;
+        }
+        var prefixes = (data.CommonPrefixes || []).map(function (p) { return p.Prefix; });
+        allKeys = allKeys.concat(prefixes);
+        if (data.IsTruncated) {
+          listAll(data.NextContinuationToken);
+        } else {
+          fetchSessionDetails(allKeys);
+        }
+      });
+    }
+    listAll(null);
+  }
+
+  function fetchSessionDetails(prefixes) {
+    var total = prefixes.length;
+    var loaded = 0;
+    var progressEl = document.getElementById("progress-text");
+    progressEl.classList.remove("hidden");
+
+    if (total === 0) {
+      document.getElementById("loading").classList.add("hidden");
+      progressEl.classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      renderDashboard();
+      return;
+    }
+
+    var pending = total;
+    prefixes.forEach(function (prefix) {
+      var sessionId = prefix.replace("sessions/", "").replace(/\/$/, "");
+      var session = { id: sessionId, metadata: null, summary: null };
+
+      var metaDone = false;
+      var summaryDone = false;
+
+      function checkDone() {
+        if (metaDone && summaryDone) {
+          allSessions.push(session);
+          loaded++;
+          progressEl.textContent = "Loading sessions: " + loaded + " / " + total;
+          pending--;
+          if (pending === 0) {
+            document.getElementById("loading").classList.add("hidden");
+            progressEl.classList.add("hidden");
+            document.getElementById("dashboard").classList.remove("hidden");
+            renderDashboard();
+          }
+        }
+      }
+
+      s3.getObject({ Key: prefix + "metadata.json" }, function (err, data) {
+        if (!err && data.Body) {
+          try { session.metadata = JSON.parse(data.Body.toString()); } catch (e) {}
+        }
+        metaDone = true;
+        checkDone();
+      });
+
+      s3.getObject({ Key: prefix + "output/summary.json" }, function (err, data) {
+        if (!err && data.Body) {
+          try { session.summary = JSON.parse(data.Body.toString()); } catch (e) {}
+        }
+        summaryDone = true;
+        checkDone();
+      });
+    });
+  }
+
+  // ── Filtering ─────────────────────────────────────────────────────────────
+
+  function filterSessions(range) {
+    var now = new Date();
+    var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+    return allSessions.filter(function (s) {
+      if (range === "all") return true;
+      var meta = s.metadata;
+      if (!meta) return false;
+      var d = new Date(meta.started_at || meta.created_at || "");
+      if (isNaN(d.getTime())) return false;
+      if (range === "today") return d >= startOfToday;
+      if (range === "week") return d >= startOfWeek;
+      return true;
+    });
+  }
+
+  // ── Filter buttons ────────────────────────────────────────────────────────
+
+  document.querySelectorAll(".filter-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".filter-btn").forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      activeRange = btn.getAttribute("data-range");
+      renderDashboard();
+    });
+  });
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+
+  function renderDashboard() {
+    var sessions = filterSessions(activeRange);
+    renderKPIs(sessions);
+    renderSessionsByDay(sessions);
+    renderPeakHours(sessions);
+    renderProducts(sessions);
+    renderScores(sessions);
+    renderCompanies(sessions);
+  }
+
+  function getSessionDate(s) {
+    var meta = s.metadata;
+    if (!meta) return null;
+    var d = new Date(meta.started_at || meta.created_at || "");
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function getSessionDuration(s) {
+    var meta = s.metadata;
+    if (!meta || !meta.started_at) return null;
+    var start = new Date(meta.started_at).getTime();
+    var end = meta.ended_at ? new Date(meta.ended_at).getTime() : null;
+    if (!end || isNaN(start) || isNaN(end)) return null;
+    return Math.max(0, (end - start) / 1000); // seconds
+  }
+
+  function getScore(s) {
+    if (s.summary && typeof s.summary.session_score === "number") return s.summary.session_score;
+    return null;
+  }
+
+  // ── KPI cards ─────────────────────────────────────────────────────────────
+
+  function renderKPIs(sessions) {
+    document.getElementById("kpi-total").textContent = sessions.length;
+
+    // Avg duration
+    var durations = sessions.map(getSessionDuration).filter(function (d) { return d !== null; });
+    if (durations.length > 0) {
+      var avg = durations.reduce(function (a, b) { return a + b; }, 0) / durations.length;
+      document.getElementById("kpi-duration").textContent = formatDuration(avg);
+    } else {
+      document.getElementById("kpi-duration").textContent = "--";
+    }
+
+    // Success rate
+    var scores = sessions.map(getScore).filter(function (s) { return s !== null; });
+    if (scores.length > 0) {
+      var highCount = scores.filter(function (s) { return s >= HIGH_ENGAGEMENT_THRESHOLD; }).length;
+      var pct = Math.round((highCount / scores.length) * 100);
+      document.getElementById("kpi-success").textContent = pct + "%";
+    } else {
+      document.getElementById("kpi-success").textContent = "--";
+    }
+
+    // Avg score
+    if (scores.length > 0) {
+      var avgScore = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
+      document.getElementById("kpi-avg-score").textContent = avgScore.toFixed(1) + "/10";
+    } else {
+      document.getElementById("kpi-avg-score").textContent = "--";
+    }
+
+    // Unique companies
+    var companies = {};
+    sessions.forEach(function (s) {
+      var co = (s.metadata && s.metadata.visitor_company) || (s.summary && s.summary.visitor_company);
+      if (co) companies[co.toLowerCase()] = true;
+    });
+    document.getElementById("kpi-companies").textContent = Object.keys(companies).length;
+  }
+
+  function formatDuration(sec) {
+    if (sec < 60) return Math.round(sec) + "s";
+    var m = Math.floor(sec / 60);
+    var s = Math.round(sec % 60);
+    if (m >= 60) {
+      var h = Math.floor(m / 60);
+      m = m % 60;
+      return h + "h " + m + "m";
+    }
+    return m + "m " + s + "s";
+  }
+
+  // ── Sessions by day chart ─────────────────────────────────────────────────
+
+  function renderSessionsByDay(sessions) {
+    var dayMap = {};
+    sessions.forEach(function (s) {
+      var d = getSessionDate(s);
+      if (!d) return;
+      var key = d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0");
+      dayMap[key] = (dayMap[key] || 0) + 1;
+    });
+
+    var labels = Object.keys(dayMap).sort();
+    var values = labels.map(function (k) { return dayMap[k]; });
+
+    // Format labels for display
+    var displayLabels = labels.map(function (k) {
+      var parts = k.split("-");
+      var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return months[parseInt(parts[1], 10) - 1] + " " + parseInt(parts[2], 10);
+    });
+
+    if (chartSessionsDay) chartSessionsDay.destroy();
+    chartSessionsDay = new Chart(document.getElementById("chart-sessions-day"), {
+      type: "bar",
+      data: {
+        labels: displayLabels,
+        datasets: [{
+          label: "Sessions",
+          data: values,
+          backgroundColor: "#58a6ff88",
+          borderColor: "#58a6ff",
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: chartOptions("Sessions")
+    });
+  }
+
+  // ── Peak hours chart ──────────────────────────────────────────────────────
+
+  function renderPeakHours(sessions) {
+    var hourMap = {};
+    for (var i = 0; i < 24; i++) hourMap[i] = 0;
+    sessions.forEach(function (s) {
+      var d = getSessionDate(s);
+      if (d) hourMap[d.getHours()]++;
+    });
+
+    var labels = [];
+    var values = [];
+    for (var h = 6; h < 22; h++) { // show 6am-10pm
+      labels.push(h < 12 ? h + "am" : (h === 12 ? "12pm" : (h - 12) + "pm"));
+      values.push(hourMap[h]);
+    }
+
+    if (chartPeakHours) chartPeakHours.destroy();
+    chartPeakHours = new Chart(document.getElementById("chart-peak-hours"), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Sessions",
+          data: values,
+          backgroundColor: "#a371f788",
+          borderColor: "#a371f7",
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: chartOptions("Sessions")
+    });
+  }
+
+  // ── Products chart ────────────────────────────────────────────────────────
+
+  function renderProducts(sessions) {
+    var productMap = {};
+    sessions.forEach(function (s) {
+      if (!s.summary || !Array.isArray(s.summary.products_demonstrated)) return;
+      s.summary.products_demonstrated.forEach(function (p) {
+        var name = p.trim();
+        if (name) productMap[name] = (productMap[name] || 0) + 1;
+      });
+    });
+
+    var sorted = Object.keys(productMap).sort(function (a, b) {
+      return productMap[b] - productMap[a];
+    }).slice(0, 10);
+
+    var labels = sorted;
+    var values = sorted.map(function (k) { return productMap[k]; });
+
+    if (chartProducts) chartProducts.destroy();
+    chartProducts = new Chart(document.getElementById("chart-products"), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Demos",
+          data: values,
+          backgroundColor: "#3fb95088",
+          borderColor: "#3fb950",
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#8b949e", stepSize: 1 },
+            grid: { color: "#21262d" }
+          },
+          y: {
+            ticks: { color: "#e6edf3", font: { size: 11 } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Average scores ────────────────────────────────────────────────────────
+
+  function renderScores(sessions) {
+    var engagements = [];
+    var coverages = [];
+    var followups = [];
+
+    sessions.forEach(function (s) {
+      if (!s.summary) return;
+      if (typeof s.summary.session_score === "number") engagements.push(s.summary.session_score);
+      if (typeof s.summary.coverage_score === "number") coverages.push(s.summary.coverage_score);
+      if (typeof s.summary.follow_up_score === "number") followups.push(s.summary.follow_up_score);
+    });
+
+    function avg(arr) {
+      if (arr.length === 0) return null;
+      return arr.reduce(function (a, b) { return a + b; }, 0) / arr.length;
+    }
+
+    setScore("engagement", avg(engagements), 10);
+    setScore("coverage", avg(coverages), 10);
+    setScore("followup", avg(followups), 10);
+  }
+
+  function setScore(id, value, max) {
+    var fill = document.getElementById("score-" + id);
+    var valEl = document.getElementById("score-" + id + "-val");
+    if (value === null) {
+      fill.style.width = "0%";
+      valEl.textContent = "--";
+    } else {
+      var pct = Math.round((value / max) * 100);
+      fill.style.width = pct + "%";
+      valEl.textContent = value.toFixed(1) + "/" + max;
+    }
+  }
+
+  // ── Top companies ─────────────────────────────────────────────────────────
+
+  function renderCompanies(sessions) {
+    var companyMap = {};
+    sessions.forEach(function (s) {
+      var co = (s.metadata && s.metadata.visitor_company) || (s.summary && s.summary.visitor_company);
+      if (!co) return;
+      var key = co.trim();
+      if (!key) return;
+      companyMap[key] = (companyMap[key] || 0) + 1;
+    });
+
+    var sorted = Object.keys(companyMap).sort(function (a, b) {
+      return companyMap[b] - companyMap[a];
+    }).slice(0, 10);
+
+    var tbody = document.getElementById("companies-body");
+    if (sorted.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:#484f58;text-align:center;">No company data</td></tr>';
+      return;
+    }
+
+    var html = "";
+    sorted.forEach(function (co, i) {
+      html += "<tr>";
+      html += '<td class="rank">#' + (i + 1) + "</td>";
+      html += "<td>" + esc(co) + "</td>";
+      html += '<td style="font-family:monospace;text-align:right;">' + companyMap[co] + "</td>";
+      html += "</tr>";
+    });
+    tbody.innerHTML = html;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function showError(msg) {
+    var el = document.getElementById("error-banner");
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  function chartOptions(yLabel) {
+    return {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#8b949e", maxRotation: 45 },
+          grid: { color: "#21262d" }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: "#8b949e", stepSize: 1 },
+          grid: { color: "#21262d" }
+        }
+      }
+    };
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadAllSessions();
+
+})();
+</script>
+</body>
+</html>
