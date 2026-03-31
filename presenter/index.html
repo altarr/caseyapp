@@ -525,7 +525,8 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }
       return;
     }
 
-    fetch(apiUrl + '/sessions')
+    // Single request with ?include=analysis to avoid N+1 detail fetches
+    fetch(apiUrl + '/sessions?include=analysis')
       .then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
@@ -551,47 +552,28 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }
           return;
         }
 
-        // Fetch detail for each completed session to get analysis scores
-        var detailPromises = completed.map(function (s) {
-          return fetch(apiUrl + '/sessions/' + encodeURIComponent(s.session_id))
-            .then(function (res) { return res.ok ? res.json() : null; })
-            .catch(function () { return null; });
+        var enriched = completed.map(function (s) {
+          return {
+            session_id: s.session_id,
+            visitor_name: s.visitor_name || 'Unknown Visitor',
+            visitor_company: s.visitor_company || '',
+            started_at: s.started_at,
+            ended_at: s.ended_at,
+            status: s.status,
+            se_name: s.se_name || '',
+            session_score: s.session_score != null ? s.session_score : null,
+            executive_summary: s.executive_summary || ''
+          };
         });
 
-        return Promise.all(detailPromises).then(function (details) {
-          var enriched = completed.map(function (s, i) {
-            var detail = details[i];
-            var score = null;
-            var summary = '';
-            var company = s.visitor_company || '';
-
-            if (detail && detail.analysis) {
-              score = detail.analysis.session_score;
-              summary = detail.analysis.executive_summary || '';
-            }
-
-            return {
-              session_id: s.session_id,
-              visitor_name: s.visitor_name || 'Unknown Visitor',
-              visitor_company: company,
-              started_at: s.started_at,
-              ended_at: s.ended_at,
-              status: s.status,
-              se_name: s.se_name || '',
-              session_score: score,
-              executive_summary: summary
-            };
-          });
-
-          // Sort by score descending (null scores at bottom)
-          enriched.sort(function (a, b) {
-            var sa = a.session_score != null ? a.session_score : -1;
-            var sb = b.session_score != null ? b.session_score : -1;
-            return sb - sa;
-          });
-
-          renderGrid(enriched);
+        // Sort by score descending (null scores at bottom)
+        enriched.sort(function (a, b) {
+          var sa = a.session_score != null ? a.session_score : -1;
+          var sb = b.session_score != null ? b.session_score : -1;
+          return sb - sa;
         });
+
+        renderGrid(enriched);
       })
       .catch(function (err) {
         showError('Failed to load sessions: ' + err.message);
