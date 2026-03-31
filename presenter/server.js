@@ -100,6 +100,10 @@ app.get('/api/pages', (req, res) => {
   res.json({ pages: htmlFiles });
 });
 
+// --- Batch analysis API ---
+const { createRouter: batchAnalyzeRouter } = require('./lib/batch-analyze');
+app.use(batchAnalyzeRouter({ bucket: S3_BUCKET }));
+
 // --- Static files ---
 app.use(express.static(path.join(__dirname)));
 
