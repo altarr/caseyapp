@@ -19,3 +19,4 @@ android/local.properties
 *.apk
 *.aab
 *.hprof
+.claude/worktrees/

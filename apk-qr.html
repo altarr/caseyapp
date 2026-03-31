@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>CaseyApp APK Download</title>
+<style>
+body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:system-ui,sans-serif}
+.wrap{text-align:center;padding:2rem}
+h1{color:#d71920;font-size:1.5rem;margin-bottom:.5rem}
+p{color:#888;font-size:.9rem;margin-bottom:1.5rem}
+#qr{display:inline-block;background:#fff;padding:20px;border-radius:12px}
+</style>
+</head><body>
+<div class="wrap">
+<h1>CaseyApp</h1>
+<p>Scan with your Android phone to download the APK</p>
+<div id="qr"></div>
+</div>
+<script src="brand/digital/qrcode.min.js"></script>
+<script>
+new QRCode(document.getElementById('qr'),{
+text:'https://boothapp-sessions-752266476357.s3.us-east-1.amazonaws.com/demo-setup/CaseyApp.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA26JUTPNC44I34IOO%2F20260331%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260331T195313Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=363f859e79eb962b2cd0f0f02e02d74023f6ec5865550021aca9e19d0788a1c8',
+width:300,height:300,colorDark:'#d71920',colorLight:'#ffffff',
+correctLevel:QRCode.CorrectLevel.H
+});
+</script>
+</body></html>

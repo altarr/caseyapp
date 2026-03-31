@@ -4,37 +4,54 @@
   "aws_account": "752266476357",
   "region": "us-east-1",
   "resources": {
-    "ec2_instance": {
-      "id": "i-0b01d5bd6209e19d4",
-      "type": "t3.medium",
-      "name": "CaseyApp-Demo-PC",
-      "public_ip": "44.220.43.218",
-      "ami": "ami-05856bd26dd466893",
-      "os": "Windows Server 2022"
+    "management_server": {
+      "id": "i-058a9f7e7e80ac777",
+      "type": "t3.small",
+      "name": "caseyapp-management",
+      "public_ip": "34.239.159.231",
+      "dns": "caseyapp.trendcyberrange.com",
+      "ami": "ami-0cb5cf49019e79c51",
+      "os": "Amazon Linux 2023",
+      "services": ["management server (port 4000)", "nginx reverse proxy (80/443)"]
     },
-    "security_group": {
-      "id": "sg-0a2d74c0aec3543b2",
-      "name": "caseyapp-demo-rdp",
-      "ports": [3389, 3000, 9222]
+    "demo_pc_windows": {
+      "id": "i-078e20cb0b73776bd",
+      "name": "boothapp-demo-windows",
+      "note": "Pre-existing instance, check if still needed"
+    },
+    "security_groups": [
+      { "id": "sg-0a2d74c0aec3543b2", "name": "caseyapp-demo-rdp", "ports": [3389, 3000, 9222] },
+      { "id": "sg-0e4794b565ccf4c57", "name": "caseyapp-management", "ports": [22, 80, 443] }
+    ],
+    "iam": {
+      "role": "caseyapp-management-role",
+      "instance_profile": "caseyapp-management-profile",
+      "policies": ["AmazonS3FullAccess"]
+    },
+    "dns": {
+      "zone": "trendcyberrange.com",
+      "zone_id": "Z08962549NVDQ5V5JIWS",
+      "record": "caseyapp.trendcyberrange.com A 34.239.159.231"
     },
     "key_pair": {
       "name": "caseyapp-demo-key",
       "local_path": "~/.ssh/caseyapp-demo-key.pem"
     },
     "s3_objects": [
-      "demo-setup/caseyapp-demo.zip"
+      "demo-setup/caseyapp-demo.zip",
+      "demo-setup/CaseyApp.apk"
     ]
   },
-  "rdp_access": {
-    "host": "44.220.43.218",
-    "port": 3389,
-    "username": "Administrator",
-    "password": "CaseyApp-Demo-2026!"
-  },
   "cleanup_commands": [
-    "aws ec2 terminate-instances --instance-ids i-0b01d5bd6209e19d4 --region us-east-1",
+    "aws ec2 terminate-instances --instance-ids i-058a9f7e7e80ac777 --region us-east-1",
+    "aws ec2 delete-security-group --group-id sg-0e4794b565ccf4c57 --region us-east-1",
     "aws ec2 delete-security-group --group-id sg-0a2d74c0aec3543b2 --region us-east-1",
     "aws ec2 delete-key-pair --key-name caseyapp-demo-key --region us-east-1",
+    "aws iam remove-role-from-instance-profile --instance-profile-name caseyapp-management-profile --role-name caseyapp-management-role --region us-east-1",
+    "aws iam delete-instance-profile --instance-profile-name caseyapp-management-profile --region us-east-1",
+    "aws iam detach-role-policy --role-name caseyapp-management-role --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess --region us-east-1",
+    "aws iam delete-role --role-name caseyapp-management-role --region us-east-1",
+    "aws route53 change-resource-record-sets --hosted-zone-id Z08962549NVDQ5V5JIWS --change-batch '{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"caseyapp.trendcyberrange.com\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"34.239.159.231\"}]}}]}'",
     "aws s3 rm s3://boothapp-sessions-752266476357/demo-setup/ --recursive --region us-east-1"
   ]
 }
