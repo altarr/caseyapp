@@ -1,4 +1,4 @@
-# BoothApp -- AI-Powered Trade Show Demo Capture
+# BoothApp - AI-Powered Trade Show Demo Capture
 
 ```
  ____              _   _       _
@@ -12,70 +12,69 @@
 > **Record everything. Analyze instantly. Follow up personally.**
 
 A visitor walks up to your trade show booth. The SE gives a live product demo.
-Minutes later, the visitor receives a personalized summary of exactly what they
-saw, what interested them, and what to explore next -- powered by Claude AI.
+Minutes later, the visitor gets a personalized AI summary of what they saw,
+what caught their attention, and recommended next steps.
 
 ---
 
 ## Architecture
 
 ```
-  CAPTURE                      STORAGE              PROCESSING
-  =======                      =======              ==========
+  CAPTURE                    STORE                  PROCESS
+  -------                    -----                  -------
 
-  +------------------+
-  | Chrome Extension |--+                      +------------------+
-  | clicks + screens |  |   +--------------+   | Watcher          |
-  +------------------+  +-->|              |-->| polls S3 for     |
-                        |   |  S3 Session  |   | completed        |
-  +------------------+  +-->|    Store     |   | sessions         |
-  | Audio Recorder   |  |   |              |   +---------+--------+
-  | mic + transcript |--+   +--------------+             |
-  +------------------+  |                                v
-                        |                      +------------------+
-  +------------------+  |                      | Analysis Engine  |
-  | Badge Scanner    |--+                      | correlate clicks |
-  | OCR + session ID |                         | + audio + screen |
-  +------------------+                         +---------+--------+
-                                                         |
-                                                         v
-                                               +------------------+
-                                               | Claude AI        |
-                                               | * interests      |
-                                               | * engagement     |
-                                               | * follow-up recs |
-                                               +---------+--------+
-                                                         |
-                                                         v
-                                               +------------------+
-                                               | HTML Report      |
-                                               | personalized     |
-                                               | summary + recs   |
-                                               +------------------+
+  +----------------+
+  | Chrome Ext     |--+
+  | clicks+screens |  |    +--------------+    +----------------+
+  +----------------+  +--> |              | -> | Watcher        |
+                      |    |   AWS S3     |    | polls for new  |
+  +----------------+  +--> |   sessions/  |    | sessions       |
+  | Audio Recorder |  |    |              |    +-------+--------+
+  | mic+transcript |--+    +--------------+            |
+  +----------------+  |                                v
+                      |                        +-------+--------+
+  +----------------+  |                        | Analysis       |
+  | Badge Scanner  |--+                        | correlate all  |
+  | OCR+session ID |                           | data by time   |
+  +----------------+                           +-------+--------+
+                                                       |
+                                                       v
+                                               +-------+--------+
+                                               | Claude AI      |
+                                               | interests      |
+                                               | engagement     |
+                                               | follow-up recs |
+                                               +-------+--------+
+                                                       |
+                                                       v
+                                               +----------------+
+                                               | HTML Report    |
+                                               | personalized   |
+                                               | summary + recs |
+                                               +----------------+
 ```
 
-**Pipeline:** Chrome ext + audio + badge --> S3 --> watcher --> analysis --> Claude --> report
+**Pipeline:** `Chrome ext + audio + badge --> S3 --> watcher --> analysis --> Claude --> report`
 
 ---
 
 ## How It Works
 
-```
- [1] BADGE SCAN       [2] LIVE DEMO        [3] UPLOAD         [4] AI ANALYSIS
- ==============       ===========          =========          ==============
- Scan badge     -->   Record audio   -->   Session data -->   Correlate clicks
- Extract name         Track clicks         uploads to S3      + transcript
- Start session        Take screenshots                        Claude two-pass
-                                                              Render report
-```
+| Step | What Happens |
+|------|-------------|
+| **1. Badge Scan** | Photo of visitor badge -> OCR -> name extracted -> session ID created |
+| **2. Live Demo** | SE demos the product; audio records, extension tracks clicks + takes screenshots |
+| **3. Upload** | Session ends -> all captured data uploads to S3 |
+| **4. AI Analysis** | Watcher detects completed session -> Claude correlates clicks + audio + screens |
+| **5. Report** | Personalized HTML summary with interests, engagement signals, and follow-up recs |
 
-**Status flow:** `active` --> `ended` --> `analyzing` --> `complete`
+Status flow: `active` -> `ended` -> `analyzing` -> `complete`
 
 ---
 
 ## Quick Start
 
-**Prerequisites:** Node.js 18+ | AWS CLI | Chrome | ffmpeg | Python 3.10+
+**Prerequisites:** Node.js 18+ | AWS CLI | Chrome | ffmpeg
 
 ```bash
 # Clone and install
@@ -83,23 +82,23 @@ git clone https://github.com/altarr/boothapp.git && cd boothapp
 npm install
 
 # Chrome extension
-#   chrome://extensions -> Developer Mode -> Load Unpacked -> extension/
+#   chrome://extensions -> Developer Mode -> Load Unpacked -> select extension/
 
-# Analysis dependencies
+# Analysis deps
 cd analysis && npm install && pip install -r requirements.txt && cd ..
 
-# Configure environment
-cp .env.example .env        # Add your AWS + Claude API keys
+# Configure
+cp .env.example .env     # Add AWS credentials + Claude API key
 
 # Run full pipeline with synthetic data (no hardware needed)
 bash scripts/run-demo-simulation.sh
 ```
 
-### Run Individual Services
+### Individual Services
 
 ```bash
-node infra/session-orchestrator/orchestrator.js   # Session API on :3000
-node analysis/watcher.js                          # S3 session poller
+node infra/session-orchestrator/orchestrator.js   # Session API    :3000
+node analysis/watcher.js                          # S3 poller
 node audio/recorder.js                            # Mic capture
 ```
 
@@ -109,13 +108,13 @@ node audio/recorder.js                            # Mic capture
 
 ```
 boothapp/
-  extension/     Chrome extension -- click tracking + screenshots (Manifest V3)
-  audio/         Audio capture -- USB mic recording + transcription
+  extension/     Chrome extension (Manifest V3) -- click tracking + screenshots
+  audio/         Audio capture + transcription via Whisper
   analysis/      AI pipeline -- correlator, Claude analyzer, report renderer
   infra/         Session orchestrator + S3 CloudFormation
   presenter/     Presenter dashboard -- session timeline + review UI
   demo/          Demo landing page + session review interface
-  scripts/       Simulation, health check, integration tests
+  scripts/       Simulation, health checks, integration tests
   docs/          Architecture docs + demo walkthrough
 ```
 
@@ -142,18 +141,7 @@ sessions/<session-id>/
 | Storage | AWS S3, CloudFormation |
 | Analysis | Node.js, Python, Claude API (two-pass) |
 | Output | HTML reports, structured JSON |
-| Orchestration | Session API (Express), S3 event polling |
-
----
-
-## Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `run-demo-simulation.sh` | Full pipeline test with synthetic data |
-| `health-check.sh` | Verify all services are running |
-| `test-integration.sh` | End-to-end integration test suite |
-| `validate-session.sh` | Validate session data completeness |
+| Orchestration | Express session API, S3 event polling |
 
 ---
 
@@ -161,8 +149,8 @@ sessions/<session-id>/
 
 ### Smells Like Machine Learning -- Hackathon 2026
 
-| Name | Role |
-|------|------|
+| Name | Focus |
+|------|-------|
 | **Casey Mondoux** | App, web UI, presentation |
 | **Joel Ginsberg** | Chrome extension, audio, AWS infra, AI analysis |
 | **Tom Gamull** | App development |
@@ -171,4 +159,4 @@ sessions/<session-id>/
 
 ---
 
-*Every demo remembered. Every visitor followed up.*
+*Built for Black Hat, RSA, and re:Invent. Every demo remembered. Every visitor followed up.*
