@@ -147,6 +147,33 @@ class SessionAnalyzer:
         data = self._read_file(relative_path)
         return json.loads(data)
 
+    @staticmethod
+    def _normalize_clicks(data):
+        """Normalize clicks: accepts {events:[...]}, {clicks:[...]}, or top-level array."""
+        if not data:
+            return []
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            if isinstance(data.get("events"), list):
+                return data["events"]
+            if isinstance(data.get("clicks"), list):
+                return data["clicks"]
+        return []
+
+    @staticmethod
+    def _normalize_transcript_entries(data):
+        """Normalize transcript: accepts {entries:[...]}, {results:[...]}, {items:[...]}, {transcripts:[...]}, or top-level array."""
+        if not data:
+            return []
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("entries", "results", "items", "transcripts"):
+                if isinstance(data.get(key), list):
+                    return data[key]
+        return []
+
     def _load_inputs(self):
         try:
             self._metadata = self._read_json("metadata.json")
@@ -168,7 +195,11 @@ class SessionAnalyzer:
         except Exception:
             self._tenant = {}
 
-        if not self._transcript and not self._clicks:
+        # Normalize into standard lists for downstream use
+        self._clicks_list = self._normalize_clicks(self._clicks)
+        self._transcript_entries = self._normalize_transcript_entries(self._transcript)
+
+        if not self._transcript_entries and not self._clicks_list:
             raise ValueError("No transcript and no clicks found — cannot analyze session")
 
     def _load_screenshot(self, filename: str) -> str:
@@ -206,7 +237,7 @@ class SessionAnalyzer:
     def _build_timeline_context(self) -> tuple:
         events = []
 
-        for entry in self._transcript.get("entries", []):
+        for entry in self._transcript_entries:
             events.append({
                 "type": "transcript",
                 "timestamp": entry.get("timestamp", "00:00:00"),
@@ -215,13 +246,13 @@ class SessionAnalyzer:
                 "text": entry.get("text", ""),
             })
 
-        for click in self._clicks.get("events", []):
+        for click in self._clicks_list:
             events.append({
                 "type": "click",
                 "timestamp": click.get("timestamp", ""),
                 "seconds": 0,
                 "index": click.get("index", 0),
-                "element_text": click.get("element", {}).get("text", ""),
+                "element_text": click.get("element", {}).get("text", "") if isinstance(click.get("element"), dict) else (click.get("element") or ""),
                 "page_title": click.get("page_title", ""),
                 "screenshot_file": click.get("screenshot_file", ""),
             })

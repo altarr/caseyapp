@@ -146,8 +146,32 @@ def main():
         analyzer = SessionAnalyzer(args.session_dir)
         results = analyzer.analyze()
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+        print(f"Warning: {e} — generating fallback summary", file=sys.stderr)
+        results = {
+            "summary": {
+                "session_id": "unknown",
+                "visitor_name": "Unknown Visitor",
+                "demo_duration_seconds": 0,
+                "session_score": 0,
+                "executive_summary": f"Analysis unavailable: {e}",
+                "products_demonstrated": [],
+                "key_interests": [],
+                "follow_up_actions": ["Review session recording manually"],
+                "key_moments": [],
+                "generated_at": __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "fallback": True,
+                "fallback_reason": str(e),
+            },
+            "follow_up": {
+                "session_id": "unknown",
+                "visitor_email": "",
+                "priority": "medium",
+                "tags": ["fallback"],
+                "sdr_notes": f"Analysis unavailable: {e}. Please review session manually.",
+            },
+        }
     except Exception as e:
         print(f"Analysis failed: {e}", file=sys.stderr)
         return 1
