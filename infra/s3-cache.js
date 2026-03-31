@@ -10,7 +10,7 @@
  *   const detail = await cache.getSessionDetail('ABC123');
  */
 
-const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 // ── LRU Cache ───────────────────────────────────────────────────────────────
 
@@ -253,6 +253,31 @@ class S3Cache {
     this.cache.set(cacheKey, files, this.ttl);
     this._log('listSessionFiles', `${sessionId}/${subfolder || '*'} (${files.length})`, false, Date.now() - start);
     return files;
+  }
+
+  // ── Write JSON to S3 ─────────────────────────────────────────────────────
+
+  async _putJson(key, data) {
+    const cmd = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: JSON.stringify(data, null, 2),
+      ContentType: 'application/json',
+    });
+    await this.client.send(cmd);
+    // Invalidate caches that include this key
+    this.cache.invalidate(key);
+  }
+
+  async updateSessionTags(sessionId, tags) {
+    const key = `sessions/${sessionId}/metadata.json`;
+    const meta = await this._getCachedJson(key) || {};
+    meta.tags = Array.isArray(tags) ? tags : [];
+    await this._putJson(key, meta);
+    // Invalidate session list cache so next fetch picks up new tags
+    this.cache.invalidate('_sessions_list');
+    this.cache.invalidate(`_detail_${sessionId}`);
+    return meta.tags;
   }
 
   // ── Cache stats ─────────────────────────────────────────────────────────

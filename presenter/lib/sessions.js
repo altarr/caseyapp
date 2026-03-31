@@ -7,7 +7,8 @@
 // GET /api/sessions/:id/files/:subfolder — list files in subfolder
 // GET /api/cache-stats      — cache diagnostics
 
-const { Router } = require('express');
+const express = require('express');
+const { Router } = express;
 const { S3Cache } = require('../../infra/s3-cache');
 
 function createRouter(opts) {
@@ -86,6 +87,51 @@ function createRouter(opts) {
       }
       console.error(`[sessions] Error fetching ${sessionId}:`, err.message);
       res.status(500).json({ error: 'Failed to fetch session' });
+    }
+  });
+
+  // PUT /api/sessions/:id/tags — add a tag
+  router.put('/api/sessions/:id/tags', express.json(), async (req, res) => {
+    const sessionId = req.params.id;
+    if (!sessionId || !/^[A-Za-z0-9_-]+$/.test(sessionId)) {
+      return res.status(400).json({ error: 'Invalid session ID' });
+    }
+    const tag = (req.body && req.body.tag || '').trim().toLowerCase();
+    if (!tag || tag.length > 50) {
+      return res.status(400).json({ error: 'Tag required (max 50 chars)' });
+    }
+
+    try {
+      const meta = await s3cache._getCachedJson(`sessions/${sessionId}/metadata.json`);
+      if (!meta) return res.status(404).json({ error: 'Session not found' });
+      const tags = Array.isArray(meta.tags) ? meta.tags : [];
+      if (!tags.includes(tag)) tags.push(tag);
+      const result = await s3cache.updateSessionTags(sessionId, tags);
+      res.json({ session_id: sessionId, tags: result });
+    } catch (err) {
+      console.error(`[sessions] Error adding tag to ${sessionId}:`, err.message);
+      res.status(500).json({ error: 'Failed to add tag' });
+    }
+  });
+
+  // DELETE /api/sessions/:id/tags/:tag — remove a tag
+  router.delete('/api/sessions/:id/tags/:tag', async (req, res) => {
+    const sessionId = req.params.id;
+    if (!sessionId || !/^[A-Za-z0-9_-]+$/.test(sessionId)) {
+      return res.status(400).json({ error: 'Invalid session ID' });
+    }
+    const tag = decodeURIComponent(req.params.tag).trim().toLowerCase();
+    if (!tag) return res.status(400).json({ error: 'Tag required' });
+
+    try {
+      const meta = await s3cache._getCachedJson(`sessions/${sessionId}/metadata.json`);
+      if (!meta) return res.status(404).json({ error: 'Session not found' });
+      const tags = Array.isArray(meta.tags) ? meta.tags.filter(t => t !== tag) : [];
+      const result = await s3cache.updateSessionTags(sessionId, tags);
+      res.json({ session_id: sessionId, tags: result });
+    } catch (err) {
+      console.error(`[sessions] Error removing tag from ${sessionId}:`, err.message);
+      res.status(500).json({ error: 'Failed to remove tag' });
     }
   });
 

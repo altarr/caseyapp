@@ -171,6 +171,87 @@
   .badge-processing  { background: #58a6ff33; color: #58a6ff; }
   .badge-unknown     { background: #30363d;   color: #8b949e; }
 
+  /* -- Tag pills -- */
+  .tag-pill {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0 0.2rem 0.1rem 0;
+    white-space: nowrap;
+    cursor: default;
+    line-height: 1.4;
+  }
+  .tag-pill .tag-remove {
+    margin-left: 0.3rem;
+    cursor: pointer;
+    opacity: 0.6;
+    font-weight: bold;
+  }
+  .tag-pill .tag-remove:hover { opacity: 1; }
+
+  .tag-add-btn {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    color: #8b949e;
+    border: 1px dashed #30363d;
+    cursor: pointer;
+    background: transparent;
+    vertical-align: middle;
+  }
+  .tag-add-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  .tag-input-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .tag-input-wrap input {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #161b22;
+    color: #e6edf3;
+    width: 100px;
+    font-family: inherit;
+  }
+  .tag-input-wrap input:focus { outline: 1px solid #58a6ff; }
+
+  /* -- Tag filter bar -- */
+  .tag-filter-bar {
+    max-width: 1100px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-height: 2rem;
+  }
+  .tag-filter-bar .filter-label {
+    font-size: 0.8rem;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .tag-filter-bar .tag-pill {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+  }
+  .tag-filter-bar .tag-pill:hover,
+  .tag-filter-bar .tag-pill.active { opacity: 1; }
+  .tag-filter-bar .clear-filter {
+    font-size: 0.75rem;
+    color: #484f58;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .tag-filter-bar .clear-filter:hover { color: #8b949e; }
+
   /* -- Engagement score bar -- */
   .score-bar {
     display: inline-flex;
@@ -340,6 +421,12 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
 
   <div class="error-banner" id="error-banner"></div>
 
+  <div class="tag-filter-bar hidden" id="tag-filter-bar">
+    <span class="filter-label">Filter by tag:</span>
+    <span id="tag-filter-pills"></span>
+    <span class="clear-filter hidden" id="clear-tag-filter">clear</span>
+  </div>
+
   <div class="table-wrap">
     <div class="loading" id="loading">Loading sessions</div>
     <table id="session-table" class="hidden" aria-label="Session list" role="table">
@@ -349,6 +436,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
           <th data-col="name">Visitor <span class="sort-arrow"></span></th>
           <th data-col="date">Date <span class="sort-arrow"></span></th>
           <th data-col="status">Status <span class="sort-arrow"></span></th>
+          <th data-col="tags">Tags</th>
           <th data-col="score">Engagement <span class="sort-arrow"></span></th>
         </tr>
       </thead>
@@ -424,6 +512,47 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
   var refreshTimer = null;
   var countdown = 0;
   var countdownTimer = null;
+  var activeTagFilter = null;
+
+  // ── Tag colors (deterministic hash) ──────────────────────────────────────
+  var TAG_COLORS = [
+    { bg: "#58a6ff33", fg: "#58a6ff" },
+    { bg: "#3fb95033", fg: "#3fb950" },
+    { bg: "#d2992233", fg: "#d29922" },
+    { bg: "#f8514933", fg: "#f85149" },
+    { bg: "#bc8cff33", fg: "#bc8cff" },
+    { bg: "#f778ba33", fg: "#f778ba" },
+    { bg: "#79c0ff33", fg: "#79c0ff" },
+    { bg: "#56d36433", fg: "#56d364" },
+  ];
+
+  function tagColor(tag) {
+    var hash = 0;
+    for (var i = 0; i < tag.length; i++) {
+      hash = ((hash << 5) - hash) + tag.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+  }
+
+  function renderTagPill(tag, sessionId) {
+    var c = tagColor(tag);
+    var removeHtml = sessionId
+      ? ' <span class="tag-remove" data-tag="' + esc(tag) + '" data-sid="' + esc(sessionId) + '">x</span>'
+      : '';
+    return '<span class="tag-pill" style="background:' + c.bg + ';color:' + c.fg + '">' +
+      esc(tag) + removeHtml + '</span>';
+  }
+
+  // ── Tag filter elements ──────────────────────────────────────────────────
+  var tagFilterBar = document.getElementById("tag-filter-bar");
+  var tagFilterPills = document.getElementById("tag-filter-pills");
+  var clearTagFilter = document.getElementById("clear-tag-filter");
+
+  clearTagFilter.addEventListener("click", function () {
+    activeTagFilter = null;
+    renderTable();
+  });
 
   // Auto-start dashboard (auth gate already passed)
   loadSessions();
@@ -488,7 +617,8 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
       clicks: (s.click_count != null) ? s.click_count : "--",
       company: s.visitor_company || "",
       endedAt: s.ended_at || "",
-      hasAnalysis: s.has_analysis || false
+      hasAnalysis: s.has_analysis || false,
+      tags: Array.isArray(s.tags) ? s.tags : []
     };
   }
 
@@ -583,6 +713,45 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
   function renderTable() {
     var sorted = sortSessions(sessions);
 
+    // Build tag filter bar from all unique tags
+    var allTags = {};
+    sessions.forEach(function (s) {
+      (s.tags || []).forEach(function (t) { allTags[t] = (allTags[t] || 0) + 1; });
+    });
+    var tagKeys = Object.keys(allTags).sort();
+    if (tagKeys.length > 0) {
+      tagFilterBar.classList.remove("hidden");
+      tagFilterPills.innerHTML = tagKeys.map(function (t) {
+        var c = tagColor(t);
+        var active = (activeTagFilter === t) ? " active" : "";
+        return '<span class="tag-pill' + active + '" data-filter-tag="' + esc(t) +
+          '" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(t) +
+          ' <span style="opacity:0.6;font-size:0.65rem">(' + allTags[t] + ')</span></span>';
+      }).join(" ");
+      // Bind click on filter pills
+      tagFilterPills.querySelectorAll(".tag-pill").forEach(function (el) {
+        el.addEventListener("click", function () {
+          var t = el.getAttribute("data-filter-tag");
+          activeTagFilter = (activeTagFilter === t) ? null : t;
+          renderTable();
+        });
+      });
+      if (activeTagFilter) {
+        clearTagFilter.classList.remove("hidden");
+      } else {
+        clearTagFilter.classList.add("hidden");
+      }
+    } else {
+      tagFilterBar.classList.add("hidden");
+    }
+
+    // Apply tag filter
+    if (activeTagFilter) {
+      sorted = sorted.filter(function (s) {
+        return (s.tags || []).indexOf(activeTagFilter) !== -1;
+      });
+    }
+
     loadingEl.classList.add("hidden");
     emptyEl.classList.add("hidden");
     tableEl.classList.remove("hidden");
@@ -591,6 +760,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
     // Update sort arrows
     document.querySelectorAll("thead th").forEach(function (th) {
       var arrow = th.querySelector(".sort-arrow");
+      if (!arrow) return;
       if (th.getAttribute("data-col") === sortCol) {
         arrow.textContent = sortAsc ? " ^" : " v";
       } else {
@@ -605,17 +775,38 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
       tr.setAttribute("data-sid", s.id);
       if (s.id === expandedId) tr.classList.add("expanded");
 
+      var tagsHtml = (s.tags || []).map(function (t) { return renderTagPill(t, s.id); }).join(" ");
+      tagsHtml += ' <span class="tag-add-btn" data-sid="' + esc(s.id) + '">+ tag</span>';
+
       tr.innerHTML =
         '<td class="session-id-cell">' + esc(s.id) + '</td>' +
         '<td>' + esc(s.name) + '</td>' +
         '<td>' + esc(formatDate(s.date)) + '</td>' +
         '<td><span class="badge ' + badgeClass(s.status) + '">' + esc(s.status) + '</span></td>' +
+        '<td style="white-space:normal;max-width:250px">' + tagsHtml + '</td>' +
         '<td>' +
           '<div class="score-bar">' +
             '<div class="score-track"><div class="score-fill ' + scoreColor(s.score) + '" style="width:' + s.score + '%"></div></div>' +
             '<span class="score-label">' + s.score + '</span>' +
           '</div>' +
         '</td>';
+
+      // Bind tag remove buttons
+      tr.querySelectorAll(".tag-remove").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          removeTag(btn.getAttribute("data-sid"), btn.getAttribute("data-tag"));
+        });
+      });
+
+      // Bind tag add button
+      var addBtn = tr.querySelector(".tag-add-btn");
+      if (addBtn) {
+        addBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          showTagInput(addBtn);
+        });
+      }
 
       tr.addEventListener("click", function () {
         toggleExpand(s.id);
@@ -627,7 +818,7 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
         var detailTr = document.createElement("tr");
         detailTr.classList.add("detail-row");
         var detailTd = document.createElement("td");
-        detailTd.setAttribute("colspan", "5");
+        detailTd.setAttribute("colspan", "6");
         detailTd.innerHTML =
           '<div class="detail-panel">' +
             '<div class="detail-item"><label>SE</label><span>' + esc(s.se || "--") + '</span></div>' +
@@ -646,6 +837,67 @@ else if (!BoothAuth.requireLogin()) { /* redirects */ }</script>
         detailTr.appendChild(detailTd);
         tbodyEl.appendChild(detailTr);
       }
+    });
+  }
+
+  // ── Tag add/remove ──────────────────────────────────────────────────────
+  function showTagInput(addBtn) {
+    var sid = addBtn.getAttribute("data-sid");
+    var wrap = document.createElement("span");
+    wrap.className = "tag-input-wrap";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "new tag...";
+    input.maxLength = 50;
+    wrap.appendChild(input);
+    addBtn.replaceWith(wrap);
+    input.focus();
+
+    function submit() {
+      var val = input.value.trim().toLowerCase();
+      if (val) addTag(sid, val);
+      else wrap.replaceWith(addBtn);
+    }
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); submit(); }
+      if (e.key === "Escape") { wrap.replaceWith(addBtn); }
+    });
+    input.addEventListener("blur", submit);
+  }
+
+  function addTag(sessionId, tag) {
+    fetch(apiUrl + "/sessions/" + encodeURIComponent(sessionId) + "/tags", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag: tag })
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.tags) {
+        updateLocalTags(sessionId, data.tags);
+        renderTable();
+      }
+    })
+    .catch(function (err) { showError("Failed to add tag: " + err.message); });
+  }
+
+  function removeTag(sessionId, tag) {
+    fetch(apiUrl + "/sessions/" + encodeURIComponent(sessionId) + "/tags/" + encodeURIComponent(tag), {
+      method: "DELETE"
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (data.tags) {
+        updateLocalTags(sessionId, data.tags);
+        renderTable();
+      }
+    })
+    .catch(function (err) { showError("Failed to remove tag: " + err.message); });
+  }
+
+  function updateLocalTags(sessionId, tags) {
+    sessions.forEach(function (s) {
+      if (s.id === sessionId) s.tags = tags;
     });
   }
 
