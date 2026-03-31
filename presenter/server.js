@@ -142,6 +142,10 @@ app.get('/api/share/:sessionId', (req, res) => {
   });
 });
 
+// --- Sessions API (cached S3 access) ---
+const { createRouter: sessionsRouter } = require('./lib/sessions');
+app.use(sessionsRouter({ bucket: S3_BUCKET }));
+
 // --- Batch analysis API ---
 const { createRouter: batchAnalyzeRouter } = require('./lib/batch-analyze');
 app.use(batchAnalyzeRouter({ bucket: S3_BUCKET }));
