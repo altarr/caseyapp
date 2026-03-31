@@ -185,10 +185,97 @@ sessions/<session-id>/
 }
 ```
 
+## Packaged Session Format (v2)
+
+In v2, the demo PC packager collects all session artifacts locally and uploads a single zip to S3.
+
+```
+sessions/<session-id>/
+├── metadata.json                           # WHO: Android app / web form
+├── badge.jpg                               # WHO: Android app
+├── commands/
+│   └── stop-audio                          # WHO: Orchestrator (presence = audio opted out)
+├── <Visitor_Name>_<session_id>.zip         # WHO: Demo PC packager
+│   ├── screenshots/
+│   │   ├── screenshot_00m00s000.jpg
+│   │   ├── screenshot_00m01s012.jpg
+│   │   └── ...
+│   ├── audio/
+│   │   └── recording.mp3                   # Absent if audio opted out
+│   └── clicks/
+│       └── clicks.json
+├── package-manifest.json                   # WHO: Demo PC packager
+├── v1-tenant/
+│   └── tenant.json                         # WHO: Tenant pool manager
+└── output/                                 # WHO: Analysis pipeline
+    ├── summary.html
+    ├── summary.json
+    └── follow-up.json
+```
+
+### Screenshot Naming Convention
+
+Format: `screenshot_<MM>m<SS>s<mmm>.jpg`
+
+| Component | Description |
+|-----------|-------------|
+| `MM` | Minutes elapsed, zero-padded |
+| `SS` | Seconds elapsed, zero-padded |
+| `mmm` | Milliseconds, zero-padded |
+
+Elapsed time is from session start. Timecodes correlate directly with audio recording timeline for analysis correlation.
+
+- **Interval**: Configurable, default 1000ms (1 screenshot per second)
+- **Format**: JPEG, max 1920x1080, quality 60
+- **Source**: Chrome extension `captureVisibleTab()`, POSTed to packager at `localhost:9222`
+
+### Audio Format
+
+- **Output**: MP3, libmp3lame VBR quality 2
+- **Source**: Converted from 44100Hz stereo WAV recorded by ffmpeg
+- **Original WAV**: Stays on demo PC, not uploaded
+- **Opt-out**: If visitor opts out, no `audio/` directory in zip
+
+### Stop Audio Command
+
+Presence-based signal at `sessions/<id>/commands/stop-audio`:
+- Written by orchestrator when SE taps "Stop Audio" on phone
+- Packager polls and stops audio recording, continues screenshots
+- `active-session.json` updated with `stop_audio: true`
+- Metadata should have `audio_opted_out: true` after this
+
+### Schema: package-manifest.json
+
+```json
+{
+  "session_id": "ABC12345",
+  "visitor_name": "Sarah Mitchell",
+  "zip_key": "sessions/ABC12345/Sarah_Mitchell_ABC12345.zip",
+  "zip_size_bytes": 52428800,
+  "screenshot_count": 300,
+  "has_audio": true,
+  "has_clicks": true,
+  "audio_opted_out": false,
+  "created_at": "2026-04-01T14:30:00.000Z"
+}
+```
+
+### Zip Naming
+
+Format: `<Visitor_Name>_<session_id>.zip`
+- Visitor name sanitized: non-alphanumeric removed, spaces replaced with underscores
+- Example: `Sarah_Mitchell_ABC12345.zip`
+
+---
+
+## Legacy Session Format (v1 — individual file upload)
+
+The v1 format uploaded files individually to S3. Retained here for reference.
+
 ## Rules
 - All timestamps are UTC ISO-8601
 - All file paths are relative to the session folder
 - Screenshots are JPEG, quality 60, max 1920x1080
-- Audio is WAV, 44100Hz, stereo
+- Audio: MP3 (v2) or WAV (v1), 44100Hz, stereo source
 - Session ID format: alphanumeric, 6-10 chars
 - Any workstream can READ any file. Only WRITE to your own files.
