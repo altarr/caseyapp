@@ -311,7 +311,9 @@ class SessionAnalyzer:
             "key_interests": recommendations.get("key_interests", recommendations.get("visitor_interests", [])),
             "follow_up_actions": recommendations.get("follow_up_actions", recommendations.get("recommended_follow_up", [])),
             "demo_duration_seconds": duration_seconds,
-            "session_score": recommendations.get("session_score", 0),
+            "engagement_rating": recommendations.get("engagement_rating", recommendations.get("session_score", 0)),
+            "session_score": recommendations.get("engagement_rating", recommendations.get("session_score", 0)),
+            "visitor_technical_level": factual.get("visitor_technical_level", recommendations.get("visitor_technical_level", "unknown")),
             "executive_summary": recommendations.get("executive_summary", ""),
             "key_moments": [
                 {

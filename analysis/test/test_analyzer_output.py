@@ -39,6 +39,8 @@ def _make_analyzer():
 SAMPLE_FACTUAL = {
     "products_demonstrated": ["Endpoint Security", "XDR"],
     "features_demonstrated": [],
+    "visitor_technical_level": "technical",
+    "visitor_technical_evidence": "Asked about API integration and log formats",
     "visitor_questions": [],
     "key_moments": [
         {"timestamp_rel": "02:30", "screenshot_file": "click-001.jpg", "description": "Asked about BYOD", "impact": "Real deployment concern"},
@@ -50,15 +52,16 @@ SAMPLE_FACTUAL = {
 }
 
 SAMPLE_RECOMMENDATIONS = {
-    "session_score": 8,
+    "engagement_rating": 4,
     "executive_summary": "Jane showed strong interest in endpoint policy and XDR detection rules. Schedule a deep-dive within the week.",
+    "visitor_technical_level": "technical",
     "key_interests": [
         {"topic": "Endpoint policy", "confidence": "high", "evidence": "Asked 3 questions"},
         {"topic": "XDR rules", "confidence": "medium", "evidence": "Spent 2 min exploring"},
     ],
     "follow_up_actions": [
-        "Send EP policy best practices guide",
-        "Schedule XDR deep-dive",
+        {"action": "Send EP policy best practices guide", "owner": "SE", "deadline": "within 48 hours"},
+        {"action": "Schedule XDR deep-dive", "owner": "SDR", "deadline": "next week"},
     ],
     "sdr_notes": "CISO, 5000 endpoints, comparing with CrowdStrike",
 }
@@ -81,13 +84,21 @@ class TestBuildSummaryJson(unittest.TestCase):
 
     def test_follow_up_actions(self):
         self.assertEqual(len(self.summary["follow_up_actions"]), 2)
-        self.assertIn("EP policy", self.summary["follow_up_actions"][0])
+        first = self.summary["follow_up_actions"][0]
+        if isinstance(first, dict):
+            self.assertIn("EP policy", first["action"])
+        else:
+            self.assertIn("EP policy", first)
 
     def test_demo_duration_seconds(self):
         self.assertEqual(self.summary["demo_duration_seconds"], 1200)
 
-    def test_session_score_present(self):
-        self.assertEqual(self.summary["session_score"], 8)
+    def test_engagement_rating_present(self):
+        self.assertEqual(self.summary["engagement_rating"], 4)
+        self.assertEqual(self.summary["session_score"], 4)
+
+    def test_visitor_technical_level(self):
+        self.assertEqual(self.summary["visitor_technical_level"], "technical")
 
     def test_executive_summary_present(self):
         self.assertIn("strong interest", self.summary["executive_summary"])
@@ -104,10 +115,10 @@ class TestBuildSummaryJson(unittest.TestCase):
         timestamps = [m["timestamp"] for m in self.summary["key_moments"]]
         self.assertEqual(timestamps, ["02:30", "05:10", "08:45"])
 
-    def test_session_score_defaults_to_zero(self):
-        no_score = {k: v for k, v in SAMPLE_RECOMMENDATIONS.items() if k != "session_score"}
+    def test_engagement_rating_defaults_to_zero(self):
+        no_score = {k: v for k, v in SAMPLE_RECOMMENDATIONS.items() if k != "engagement_rating"}
         summary = self.analyzer._build_summary_json(SAMPLE_FACTUAL, no_score)
-        self.assertEqual(summary["session_score"], 0)
+        self.assertEqual(summary["engagement_rating"], 0)
 
     def test_executive_summary_defaults_to_empty(self):
         no_summary = {k: v for k, v in SAMPLE_RECOMMENDATIONS.items() if k != "executive_summary"}
@@ -119,13 +130,15 @@ class TestBuildSummaryJson(unittest.TestCase):
         self.assertNotIn("visitor_interests", self.summary)
         self.assertNotIn("recommended_follow_up", self.summary)
         self.assertNotIn("demo_duration_minutes", self.summary)
+        self.assertIn("engagement_rating", self.summary)
+        self.assertIn("visitor_technical_level", self.summary)
 
     def test_fallback_from_old_field_names(self):
         """LLM may still return old field names -- analyzer should handle gracefully."""
         old_factual = {**SAMPLE_FACTUAL, "products_shown": ["XDR"]}
         del old_factual["products_demonstrated"]
         old_recs = {
-            "session_score": 5,
+            "session_score": 3,
             "executive_summary": "Test.",
             "visitor_interests": [{"topic": "XDR", "confidence": "low", "evidence": "brief"}],
             "recommended_follow_up": ["Follow up"],
@@ -135,6 +148,8 @@ class TestBuildSummaryJson(unittest.TestCase):
         self.assertEqual(summary["products_demonstrated"], ["XDR"])
         self.assertEqual(summary["key_interests"][0]["topic"], "XDR")
         self.assertEqual(summary["follow_up_actions"], ["Follow up"])
+        # session_score fallback should work for engagement_rating
+        self.assertEqual(summary["engagement_rating"], 3)
 
 
 class TestBuildFollowUpJson(unittest.TestCase):
@@ -179,9 +194,10 @@ class TestValidator(unittest.TestCase):
         errors = validate_summary(summary)
         self.assertTrue(any("confidence" in e for e in errors))
 
-    def test_session_score_out_of_range(self):
+    def test_engagement_rating_out_of_range(self):
         summary = self._valid_summary()
-        summary["session_score"] = 11
+        summary["engagement_rating"] = 6
+        summary["session_score"] = 6
         errors = validate_summary(summary)
         self.assertTrue(any("maximum" in e for e in errors))
 

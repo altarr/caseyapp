@@ -22,15 +22,20 @@ SAMPLE_SUMMARY = {
     "session_id": "TEST-001",
     "visitor_name": "Jane Doe",
     "se_name": "Casey M",
-    "demo_duration_minutes": 17,
-    "session_score": 8,
+    "demo_duration_seconds": 1020,
+    "engagement_rating": 4,
+    "session_score": 4,
+    "visitor_technical_level": "technical",
     "executive_summary": "Strong interest in endpoint security.",
-    "products_shown": ["Endpoint Security", "XDR"],
-    "visitor_interests": [
+    "products_demonstrated": ["Endpoint Security", "XDR"],
+    "key_interests": [
         {"topic": "BYOD", "confidence": "high", "evidence": "Asked 3 questions"},
         {"topic": "XDR", "confidence": "medium", "evidence": "Explored workbench"},
     ],
-    "recommended_follow_up": ["Send POC guide", "Schedule deep-dive"],
+    "follow_up_actions": [
+        {"action": "Send POC guide", "owner": "SE", "deadline": "within 48 hours"},
+        {"action": "Schedule deep-dive", "owner": "SDR", "deadline": "next week"},
+    ],
     "key_moments": [
         {"timestamp": "02:30", "description": "Asked about BYOD", "impact": "Key concern"},
     ],
@@ -64,16 +69,15 @@ class TestEscapeHtml(unittest.TestCase):
 
 
 class TestScoreColor(unittest.TestCase):
-    def test_high_score_green(self):
-        self.assertEqual(_score_color(8), "#14b8a6")
-        self.assertEqual(_score_color(10), "#8b5cf6")
+    def test_high_score(self):
+        self.assertEqual(_score_color(5), "#8b5cf6")
+        self.assertEqual(_score_color(4), "#10b981")
 
-    def test_medium_score_yellow(self):
-        self.assertEqual(_score_color(6), "#22c55e")
-        self.assertEqual(_score_color(7), "#10b981")
+    def test_medium_score(self):
+        self.assertEqual(_score_color(3), "#a3e635")
 
-    def test_low_score_orange(self):
-        self.assertEqual(_score_color(4), "#eab308")
+    def test_low_score(self):
+        self.assertEqual(_score_color(2), "#f59e0b")
 
     def test_very_low_score_red(self):
         self.assertEqual(_score_color(1), "#ef4444")
@@ -82,7 +86,7 @@ class TestScoreColor(unittest.TestCase):
 
 class TestGaugeDasharray(unittest.TestCase):
     def test_full_score(self):
-        da = _gauge_dasharray(10)
+        da = _gauge_dasharray(5)
         parts = da.split()
         self.assertEqual(len(parts), 2)
         self.assertAlmostEqual(float(parts[0]), float(parts[1]), delta=0.5)
@@ -92,7 +96,8 @@ class TestGaugeDasharray(unittest.TestCase):
         self.assertTrue(da.startswith("0.0"))
 
     def test_half_score(self):
-        da = _gauge_dasharray(5)
+        # 2.5 out of 5 = half the gauge
+        da = _gauge_dasharray(2.5)
         parts = da.split()
         self.assertAlmostEqual(float(parts[0]), float(parts[1]) / 2, delta=0.5)
 
@@ -172,7 +177,7 @@ class TestRenderHtmlReport(unittest.TestCase):
 
     def test_contains_gauge(self):
         self.assertIn("gauge-fill", self.html)
-        self.assertIn(">8</span>", self.html)
+        self.assertIn(">4</span>", self.html)
 
     def test_contains_timeline(self):
         self.assertIn("tl-item", self.html)

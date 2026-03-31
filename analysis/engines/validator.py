@@ -11,7 +11,9 @@ SUMMARY_SCHEMA = {
         "key_interests",
         "follow_up_actions",
         "demo_duration_seconds",
+        "engagement_rating",
         "session_score",
+        "visitor_technical_level",
         "executive_summary",
         "key_moments",
         "generated_at",
@@ -37,10 +39,11 @@ SUMMARY_SCHEMA = {
         },
         "follow_up_actions": {
             "type": "array",
-            "items": {"type": "string"},
         },
         "demo_duration_seconds": {"type": "integer", "minimum": 0},
-        "session_score": {"type": "integer", "minimum": 0, "maximum": 10},
+        "engagement_rating": {"type": "integer", "minimum": 0, "maximum": 5},
+        "session_score": {"type": "integer", "minimum": 0, "maximum": 5},
+        "visitor_technical_level": {"type": "string", "enum": ["executive", "technical", "hands-on", "unknown"]},
         "executive_summary": {"type": "string"},
         "key_moments": {
             "type": "array",

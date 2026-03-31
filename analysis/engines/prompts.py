@@ -2,25 +2,42 @@ SYSTEM_FACTUAL = """You are analyzing a recorded product demo session for Trend 
 
 Your job is to extract ONLY what is directly evidenced by the transcript, click events, and screenshots provided.
 
+Vision One Feature Taxonomy -- use these exact category names in "products_demonstrated":
+- XDR (Extended Detection & Response): Workbench alerts, threat investigation, correlated detections, search queries
+- Endpoint Security: Endpoint protection policies, agent deployment, device inventory, vulnerability assessment
+- Cloud Security: Cloud account monitoring, container security, cloud posture management, cloud workload protection
+- Email Security: Email threat detection, quarantine, email activity monitoring, phishing analysis
+- Network Security: Network sensors, lateral movement detection, network analytics
+- Zero Trust Secure Access: Private access rules, internet access rules, risk-based access policies
+- Attack Surface Risk Management: Risk index, attack surface discovery, vulnerability prioritization
+- Identity Security: Identity posture, Active Directory monitoring, identity risk scoring
+- Companion AI: AI assistant queries, natural language threat hunting
+
+Visitor Technical Level -- classify based on their questions and interaction style:
+- "executive": Asks about ROI, consolidation, total cost, competitive positioning. Does not drill into configs.
+- "technical": Asks about integration, APIs, deployment architecture, log formats. Understands security concepts.
+- "hands-on": Asks to see specific settings, requests CLI examples, references their own environment configs.
+
 Rules:
 - Do NOT hallucinate products or features not shown in the session data
-- The "products_demonstrated" list must ONLY include products actually demonstrated (not just mentioned in passing)
-- Cite specific timestamps or click events as evidence
+- "products_demonstrated" must ONLY include products actually demonstrated, using exact taxonomy names above
+- Cite specific timestamps or click events as evidence for every claim
 - If something is unclear or ambiguous, omit it rather than guess
-- The output must be valid JSON with no trailing commas or comments"""
+- Your response must be valid JSON only -- no markdown fences, no comments, no trailing commas"""
 
 SYSTEM_RECOMMENDATIONS = """You are a senior sales analyst helping the SDR team follow up after a Trend Micro Vision One product demo.
 
 Based on the factual extraction from Pass 1, generate personalized follow-up recommendations.
 
 Rules:
-- Recommendations must be specific and actionable — not generic ("send a follow-up email" is not acceptable)
+- Recommendations must be specific and actionable -- not generic ("send a follow-up email" is not acceptable)
+- Every follow-up action MUST have an owner (SE, SDR, or visitor) -- unowned actions are useless
 - Visitor interests must cite specific evidence from the session (transcript quotes, pages visited)
 - SDR notes should be concise and include key facts: visitor role, company size if known, specific concerns raised, competing products mentioned
 - Confidence levels: "high" = visitor explicitly asked about topic or spent significant time on it; "medium" = indirect signals; "low" = brief mention only
-- session_score (1-10): 1-3 = passive/minimal engagement, 4-6 = moderate interest with some interaction, 7-8 = strong engagement with questions and deep exploration, 9-10 = exceptional — multiple product areas explored deeply, strong buying signals, specific use-case discussions
-- executive_summary must be exactly 2 sentences suitable for a sales manager email — lead with the most important takeaway
-- The output must be valid JSON with no trailing commas or comments"""
+- engagement_rating (1-5): 1 = passive/no interaction, 2 = polite but minimal engagement, 3 = moderate interest with some questions, 4 = strong engagement with deep-dive requests, 5 = exceptional -- multiple areas explored deeply, strong buying signals
+- executive_summary must be exactly 2 sentences suitable for a sales manager email -- lead with the most important takeaway
+- Your response must be valid JSON only -- no markdown fences, no comments, no trailing commas"""
 
 FACTUAL_EXTRACTION_PROMPT = """Analyze this Vision One demo session and extract factual information.
 
@@ -32,22 +49,30 @@ Session metadata:
 
 Return a JSON object with exactly these fields:
 {{
-  "products_demonstrated": ["list of Vision One products/modules actually demonstrated"],
+  "products_demonstrated": ["Use exact V1 taxonomy names: XDR, Endpoint Security, Cloud Security, Email Security, Network Security, Zero Trust Secure Access, Attack Surface Risk Management, Identity Security, Companion AI"],
   "features_demonstrated": [
-    {{"feature": "feature name", "timestamp_rel": "MM:SS", "evidence": "specific transcript or click evidence"}}
+    {{"feature": "feature name", "v1_category": "taxonomy category name", "timestamp_rel": "MM:SS", "evidence": "specific transcript or click evidence"}}
   ],
+  "visitor_technical_level": "executive | technical | hands-on",
+  "visitor_technical_evidence": "brief explanation of why you chose this level, citing specific visitor behavior",
   "visitor_questions": [
     {{"question": "paraphrased question", "timestamp_rel": "MM:SS", "speaker_text": "exact quote from transcript"}}
   ],
   "key_moments": [
     {{"timestamp_rel": "MM:SS", "screenshot_file": "filename or null", "description": "what happened", "impact": "why this moment mattered for the visitor"}}
-  ]  (select the top 3 most impactful demo moments — prioritize visitor reactions, deep-dive requests, and aha-moments),
+  ],
   "session_stats": {{
     "duration_seconds": 0,
     "click_count": 0,
     "transcript_entries": 0
   }}
-}}"""
+}}
+
+Constraints:
+- "products_demonstrated" must only contain names from the V1 taxonomy in the system prompt
+- "key_moments" must contain exactly 3 items (the top 3 most impactful demo moments)
+- "visitor_technical_level" must be exactly one of: "executive", "technical", "hands-on"
+- Each "features_demonstrated" entry must include "v1_category" matching a taxonomy name"""
 
 RECOMMENDATIONS_PROMPT = """Based on the factual analysis of this Vision One demo session, generate follow-up recommendations.
 
@@ -59,19 +84,24 @@ Factual analysis from Pass 1:
 
 Return a JSON object with exactly these fields (use these EXACT field names):
 {{
-  "session_score": 7,
+  "engagement_rating": 3,
   "executive_summary": "Two sentences for a sales manager. Lead with the key takeaway, then the recommended action.",
+  "visitor_technical_level": "executive | technical | hands-on",
   "key_interests": [
-    {{"topic": "specific topic", "confidence": "high|medium|low", "evidence": "specific quote or action from session"}}
+    {{"topic": "specific V1 feature or capability", "confidence": "high|medium|low", "evidence": "specific quote or action from session"}}
   ],
   "follow_up_actions": [
-    "specific actionable follow-up item 1",
-    "specific actionable follow-up item 2"
+    {{"action": "specific actionable follow-up item", "owner": "SE | SDR | visitor", "deadline": "timeframe e.g. within 48 hours, next week"}}
   ],
-  "sdr_notes": "concise paragraph with key facts: visitor background, main interests, concerns, competing products, urgency signals"
+  "sdr_notes": "concise paragraph with key facts: visitor background, technical level, main interests, concerns, competing products, urgency signals"
 }}
 
-IMPORTANT: Use exactly the field names shown above. "key_interests" (not "visitor_interests"), "follow_up_actions" (not "recommended_follow_up")."""
+IMPORTANT:
+- Use exactly the field names shown above
+- "engagement_rating" is 1-5 (NOT 1-10). See system prompt for scale definition.
+- "follow_up_actions" are objects with action + owner + deadline, NOT plain strings
+- "owner" must be exactly "SE", "SDR", or "visitor"
+- "visitor_technical_level" must match the level from Pass 1 factual analysis"""
 
 
 def _esc(val):
@@ -88,30 +118,28 @@ def _esc(val):
 
 
 def _score_color(score):
-    """Return CSS color for engagement score 1-10 on a smooth gradient."""
-    colors = [
-        "#ef4444", "#f97316", "#f59e0b", "#eab308",
-        "#a3e635", "#22c55e", "#10b981", "#14b8a6",
-        "#06b6d4", "#8b5cf6",
-    ]
-    idx = max(0, min(9, int(score) - 1))
+    """Return CSS color for engagement score 1-5 on a gradient."""
+    colors = ["#ef4444", "#f59e0b", "#a3e635", "#10b981", "#8b5cf6"]
+    idx = max(0, min(4, int(score) - 1))
     return colors[idx]
 
 
 def _score_summary(score):
-    if score >= 8:
-        return "Strong engagement -- high-priority follow-up recommended"
-    if score >= 6:
-        return "Good engagement -- visitor showed clear interest"
+    if score >= 5:
+        return "Exceptional engagement -- high-priority follow-up recommended"
     if score >= 4:
+        return "Strong engagement -- visitor showed deep interest"
+    if score >= 3:
         return "Moderate engagement -- some interest signals detected"
-    return "Light engagement -- brief interaction or limited data"
+    if score >= 2:
+        return "Light engagement -- polite but minimal interaction"
+    return "Minimal engagement -- brief or passive interaction"
 
 
 def _gauge_dasharray(score):
-    """SVG circle r=40, circumference ~251.3. Score is 1-10."""
+    """SVG circle r=40, circumference ~251.3. Score is 1-5."""
     circ = 2 * 3.14159265 * 40
-    filled = (score / 10.0) * circ
+    filled = (score / 5.0) * circ
     return f"{filled:.1f} {circ:.1f}"
 
 
@@ -177,13 +205,23 @@ def _build_followup_cards(actions, priority):
     p = (priority or "medium").lower()
     cards = []
     for idx, action in enumerate(actions or []):
+        # Support both string format (legacy) and object format (new: action/owner/deadline)
+        if isinstance(action, dict):
+            action_text = action.get("action", "")
+            owner = action.get("owner", "")
+            deadline = action.get("deadline", "")
+            owner_tag = f' <span class="fu-owner">[{_esc(owner)}]</span>' if owner else ""
+            deadline_tag = f' <span class="fu-deadline">{_esc(deadline)}</span>' if deadline else ""
+            display = f'{_esc(action_text)}{owner_tag}{deadline_tag}'
+        else:
+            display = _esc(action)
         pri_tag = ""
         if idx == 0:
             pri_tag = f' <span class="fu-priority p-{p}">{_esc(priority or "medium")}</span>'
         cards.append(
             f'  <div class="fu-card">'
             f'<div class="fu-num p-{p}">{idx + 1}</div>'
-            f'<div class="fu-text">{_esc(action)}{pri_tag}</div>'
+            f'<div class="fu-text">{display}{pri_tag}</div>'
             f'</div>'
         )
     return "\n".join(cards) if cards else '  <div style="color:#475569;padding:12px">No follow-up actions</div>'
@@ -194,8 +232,9 @@ def render_html_report(summary, follow_up, factual=None):
 
     Returns the full HTML string ready to write to disk.
     """
-    score = summary.get("session_score", 0)
+    score = summary.get("engagement_rating", summary.get("session_score", 0))
     priority = follow_up.get("priority", "medium")
+    technical_level = summary.get("visitor_technical_level", "unknown")
 
     # Merge key_moments from summary with features from factual for timeline
     key_moments = summary.get("key_moments", [])
@@ -231,6 +270,7 @@ def render_html_report(summary, follow_up, factual=None):
         "generated_at": _esc(summary.get("generated_at", "")),
         "company_logo_html": "Company<br>Logo",
         "session_score": str(score),
+        "visitor_technical_level": _esc(technical_level),
         "score_color": _score_color(score),
         "score_dasharray": _gauge_dasharray(score),
         "score_summary": _score_summary(score),
@@ -373,6 +413,8 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;b
 .fu-priority.p-high{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3)}
 .fu-priority.p-medium{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
 .fu-priority.p-low{background:#21262d;color:#8b949e;border:1px solid #30363d}
+.fu-owner{display:inline-block;padding:2px 10px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3);margin-left:8px}
+.fu-deadline{display:inline-block;padding:2px 10px;border-radius:8px;font-size:11px;font-weight:600;color:#484f58;margin-left:6px}
 
 /* -- SDR Notes ------------------------------------------------ */
 .sdr-box{background:#1a1a2e;border:1px solid #30363d;border-radius:12px;padding:22px 24px;font-size:15px;color:#8b949e;line-height:1.75;border-left:4px solid #e94560}
@@ -439,7 +481,7 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;b
       </svg>
       <div class="gauge-label">
         <span class="gauge-num" style="color:{score_color}">{session_score}</span>
-        <span class="gauge-sub">/ 10</span>
+        <span class="gauge-sub">/ 5</span>
       </div>
     </div>
     <div class="gauge-text">
@@ -449,14 +491,9 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;b
   </div>
   <div class="score-steps">
     <div class="score-step" style="background:#ef4444"></div>
-    <div class="score-step" style="background:#f97316"></div>
     <div class="score-step" style="background:#f59e0b"></div>
-    <div class="score-step" style="background:#eab308"></div>
     <div class="score-step" style="background:#a3e635"></div>
-    <div class="score-step" style="background:#22c55e"></div>
     <div class="score-step" style="background:#10b981"></div>
-    <div class="score-step" style="background:#14b8a6"></div>
-    <div class="score-step" style="background:#06b6d4"></div>
     <div class="score-step" style="background:#8b5cf6"></div>
   </div>
 </div>
@@ -468,6 +505,7 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;b
     <div class="meta-item"><div class="label">Duration</div><div class="value">{duration_minutes} min</div></div>
     <div class="meta-item"><div class="label">Clicks</div><div class="value">{click_count}</div></div>
     <div class="meta-item"><div class="label">Transcript</div><div class="value">{transcript_count} entries</div></div>
+    <div class="meta-item"><div class="label">Visitor Level</div><div class="value">{visitor_technical_level}</div></div>
     <div class="meta-item"><div class="label">Priority</div><div class="value" style="color:{priority_color}">{priority}</div></div>
   </div>
 </div>
