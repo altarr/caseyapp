@@ -26,7 +26,8 @@ sessions/<session-id>/
     ├── summary.html           # WHO: Workstream C (Analysis)
     ├── summary.json           # WHO: Workstream C (structured)
     ├── follow-up.json         # WHO: Workstream C (actions)
-    └── follow-up-email.html   # WHO: Workstream C (visitor email template)
+    ├── follow-up-email.html   # WHO: Workstream C (visitor email template)
+    └── notes.json             # WHO: Presenter (SE/manager session notes)
 ```
 
 ## Schema: metadata.json
@@ -170,6 +171,16 @@ sessions/<session-id>/
   "contact_preference": "email",
   "consent_to_contact": true,
   "submitted_at": "2026-08-05T15:10:00Z"
+}
+```
+
+## Schema: notes.json
+```json
+{
+  "session_id": "A726594",
+  "text": "Hot lead — interested in XDR POC. Follow up by Friday.",
+  "updated_at": "2026-08-05T15:30:00Z",
+  "updated_by": "casey"
 }
 ```
 
