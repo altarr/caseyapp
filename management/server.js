@@ -3,9 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const multer = require('multer');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const db = require('./lib/db');
+const auth = require('./lib/auth');
 
 const app = express();
 const PORT = parseInt(process.env.PORT, 10) || 4000;
@@ -14,6 +16,7 @@ const S3_BUCKET = process.env.S3_BUCKET || 'boothapp-sessions-752266476357';
 // ── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 
 // Request logging
@@ -23,6 +26,117 @@ app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
   });
   next();
+});
+
+// ── Auth Routes (before auth middleware) ─────────────────────────────────────
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+
+  const user = auth.getUserByUsername(username);
+  if (!user || !auth.verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const token = auth.createSessionToken(user.id);
+  res.cookie('caseyapp_token', token, {
+    httpOnly: true,
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+  res.json({
+    user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role },
+    must_change_password: !!user.must_change_password,
+  });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  if (token) auth.deleteSession(token);
+  res.clearCookie('caseyapp_token');
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/change-password', (req, res) => {
+  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const session = auth.getSessionUser(token);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+
+  const { current_password, new_password } = req.body;
+  if (!new_password || new_password.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+
+  // Verify current password (unless force-changing default)
+  if (!session.must_change_password) {
+    if (!current_password) return res.status(400).json({ error: 'Current password required' });
+    const user = auth.getUserByUsername(session.username);
+    if (!auth.verifyPassword(current_password, user.password_hash)) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+  }
+
+  auth.updatePassword(session.user_id, new_password);
+  res.json({ ok: true, message: 'Password changed' });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const session = auth.getSessionUser(token);
+  if (!session) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({
+    user: { id: session.user_id, username: session.username, display_name: session.display_name, role: session.role },
+    must_change_password: !!session.must_change_password,
+  });
+});
+
+// ── Auth Middleware (protects everything below) ─────────────────────────────
+app.use(auth.authMiddleware);
+
+// ── User Management (admin only) ────────────────────────────────────────────
+
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  next();
+}
+
+app.get('/api/users', requireAdmin, (_, res) => {
+  res.json({ users: auth.listUsers() });
+});
+
+app.post('/api/users', requireAdmin, (req, res) => {
+  const { username, password, display_name, role } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  const existing = auth.getUserByUsername(username);
+  if (existing) return res.status(409).json({ error: 'Username already exists' });
+
+  const user = auth.createUser({ username, password, display_name, role: role || 'user' });
+  res.json({ user });
+});
+
+app.put('/api/users/:id', requireAdmin, (req, res) => {
+  const user = auth.updateUser(req.params.id, req.body);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ user });
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  if (parseInt(req.params.id) === req.user.user_id) {
+    return res.status(400).json({ error: 'Cannot delete your own account' });
+  }
+  auth.deleteUser(req.params.id);
+  res.json({ deleted: true });
+});
+
+app.post('/api/users/:id/reset-password', requireAdmin, (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  auth.resetUserPassword(req.params.id, password);
+  res.json({ ok: true, message: 'Password reset, user must change on next login' });
 });
 
 // ── File Uploads ────────────────────────────────────────────────────────────
@@ -264,6 +378,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/brand', express.static(path.join(__dirname, '..', 'brand')));
 
 // ── Start ───────────────────────────────────────────────────────────────────
+auth.seedDefaultAdmin();
+// Clean expired sessions every hour
+setInterval(() => auth.cleanExpiredSessions(), 60 * 60 * 1000);
+
 app.listen(PORT, () => {
   console.log('============================================================');
   console.log('  CaseyApp Management Server');

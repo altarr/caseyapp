@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — Login</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center">
+  <div class="card" style="max-width:400px;width:100%">
+    <div style="text-align:center;margin-bottom:2rem">
+      <h1 style="font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,#d71920,#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">CaseyApp</h1>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem">Management Console</p>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label class="field-label">Username</label>
+        <input type="text" class="input" id="username" autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Password</label>
+        <input type="password" class="input" id="password" autocomplete="current-password" required>
+      </div>
+      <div id="error" style="display:none;padding:0.6rem;border-radius:8px;background:rgba(255,107,111,0.1);border:1px solid var(--error);color:var(--error);font-size:0.85rem;margin-bottom:1rem"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%" id="login-btn">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('login-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var btn = document.getElementById('login-btn');
+  var errEl = document.getElementById('error');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  errEl.style.display = 'none';
+
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: document.getElementById('username').value,
+      password: document.getElementById('password').value
+    })
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+  .then(function(res) {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+    if (!res.ok) {
+      errEl.textContent = res.data.error || 'Login failed';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (res.data.must_change_password) {
+      window.location.href = '/change-password.html';
+    } else {
+      window.location.href = '/';
+    }
+  })
+  .catch(function() {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+    errEl.textContent = 'Network error';
+    errEl.style.display = 'block';
+  });
+});
+</script>
+</body>
+</html>

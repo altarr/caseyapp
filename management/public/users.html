@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CaseyApp — User Management</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">CaseyApp</a>
+  <a href="/">Dashboard</a>
+  <a href="/badges.html">Badge Training</a>
+  <a href="/sessions.html">Sessions</a>
+  <a href="/contacts.html">Contacts</a>
+  <a href="/users.html" class="active">Users</a>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem">
+    <span id="current-user" style="color:var(--text-muted);font-size:0.8rem"></span>
+    <button class="btn btn-outline btn-sm" id="logout-btn" style="padding:6px 12px">Logout</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>User Management</h1>
+    <p>Create and manage user accounts</p>
+  </div>
+
+  <!-- Create User -->
+  <div class="card">
+    <h2>Create User</h2>
+    <form id="create-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="field-label">Username</label>
+          <input type="text" class="input" id="new-username" placeholder="e.g. jginsberg" required>
+        </div>
+        <div class="form-group">
+          <label class="field-label">Display Name</label>
+          <input type="text" class="input" id="new-displayname" placeholder="e.g. Joel Ginsberg">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Initial Password</label>
+          <input type="text" class="input" id="new-password" placeholder="Min 6 characters" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Role</label>
+          <select class="input" id="new-role">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <button type="submit" class="btn btn-primary btn-sm">Create User</button>
+        <span id="create-status" style="font-size:0.8rem"></span>
+      </div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.5rem">User will be required to change password on first login.</p>
+    </form>
+  </div>
+
+  <!-- User List -->
+  <div class="card">
+    <h2>Users</h2>
+    <table class="table">
+      <thead>
+        <tr><th>Username</th><th>Display Name</th><th>Role</th><th>Password Status</th><th>Created</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="users-body">
+        <tr><td colspan="6" style="color:var(--text-dim)">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch('/api' + path, opts).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); });
+  }
+
+  // Load current user
+  api('GET', '/auth/me').then(function(res) {
+    if (res.ok) document.getElementById('current-user').textContent = res.data.user.display_name || res.data.user.username;
+    if (res.ok && res.data.user.role !== 'admin') {
+      document.querySelector('.page').innerHTML = '<div class="card"><h2>Access Denied</h2><p>Admin access required for user management.</p></div>';
+    }
+  });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', function() {
+    api('POST', '/auth/logout').then(function() { window.location.href = '/login.html'; });
+  });
+
+  // Load users
+  function loadUsers() {
+    api('GET', '/users').then(function(res) {
+      if (!res.ok) return;
+      var tbody = document.getElementById('users-body');
+      tbody.innerHTML = res.data.users.map(function(u) {
+        var pwStatus = u.must_change_password
+          ? '<span class="badge badge-amber">Must Change</span>'
+          : '<span class="badge badge-green">Set</span>';
+        var roleBadge = u.role === 'admin'
+          ? '<span class="badge badge-red">Admin</span>'
+          : '<span class="badge" style="background:rgba(136,136,136,0.15);color:#888">User</span>';
+        return '<tr>' +
+          '<td style="font-family:monospace">' + u.username + '</td>' +
+          '<td>' + (u.display_name || '-') + '</td>' +
+          '<td>' + roleBadge + '</td>' +
+          '<td>' + pwStatus + '</td>' +
+          '<td style="font-size:0.8rem;color:var(--text-muted)">' + (u.created_at || '') + '</td>' +
+          '<td style="display:flex;gap:4px">' +
+            '<button class="btn btn-outline btn-sm" onclick="resetPw(' + u.id + ',\'' + u.username + '\')">Reset PW</button>' +
+            '<button class="btn btn-outline btn-sm" style="border-color:var(--error);color:var(--error)" onclick="deleteUser(' + u.id + ',\'' + u.username + '\')">Delete</button>' +
+          '</td></tr>';
+      }).join('');
+    });
+  }
+
+  // Create user
+  document.getElementById('create-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var status = document.getElementById('create-status');
+    api('POST', '/users', {
+      username: document.getElementById('new-username').value.trim(),
+      password: document.getElementById('new-password').value,
+      display_name: document.getElementById('new-displayname').value.trim(),
+      role: document.getElementById('new-role').value
+    }).then(function(res) {
+      if (!res.ok) { status.innerHTML = '<span style="color:var(--error)">' + res.data.error + '</span>'; return; }
+      status.innerHTML = '<span style="color:var(--green)">User created</span>';
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-displayname').value = '';
+      document.getElementById('new-password').value = '';
+      loadUsers();
+      setTimeout(function() { status.textContent = ''; }, 3000);
+    });
+  });
+
+  // Reset password
+  window.resetPw = function(id, username) {
+    var pw = prompt('New password for ' + username + ' (min 6 chars):');
+    if (!pw || pw.length < 6) { alert('Password must be at least 6 characters'); return; }
+    api('POST', '/users/' + id + '/reset-password', { password: pw }).then(function(res) {
+      if (res.ok) { alert('Password reset. User must change on next login.'); loadUsers(); }
+      else alert(res.data.error);
+    });
+  };
+
+  // Delete user
+  window.deleteUser = function(id, username) {
+    if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+    api('DELETE', '/users/' + id).then(function(res) {
+      if (res.ok) loadUsers();
+      else alert(res.data.error);
+    });
+  };
+
+  loadUsers();
+})();
+</script>
+</body>
+</html>
