@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="components/nav.js"></script>
+  <title>Session Replay</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b1120;
+      --surface: #151d2e;
+      --surface2: #1a2540;
+      --border: #243049;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --text3: #64748b;
+      --accent: #3b82f6;
+      --accent-dim: #1e40af;
+      --green: #4ade80;
+      --yellow: #facc15;
+      --red: #f87171;
+      --purple: #a78bfa;
+      --orange: #fb923c;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* -- Loading / Error / Setup -- */
+    #loading, #error, #setup {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; gap: 16px; padding: 24px;
+    }
+    #loading .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error { color: var(--red); }
+    #error .msg { max-width: 500px; text-align: center; color: var(--text2); }
+
+    #setup { max-width: 440px; margin: 0 auto; }
+    #setup h2 { font-size: 20px; color: var(--text); }
+    #setup p { color: var(--text2); font-size: 14px; text-align: center; }
+    #setup form { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    #setup label { font-size: 13px; color: var(--text2); font-weight: 600; }
+    #setup input {
+      width: 100%; padding: 10px 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 14px;
+    }
+    #setup input:focus { outline: none; border-color: var(--accent); }
+    #setup button {
+      padding: 10px 20px; background: var(--accent); color: #fff;
+      border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #setup button:hover { background: #2563eb; }
+
+    .hidden { display: none !important; }
+
+    /* -- Page Layout -- */
+    .page-header {
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+    }
+    .page-header h1 {
+      font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text3); margin-bottom: 2px;
+    }
+    .page-header .session-label { font-size: 22px; font-weight: 700; color: #f1f5f9; }
+    .page-header .meta { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 0;
+      min-height: calc(100vh - 140px);
+    }
+
+    .center-panel { padding: 20px 24px; overflow-y: auto; }
+    .right-panel {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    /* -- Timeline Bar -- */
+    .timeline-bar-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .timeline-controls {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+    }
+    .btn-play {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .btn-play:hover { background: #2563eb; }
+    .btn-play svg { fill: #fff; width: 16px; height: 16px; }
+
+    .speed-btns { display: flex; gap: 4px; }
+    .speed-btn {
+      padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text2); font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .speed-btn:hover { border-color: var(--accent); color: var(--text); }
+    .speed-btn.active { background: var(--accent-dim); color: #bfdbfe; border-color: var(--accent); }
+
+    .time-display {
+      margin-left: auto; font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 13px; color: var(--text2);
+    }
+
+    .timeline-track {
+      position: relative; height: 48px; background: var(--surface2);
+      border-radius: 6px; overflow: visible; cursor: pointer;
+    }
+    .timeline-track-inner {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center;
+    }
+    .tl-marker {
+      position: absolute; width: 10px; height: 10px;
+      border-radius: 50%; transform: translate(-50%, -50%);
+      top: 50%; cursor: pointer; transition: all 0.15s; z-index: 2;
+      border: 2px solid transparent;
+    }
+    .tl-marker:hover { transform: translate(-50%, -50%) scale(1.4); }
+    .tl-marker.active { transform: translate(-50%, -50%) scale(1.5); border-color: #fff; z-index: 3; }
+    .tl-marker.click { background: var(--accent); }
+    .tl-marker.speech { background: var(--purple); }
+
+    .playhead {
+      position: absolute; top: -4px; bottom: -4px; width: 2px;
+      background: var(--yellow); z-index: 5; transform: translateX(-50%);
+      transition: left 0.15s linear;
+      pointer-events: none;
+    }
+    .playhead::after {
+      content: ''; position: absolute; top: -4px; left: -4px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--yellow);
+    }
+
+    /* -- Event Detail -- */
+    .event-detail {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .event-detail-header {
+      padding: 14px 20px; background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .event-type-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 4px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .event-type-badge.click { background: rgba(59,130,246,0.15); color: var(--accent); }
+    .event-type-badge.speech { background: rgba(167,139,250,0.15); color: var(--purple); }
+    .event-time {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px; color: var(--text3);
+    }
+    .event-detail-body { padding: 20px; }
+
+    .detail-screenshot {
+      border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
+      margin-bottom: 16px; max-height: 400px;
+    }
+    .detail-screenshot img {
+      display: block; width: 100%; height: auto;
+      background: var(--surface2); min-height: 80px;
+    }
+    .detail-screenshot .ss-placeholder {
+      display: flex; align-items: center; justify-content: center;
+      height: 120px; color: var(--text3); font-size: 13px; background: var(--surface2);
+    }
+
+    .detail-click-info {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; margin-bottom: 16px;
+    }
+    .detail-click-info .row {
+      display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px;
+    }
+    .detail-click-info .row:last-child { margin-bottom: 0; }
+    .detail-click-info .lbl { color: var(--text3); min-width: 80px; font-weight: 600; }
+    .detail-click-info .val { color: var(--text2); word-break: break-all; }
+
+    .detail-transcript-context { margin-top: 16px; }
+    .detail-transcript-context h4 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text3); margin-bottom: 10px;
+    }
+    .ctx-entry {
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .ctx-entry:last-child { border-bottom: none; }
+    .ctx-entry.active { background: rgba(59,130,246,0.08); border-radius: 6px; padding: 8px; }
+    .ctx-entry .speaker { font-weight: 700; margin-right: 6px; }
+    .ctx-entry .speaker.se { color: var(--accent); }
+    .ctx-entry .speaker.visitor { color: var(--green); }
+    .ctx-entry .ts { font-family: monospace; font-size: 11px; color: var(--text3); margin-right: 8px; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 200px; color: var(--text3);
+      font-size: 14px; gap: 8px;
+    }
+
+    /* -- Products Panel -- */
+    .panel-title {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text3); font-weight: 700; margin-bottom: 14px;
+    }
+    .product-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; margin-bottom: 10px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .product-card.active {
+      border-color: var(--accent); background: rgba(59,130,246,0.08);
+    }
+    .product-card .product-name {
+      font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px;
+    }
+    .product-card .product-time {
+      font-size: 12px; color: var(--text3);
+      font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+    .product-card .product-clicks {
+      font-size: 12px; color: var(--text2); margin-top: 2px;
+    }
+
+    /* -- Legend -- */
+    .legend {
+      display: flex; gap: 16px; margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .legend-dot.click { background: var(--accent); }
+    .legend-dot.speech { background: var(--purple); }
+
+    /* -- Lightbox -- */
+    #lightbox {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.9); z-index: 10000;
+      align-items: center; justify-content: center; cursor: pointer;
+    }
+    #lightbox.active { display: flex; }
+    #lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .right-panel { border-left: none; border-top: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading" class="hidden">
+  <div class="spinner"></div>
+  <div style="color:var(--text2)">Loading session data...</div>
+</div>
+
+<!-- Error -->
+<div id="error" class="hidden">
+  <div style="font-size:24px">!</div>
+  <div class="msg" id="error-msg"></div>
+</div>
+
+<!-- Setup (AWS creds) -->
+<div id="setup" class="hidden">
+  <h2>AWS Credentials Required</h2>
+  <p>Enter your AWS credentials to load session data from S3.</p>
+  <form id="setup-form">
+    <label>Access Key ID</label>
+    <input type="text" id="input-access-key" autocomplete="off">
+    <label>Secret Access Key</label>
+    <input type="password" id="input-secret-key" autocomplete="off">
+    <label>Region</label>
+    <input type="text" id="input-region" value="us-east-1">
+    <label>S3 Bucket</label>
+    <input type="text" id="input-bucket" value="boothapp-sessions-752266476357">
+    <button type="submit">Connect</button>
+  </form>
+</div>
+
+<!-- Main App -->
+<div id="app" class="hidden">
+  <div class="page-header">
+    <h1>Session Replay</h1>
+    <div class="session-label" id="session-label">--</div>
+    <div class="meta" id="session-meta"></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="center-panel">
+      <!-- Timeline Bar -->
+      <div class="timeline-bar-wrap">
+        <div class="timeline-controls">
+          <button class="btn-play" id="btn-play" title="Play / Pause">
+            <svg id="icon-play" viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" class="hidden"><rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/></svg>
+          </button>
+          <div class="speed-btns">
+            <button class="speed-btn" data-speed="0.5">0.5x</button>
+            <button class="speed-btn active" data-speed="1">1x</button>
+            <button class="speed-btn" data-speed="2">2x</button>
+            <button class="speed-btn" data-speed="5">5x</button>
+          </div>
+          <div class="time-display" id="time-display">0:00 / 0:00</div>
+        </div>
+        <div class="timeline-track" id="timeline-track">
+          <div class="playhead" id="playhead" style="left:0%"></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot click"></div> Click</div>
+          <div class="legend-item"><div class="legend-dot speech"></div> Speech</div>
+        </div>
+      </div>
+
+      <!-- Event Detail -->
+      <div class="event-detail" id="event-detail">
+        <div class="empty-state" id="empty-state">
+          <div>[ Click an event on the timeline or press Play ]</div>
+        </div>
+        <div id="detail-content" class="hidden">
+          <div class="event-detail-header">
+            <span class="event-type-badge" id="detail-type-badge">--</span>
+            <span class="event-time" id="detail-time">--</span>
+          </div>
+          <div class="event-detail-body" id="detail-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Products -->
+    <div class="right-panel">
+      <div class="panel-title">V1 Modules Active</div>
+      <div id="products-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="this.classList.remove('active')">
+  <img id="lightbox-img" src="">
+</div>
+
+<script>
+// ── Utility ─────────────────────────────────────────────────
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function show(id) {
+  ['loading', 'error', 'setup', 'app'].forEach(function(s) {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  show('error');
+}
+
+function getSessionId() {
+  var params = new URLSearchParams(window.location.search);
+  return params.get('session') || params.get('sessionId') || params.get('id') || '';
+}
+
+function isDemoMode() {
+  return new URLSearchParams(window.location.search).has('demo');
+}
+
+// ── S3 helpers (same pattern as timeline.html) ──────────────
+
+function getCredentials() {
+  var ak = localStorage.getItem('booth_aws_access_key') || localStorage.getItem('boothapp_aws_ak');
+  var sk = localStorage.getItem('booth_aws_secret_key') || localStorage.getItem('boothapp_aws_sk');
+  var region = localStorage.getItem('booth_aws_region') || 'us-east-1';
+  var bucket = localStorage.getItem('booth_aws_bucket') || 'boothapp-sessions-752266476357';
+  if (!ak || !sk) return null;
+  return { accessKeyId: ak, secretAccessKey: sk, region: region, bucket: bucket };
+}
+
+function saveCredentials(ak, sk, region, bucket) {
+  localStorage.setItem('booth_aws_access_key', ak);
+  localStorage.setItem('booth_aws_secret_key', sk);
+  localStorage.setItem('booth_aws_region', region || 'us-east-1');
+  localStorage.setItem('booth_aws_bucket', bucket || 'boothapp-sessions-752266476357');
+}
+
+var s3Client = null;
+var bucketName = '';
+
+async function initS3() {
+  var creds = getCredentials();
+  if (!creds) return false;
+  bucketName = creds.bucket;
+  var mod = await import('https://cdn.jsdelivr.net/npm/@aws-sdk/client-s3@3.540.0/+esm');
+  window._S3Client = mod.S3Client;
+  window._GetObjectCommand = mod.GetObjectCommand;
+  s3Client = new mod.S3Client({
+    region: creds.region,
+    credentials: { accessKeyId: creds.accessKeyId, secretAccessKey: creds.secretAccessKey }
+  });
+  return true;
+}
+
+async function getS3Json(key) {
+  var resp = await s3Client.send(new window._GetObjectCommand({ Bucket: bucketName, Key: key }));
+  var text = await resp.Body.transformToString();
+  return JSON.parse(text);
+}
+
+async function getS3ImageUrl(key) {
+  try {
+    var resp = await s3Client.send(new window._GetObjectCommand({ Bucket: bucketName, Key: key }));
+    var bytes = await resp.Body.transformToByteArray();
+    var blob = new Blob([bytes], { type: 'image/jpeg' });
+    return URL.createObjectURL(blob);
+  } catch (e) { return null; }
+}
+
+async function fetchLocalJson(url) {
+  var resp = await fetch(url);
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+// ── Product Detection ───────────────────────────────────────
+
+var PRODUCT_MAP = [
+  { pattern: /endpoint.security|endpoint.protection|byod|device.enrollment/i, name: 'Endpoint Security', color: 'var(--accent)' },
+  { pattern: /xdr|workbench|detection|alert|investigation/i, name: 'XDR', color: 'var(--orange)' },
+  { pattern: /risk.insight|attack.surface|exposure/i, name: 'Risk Insights', color: 'var(--yellow)' },
+  { pattern: /cloud.security|cloud.one|container/i, name: 'Cloud Security', color: 'var(--green)' },
+  { pattern: /email.security|email.gateway/i, name: 'Email Security', color: 'var(--red)' },
+  { pattern: /zero.trust|ztsa|ztna/i, name: 'Zero Trust', color: 'var(--purple)' },
+  { pattern: /network.security|tippingpoint|ids|ips/i, name: 'Network Security', color: '#f472b6' },
+  { pattern: /dashboard/i, name: 'Dashboard', color: 'var(--text3)' }
+];
+
+function detectProduct(ev) {
+  var text = '';
+  if (ev.type === 'click') {
+    text = [ev.data.page_title, ev.data.page_url, ev.data.element?.text, ev.data.element?.class, ev.data.dom_path].join(' ');
+  } else {
+    text = ev.data.text || '';
+  }
+  for (var i = 0; i < PRODUCT_MAP.length; i++) {
+    if (PRODUCT_MAP[i].pattern.test(text)) return PRODUCT_MAP[i].name;
+  }
+  return 'Dashboard';
+}
+
+// ── Build unified timeline ──────────────────────────────────
+
+function buildTimeline(clicks, transcript, metadata) {
+  var events = [];
+  var startTime = metadata && metadata.started_at ? new Date(metadata.started_at).getTime() : null;
+
+  if (clicks && clicks.events) {
+    for (var i = 0; i < clicks.events.length; i++) {
+      var c = clicks.events[i];
+      var t = new Date(c.timestamp).getTime();
+      if (!startTime) startTime = t;
+      events.push({
+        type: 'click',
+        time: t,
+        offsetMs: t - startTime,
+        data: c
+      });
+    }
+  }
+
+  if (transcript && transcript.entries) {
+    for (var j = 0; j < transcript.entries.length; j++) {
+      var e = transcript.entries[j];
+      // Parse "HH:MM:SS.mmm" to ms offset
+      var parts = e.timestamp.replace(/[^0-9:.]/g, '').split(':');
+      var secs = 0;
+      if (parts.length === 3) secs = parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseFloat(parts[2]);
+      else if (parts.length === 2) secs = parseInt(parts[0])*60 + parseFloat(parts[1]);
+      else secs = parseFloat(parts[0]);
+      var ms = secs * 1000;
+      events.push({
+        type: 'speech',
+        time: startTime ? startTime + ms : ms,
+        offsetMs: ms,
+        data: e
+      });
+    }
+  }
+
+  events.sort(function(a, b) { return a.offsetMs - b.offsetMs; });
+
+  // Set startTime from first event if metadata didn't have it
+  if (!startTime && events.length) startTime = events[0].time;
+
+  var endMs = events.length ? events[events.length - 1].offsetMs : 0;
+
+  return { events: events, startTime: startTime, endMs: endMs };
+}
+
+// ── State ───────────────────────────────────────────────────
+
+var STATE = {
+  timeline: null,
+  screenshotUrls: {},
+  currentIndex: -1,
+  playing: false,
+  speed: 1,
+  playTimer: null
+};
+
+// ── Render Timeline Track ───────────────────────────────────
+
+function renderTimelineTrack() {
+  var tl = STATE.timeline;
+  if (!tl || !tl.events.length) return;
+
+  var track = document.getElementById('timeline-track');
+  // Remove old markers
+  track.querySelectorAll('.tl-marker').forEach(function(m) { m.remove(); });
+
+  var endMs = tl.endMs || 1;
+
+  for (var i = 0; i < tl.events.length; i++) {
+    var ev = tl.events[i];
+    var pct = (ev.offsetMs / endMs) * 100;
+    var marker = document.createElement('div');
+    marker.className = 'tl-marker ' + ev.type;
+    marker.style.left = pct + '%';
+    marker.dataset.index = i;
+    marker.title = ev.type === 'click'
+      ? 'Click: ' + (ev.data.element?.text || ev.data.page_title || '')
+      : (ev.data.speaker || '') + ': ' + (ev.data.text || '').substring(0, 60);
+    marker.addEventListener('click', function(e) {
+      e.stopPropagation();
+      selectEvent(parseInt(this.dataset.index));
+    });
+    track.appendChild(marker);
+  }
+
+  // Click on track to jump
+  track.addEventListener('click', function(e) {
+    var rect = track.getBoundingClientRect();
+    var pct = (e.clientX - rect.left) / rect.width;
+    var targetMs = pct * endMs;
+    // Find closest event
+    var closest = 0;
+    var closestDist = Infinity;
+    for (var i = 0; i < tl.events.length; i++) {
+      var dist = Math.abs(tl.events[i].offsetMs - targetMs);
+      if (dist < closestDist) { closestDist = dist; closest = i; }
+    }
+    selectEvent(closest);
+  });
+}
+
+// ── Select Event ────────────────────────────────────────────
+
+function selectEvent(idx) {
+  var tl = STATE.timeline;
+  if (!tl || idx < 0 || idx >= tl.events.length) return;
+
+  STATE.currentIndex = idx;
+  var ev = tl.events[idx];
+
+  // Update playhead
+  var pct = tl.endMs ? (ev.offsetMs / tl.endMs) * 100 : 0;
+  document.getElementById('playhead').style.left = pct + '%';
+
+  // Update time display
+  document.getElementById('time-display').textContent = formatMs(ev.offsetMs) + ' / ' + formatMs(tl.endMs);
+
+  // Update markers active state
+  document.querySelectorAll('.tl-marker').forEach(function(m, i) {
+    m.classList.toggle('active', i === idx);
+  });
+
+  // Show detail
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('detail-content').classList.remove('hidden');
+
+  var badge = document.getElementById('detail-type-badge');
+  badge.textContent = ev.type === 'click' ? 'Click' : ev.data.speaker || 'Speech';
+  badge.className = 'event-type-badge ' + ev.type;
+  document.getElementById('detail-time').textContent = formatMs(ev.offsetMs);
+
+  var body = document.getElementById('detail-body');
+  var html = '';
+
+  if (ev.type === 'click') {
+    // Screenshot
+    var ssFile = ev.data.screenshot_file;
+    var ssUrl = ssFile ? STATE.screenshotUrls[ssFile] : null;
+    if (ssUrl) {
+      html += '<div class="detail-screenshot"><img src="' + esc(ssUrl) + '" alt="Screenshot" onclick="openLightbox(\'' + esc(ssUrl) + '\')"></div>';
+    } else {
+      html += '<div class="detail-screenshot"><div class="ss-placeholder">' + (ssFile ? 'Screenshot: ' + esc(ssFile) : 'No screenshot') + '</div></div>';
+    }
+
+    // Click info
+    html += '<div class="detail-click-info">';
+    html += '<div class="row"><div class="lbl">Element</div><div class="val">' + esc(ev.data.element?.text || ev.data.dom_path || '--') + '</div></div>';
+    html += '<div class="row"><div class="lbl">Page</div><div class="val">' + esc(ev.data.page_title || '--') + '</div></div>';
+    html += '<div class="row"><div class="lbl">URL</div><div class="val">' + esc(ev.data.page_url || '--') + '</div></div>';
+    if (ev.data.coordinates) {
+      html += '<div class="row"><div class="lbl">Position</div><div class="val">(' + ev.data.coordinates.x + ', ' + ev.data.coordinates.y + ')</div></div>';
+    }
+    html += '</div>';
+  } else {
+    // Speech event
+    html += '<div style="font-size:15px;line-height:1.7;padding:4px 0">';
+    var spClass = (ev.data.speaker || '').toLowerCase() === 'se' ? 'se' : 'visitor';
+    html += '<span class="speaker ' + spClass + '" style="font-weight:700;color:' + (spClass === 'se' ? 'var(--accent)' : 'var(--green)') + '">' + esc(ev.data.speaker) + ':</span> ';
+    html += esc(ev.data.text);
+    html += '</div>';
+  }
+
+  // Transcript context: show nearby transcript entries
+  html += '<div class="detail-transcript-context"><h4>Transcript Context</h4>';
+  var nearbyEntries = getTranscriptContext(ev.offsetMs);
+  if (nearbyEntries.length === 0) {
+    html += '<div style="color:var(--text3);font-style:italic;font-size:13px">No transcript entries nearby</div>';
+  } else {
+    for (var i = 0; i < nearbyEntries.length; i++) {
+      var ne = nearbyEntries[i];
+      var isActive = ne.offsetMs === ev.offsetMs && ev.type === 'speech';
+      var spCls = (ne.data.speaker || '').toLowerCase() === 'se' ? 'se' : 'visitor';
+      html += '<div class="ctx-entry' + (isActive ? ' active' : '') + '">';
+      html += '<span class="ts">' + esc(ne.data.timestamp) + '</span>';
+      html += '<span class="speaker ' + spCls + '">' + esc(ne.data.speaker) + ':</span> ';
+      html += esc(ne.data.text);
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+
+  body.innerHTML = html;
+
+  // Update products panel
+  updateProductsPanel(idx);
+}
+
+function getTranscriptContext(offsetMs) {
+  var tl = STATE.timeline;
+  if (!tl) return [];
+  var speechEvents = tl.events.filter(function(e) { return e.type === 'speech'; });
+  // Find the closest speech event
+  var closestIdx = 0;
+  var closestDist = Infinity;
+  for (var i = 0; i < speechEvents.length; i++) {
+    var dist = Math.abs(speechEvents[i].offsetMs - offsetMs);
+    if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+  }
+  // Return a window of +/- 2 entries around closest
+  var start = Math.max(0, closestIdx - 2);
+  var end = Math.min(speechEvents.length, closestIdx + 3);
+  return speechEvents.slice(start, end);
+}
+
+// ── Products Panel ──────────────────────────────────────────
+
+function buildProductsSummary() {
+  var tl = STATE.timeline;
+  if (!tl) return [];
+  var products = {};
+  for (var i = 0; i < tl.events.length; i++) {
+    var ev = tl.events[i];
+    var name = detectProduct(ev);
+    if (!products[name]) {
+      products[name] = { name: name, firstSeen: ev.offsetMs, lastSeen: ev.offsetMs, clicks: 0, eventIndices: [] };
+    }
+    products[name].lastSeen = ev.offsetMs;
+    products[name].eventIndices.push(i);
+    if (ev.type === 'click') products[name].clicks++;
+  }
+  return Object.values(products).sort(function(a, b) { return a.firstSeen - b.firstSeen; });
+}
+
+function renderProductsPanel() {
+  var list = document.getElementById('products-list');
+  var products = buildProductsSummary();
+
+  if (products.length === 0) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:13px">No products detected</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < products.length; i++) {
+    var p = products[i];
+    html += '<div class="product-card" data-product="' + esc(p.name) + '">';
+    html += '<div class="product-name">' + esc(p.name) + '</div>';
+    html += '<div class="product-time">' + formatMs(p.firstSeen) + ' - ' + formatMs(p.lastSeen) + '</div>';
+    html += '<div class="product-clicks">' + p.clicks + ' click' + (p.clicks !== 1 ? 's' : '') + '</div>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function updateProductsPanel(eventIdx) {
+  var tl = STATE.timeline;
+  if (!tl || eventIdx < 0) return;
+  var ev = tl.events[eventIdx];
+  var activeName = detectProduct(ev);
+
+  document.querySelectorAll('.product-card').forEach(function(card) {
+    card.classList.toggle('active', card.dataset.product === activeName);
+  });
+}
+
+// ── Playback ────────────────────────────────────────────────
+
+function togglePlay() {
+  if (STATE.playing) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  STATE.playing = true;
+  document.getElementById('icon-play').classList.add('hidden');
+  document.getElementById('icon-pause').classList.remove('hidden');
+
+  if (STATE.currentIndex < 0 || STATE.currentIndex >= STATE.timeline.events.length - 1) {
+    STATE.currentIndex = -1;
+  }
+  advancePlay();
+}
+
+function stopPlay() {
+  STATE.playing = false;
+  document.getElementById('icon-play').classList.remove('hidden');
+  document.getElementById('icon-pause').classList.add('hidden');
+  if (STATE.playTimer) { clearTimeout(STATE.playTimer); STATE.playTimer = null; }
+}
+
+function advancePlay() {
+  if (!STATE.playing) return;
+  var next = STATE.currentIndex + 1;
+  if (next >= STATE.timeline.events.length) {
+    stopPlay();
+    return;
+  }
+  selectEvent(next);
+  var interval = 2000 / STATE.speed;
+  STATE.playTimer = setTimeout(advancePlay, interval);
+}
+
+function setSpeed(speed) {
+  STATE.speed = speed;
+  document.querySelectorAll('.speed-btn').forEach(function(btn) {
+    btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
+  });
+  // If playing, restart timer with new speed
+  if (STATE.playing) {
+    if (STATE.playTimer) clearTimeout(STATE.playTimer);
+    var interval = 2000 / STATE.speed;
+    STATE.playTimer = setTimeout(advancePlay, interval);
+  }
+}
+
+// ── Time Formatting ─────────────────────────────────────────
+
+function formatMs(ms) {
+  var totalSec = Math.floor(ms / 1000);
+  var min = Math.floor(totalSec / 60);
+  var sec = totalSec % 60;
+  return min + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+// ── Lightbox ────────────────────────────────────────────────
+
+window.openLightbox = function(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('active');
+};
+
+// ── Event Bindings ──────────────────────────────────────────
+
+document.getElementById('btn-play').addEventListener('click', togglePlay);
+
+document.querySelectorAll('.speed-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    setSpeed(parseFloat(this.dataset.speed));
+  });
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+  if (e.key === ' ' && e.target === document.body) { e.preventDefault(); togglePlay(); }
+  if (e.key === 'ArrowRight' && STATE.timeline) {
+    var next = Math.min(STATE.currentIndex + 1, STATE.timeline.events.length - 1);
+    selectEvent(next);
+  }
+  if (e.key === 'ArrowLeft' && STATE.timeline) {
+    var prev = Math.max(STATE.currentIndex - 1, 0);
+    selectEvent(prev);
+  }
+});
+
+document.getElementById('setup-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var ak = document.getElementById('input-access-key').value.trim();
+  var sk = document.getElementById('input-secret-key').value.trim();
+  var region = document.getElementById('input-region').value.trim();
+  var bucket = document.getElementById('input-bucket').value.trim();
+  if (!ak || !sk) return;
+  saveCredentials(ak, sk, region, bucket);
+  loadSession();
+});
+
+// ── Main Load ───────────────────────────────────────────────
+
+async function loadSession() {
+  var sessionId = getSessionId();
+
+  if (isDemoMode()) {
+    show('loading');
+    try {
+      var base = '/analysis/sample_data';
+      var results = await Promise.all([
+        fetchLocalJson(base + '/sample_metadata.json'),
+        fetchLocalJson(base + '/sample_clicks.json'),
+        fetchLocalJson(base + '/sample_transcript.json')
+      ]);
+      var metadata = results[0];
+      var clicks = results[1];
+      var transcript = results[2];
+
+      STATE.timeline = buildTimeline(clicks, transcript, metadata);
+      STATE.screenshotUrls = {};
+
+      show('app');
+      document.getElementById('session-label').textContent = (metadata && metadata.visitor_name) || sessionId || 'DEMO';
+      var metaText = [];
+      if (metadata && metadata.se_name) metaText.push('SE: ' + metadata.se_name);
+      if (metadata && metadata.demo_pc) metaText.push('PC: ' + metadata.demo_pc);
+      if (STATE.timeline.events.length) metaText.push(STATE.timeline.events.length + ' events');
+      metaText.push('Duration: ' + formatMs(STATE.timeline.endMs));
+      document.getElementById('session-meta').textContent = metaText.join('  |  ');
+      document.getElementById('time-display').textContent = '0:00 / ' + formatMs(STATE.timeline.endMs);
+
+      renderTimelineTrack();
+      renderProductsPanel();
+    } catch (err) {
+      showError('Demo mode failed: ' + err.message);
+    }
+    return;
+  }
+
+  if (!sessionId) {
+    showError('No session ID. Use ?session=SESSION_ID or ?demo for sample data.');
+    return;
+  }
+
+  var ok = await initS3();
+  if (!ok) { show('setup'); return; }
+
+  show('loading');
+  var prefix = 'sessions/' + sessionId;
+
+  try {
+    var results = await Promise.all([
+      getS3Json(prefix + '/metadata.json').catch(function() { return null; }),
+      getS3Json(prefix + '/clicks/clicks.json').catch(function() { return null; }),
+      getS3Json(prefix + '/transcript/transcript.json').catch(function() { return null; })
+    ]);
+    var metadata = results[0];
+    var clicks = results[1];
+    var transcript = results[2];
+
+    if (!metadata) { showError('Session "' + sessionId + '" not found (no metadata.json)'); return; }
+
+    STATE.timeline = buildTimeline(clicks, transcript, metadata);
+
+    // Load screenshot URLs
+    STATE.screenshotUrls = {};
+    if (clicks && clicks.events) {
+      var ssFiles = [];
+      var seen = {};
+      for (var i = 0; i < clicks.events.length; i++) {
+        var f = clicks.events[i].screenshot_file;
+        if (f && !seen[f]) { seen[f] = true; ssFiles.push(f); }
+      }
+      var ssPromises = ssFiles.map(function(f) {
+        return getS3ImageUrl(prefix + '/' + f).then(function(url) {
+          if (url) STATE.screenshotUrls[f] = url;
+        });
+      });
+      await Promise.all(ssPromises);
+    }
+
+    show('app');
+    document.getElementById('session-label').textContent = (metadata.visitor_name || sessionId);
+    var metaText = [];
+    if (metadata.se_name) metaText.push('SE: ' + metadata.se_name);
+    if (metadata.demo_pc) metaText.push('PC: ' + metadata.demo_pc);
+    metaText.push(STATE.timeline.events.length + ' events');
+    metaText.push('Duration: ' + formatMs(STATE.timeline.endMs));
+    document.getElementById('session-meta').textContent = metaText.join('  |  ');
+    document.getElementById('time-display').textContent = '0:00 / ' + formatMs(STATE.timeline.endMs);
+
+    renderTimelineTrack();
+    renderProductsPanel();
+  } catch (err) {
+    showError('Failed to load: ' + err.message);
+  }
+}
+
+// ── Boot ────────────────────────────────────────────────────
+
+loadSession();
+
+</script>
+<script src="lib/shortcuts.js"></script>
+</body>
+</html>

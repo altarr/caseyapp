@@ -109,6 +109,7 @@ const { createRouter: screenshotsRouter } = require('./lib/screenshots');
 app.use(screenshotsRouter({ bucket: S3_BUCKET }));
 
 // --- Static files ---
+app.use('/analysis', express.static(path.join(__dirname, '..', 'analysis')));
 app.use(express.static(path.join(__dirname)));
 
 app.listen(PORT, () => {
