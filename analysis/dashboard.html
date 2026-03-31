@@ -135,6 +135,17 @@
   .confidence.low { background: var(--red); color: #fff; }
   .evidence { font-size: 0.85rem; color: var(--text-muted); }
 
+  /* -- CRM export -- */
+  .crm-btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+  .crm-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 20px; font-size: 1rem; cursor: pointer;
+    text-decoration: none; font-weight: 600; transition: border-color 0.2s;
+  }
+  .crm-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .crm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
   /* -- Empty state -- */
   .empty { color: var(--text-muted); font-style: italic; text-align: center; padding: 40px 0; font-size: 1.2rem; }
 </style>
@@ -207,6 +218,19 @@
     <div class="card full">
       <h2>Follow-Up Recommendations</h2>
       <div class="follow-ups" id="followUps"></div>
+    </div>
+  </div>
+
+  <!-- Row 4: Export to CRM -->
+  <div class="grid" style="margin-top:20px">
+    <div class="card full">
+      <h2>Export to CRM</h2>
+      <p style="color:var(--text-muted);margin-bottom:8px">Download visitor data for CRM import</p>
+      <div class="crm-btns" id="crmBtns">
+        <button class="crm-btn" id="btnVcard" disabled onclick="downloadCrm('vcard')">[VCF] vCard Contact</button>
+        <button class="crm-btn" id="btnCsv" disabled onclick="downloadCrm('csv')">[CSV] Bulk Import</button>
+        <button class="crm-btn" id="btnSalesforce" disabled onclick="downloadCrm('salesforce')">[JSON] Salesforce Lead</button>
+      </div>
     </div>
   </div>
 
@@ -335,7 +359,92 @@ function render(data) {
     card.innerHTML = '<span class="num">' + (i + 1) + '</span>' + esc(text);
     fu.appendChild(card);
   });
+
+  // Enable CRM export buttons
+  document.getElementById('btnVcard').disabled = false;
+  document.getElementById('btnCsv').disabled = false;
+  document.getElementById('btnSalesforce').disabled = false;
+  window._crmData = data;
 }
+
+function generateVcard(data) {
+  var name = data.visitor_name || 'Unknown Visitor';
+  var parts = name.split(' ');
+  var first = parts[0] || name;
+  var last = parts.slice(1).join(' ') || '';
+  var products = (data.products_demonstrated || []).join(', ');
+  var lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    'N:' + last + ';' + first + ';;;',
+    'FN:' + name
+  ];
+  if (products) lines.push('NOTE:Demo products: ' + products);
+  lines.push('REV:' + new Date().toISOString().replace(/\.\d+/, ''));
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+
+function generateCsv(data) {
+  var name = data.visitor_name || '';
+  var products = (data.products_demonstrated || []).join('; ');
+  var score = data.session_score || 0;
+  var actions = (data.follow_up_actions || []).join('; ');
+  function csvEsc(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }
+  var header = 'name,company,title,products_shown,engagement_score,follow_up_actions';
+  var row = [name, '', '', products, score, actions].map(csvEsc).join(',');
+  return header + '\n' + row + '\n';
+}
+
+function generateSalesforceLead(data) {
+  var name = data.visitor_name || 'Unknown';
+  var parts = name.split(' ');
+  var first = parts[0] || name;
+  var last = parts.slice(1).join(' ') || '(Unknown)';
+  var score = data.session_score || 0;
+  var rating = score >= 8 ? 'Hot' : score >= 5 ? 'Warm' : 'Cold';
+  return JSON.stringify({
+    attributes: { type: 'Lead' },
+    FirstName: first,
+    LastName: last,
+    Company: '(Unknown)',
+    Title: '',
+    Email: '',
+    LeadSource: 'Trade Show',
+    Rating: rating,
+    Description: data.executive_summary || '',
+    ProductInterest__c: (data.products_demonstrated || []).join('; '),
+    EngagementScore__c: score,
+    FollowUpActions__c: (data.follow_up_actions || []).join('; '),
+    DemoDate__c: data.generated_at || '',
+    SessionId__c: data.session_id || ''
+  }, null, 2);
+}
+
+function downloadCrm(format) {
+  var data = window._crmData;
+  if (!data) return;
+  var content, filename, mime;
+  var sid = data.session_id || 'session';
+  if (format === 'vcard') {
+    content = generateVcard(data);
+    filename = sid + '.vcf';
+    mime = 'text/vcard';
+  } else if (format === 'csv') {
+    content = generateCsv(data);
+    filename = sid + '.csv';
+    mime = 'text/csv';
+  } else {
+    content = generateSalesforceLead(data);
+    filename = sid + '_salesforce.json';
+    mime = 'application/json';
+  }
+  var blob = new Blob([content], { type: mime });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 
 function loadSession() {
   var url = buildUrl();
