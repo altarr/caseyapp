@@ -100,16 +100,17 @@ def print_summary(results: dict):
         results: Analysis results dict containing ``summary`` and ``follow_up`` keys.
     """
     summary = results["summary"]
-    print(f"\nSession: {summary.get('session_id')} — {summary.get('visitor_name')}")
-    print(f"Duration: {summary.get('demo_duration_minutes')} minutes")
-    products = summary.get("products_shown", [])
-    print(f"Products shown: {', '.join(products) if products else 'none detected'}")
-    interests = summary.get("visitor_interests", [])
+    print(f"\nSession: {summary.get('session_id')} -- {summary.get('visitor_name')}")
+    duration_s = summary.get("demo_duration_seconds", 0)
+    print(f"Duration: {duration_s // 60}m {duration_s % 60}s ({duration_s}s)")
+    products = summary.get("products_demonstrated", [])
+    print(f"Products demonstrated: {', '.join(products) if products else 'none detected'}")
+    interests = summary.get("key_interests", [])
     if interests:
-        print(f"Top interests ({len(interests)}):")
+        print(f"Key interests ({len(interests)}):")
         for i in interests[:3]:
             print(f"  [{i.get('confidence','?')}] {i.get('topic')}")
-    follow_up = summary.get("recommended_follow_up", [])
+    follow_up = summary.get("follow_up_actions", [])
     if follow_up:
         print(f"Follow-up actions ({len(follow_up)}):")
         for action in follow_up[:3]:

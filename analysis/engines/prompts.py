@@ -4,7 +4,7 @@ Your job is to extract ONLY what is directly evidenced by the transcript, click 
 
 Rules:
 - Do NOT hallucinate products or features not shown in the session data
-- The "products_shown" list must ONLY include products actually demonstrated (not just mentioned in passing)
+- The "products_demonstrated" list must ONLY include products actually demonstrated (not just mentioned in passing)
 - Cite specific timestamps or click events as evidence
 - If something is unclear or ambiguous, omit it rather than guess
 - The output must be valid JSON with no trailing commas or comments"""
@@ -32,7 +32,7 @@ Session metadata:
 
 Return a JSON object with exactly these fields:
 {{
-  "products_shown": ["list of Vision One products/modules actually demonstrated"],
+  "products_demonstrated": ["list of Vision One products/modules actually demonstrated"],
   "features_demonstrated": [
     {{"feature": "feature name", "timestamp_rel": "MM:SS", "evidence": "specific transcript or click evidence"}}
   ],
@@ -57,19 +57,21 @@ SE name: {se_name}
 Factual analysis from Pass 1:
 {factual_json}
 
-Return a JSON object with exactly these fields:
+Return a JSON object with exactly these fields (use these EXACT field names):
 {{
   "session_score": 7,
   "executive_summary": "Two sentences for a sales manager. Lead with the key takeaway, then the recommended action.",
-  "visitor_interests": [
+  "key_interests": [
     {{"topic": "specific topic", "confidence": "high|medium|low", "evidence": "specific quote or action from session"}}
   ],
-  "recommended_follow_up": [
+  "follow_up_actions": [
     "specific actionable follow-up item 1",
     "specific actionable follow-up item 2"
   ],
   "sdr_notes": "concise paragraph with key facts: visitor background, main interests, concerns, competing products, urgency signals"
-}}"""
+}}
+
+IMPORTANT: Use exactly the field names shown above. "key_interests" (not "visitor_interests"), "follow_up_actions" (not "recommended_follow_up")."""
 
 
 def _esc(val):
@@ -233,16 +235,16 @@ def render_html_report(summary, follow_up, factual=None):
         "score_dasharray": _gauge_dasharray(score),
         "score_summary": _score_summary(score),
         "executive_summary": _esc(summary.get("executive_summary", "")),
-        "duration_minutes": str(summary.get("demo_duration_minutes", 0)),
+        "duration_minutes": str(summary.get("demo_duration_seconds", 0) // 60),
         "click_count": str(stats.get("click_count", summary.get("click_count", 0))),
         "transcript_count": str(stats.get("transcript_entries", summary.get("transcript_entries", 0))),
         "priority": _esc(priority),
         "priority_color": _priority_color(priority),
-        "product_tags_html": _build_product_tags(summary.get("products_shown", [])),
+        "product_tags_html": _build_product_tags(summary.get("products_demonstrated", [])),
         "timeline_html": _build_timeline(key_moments, features),
-        "interests_html": _build_interests_rows(summary.get("visitor_interests", [])),
+        "interests_html": _build_interests_rows(summary.get("key_interests", [])),
         "followup_html": _build_followup_cards(
-            summary.get("recommended_follow_up", []), priority
+            summary.get("follow_up_actions", []), priority
         ),
         "sdr_notes": _esc(follow_up.get("sdr_notes", "No SDR notes recorded.")),
         "tenant_link_html": tenant_html,

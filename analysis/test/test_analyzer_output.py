@@ -1,8 +1,8 @@
-"""Tests for SessionAnalyzer output builders.
+"""Tests for SessionAnalyzer output builders and validator.
 
 Validates that _build_summary_json and _build_follow_up_json correctly
-pass through all fields (including session_score, executive_summary,
-and enhanced key_moments) from the LLM results.
+produce the structured output with: visitor_name, products_demonstrated,
+key_interests, follow_up_actions, demo_duration_seconds.
 """
 
 import sys
@@ -19,6 +19,7 @@ sys.modules.setdefault("anthropic", types.ModuleType("anthropic"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from analysis.engines.analyzer import SessionAnalyzer
+from analysis.engines.validator import validate_summary, validate_summary_or_raise, ValidationError
 
 
 def _make_analyzer():
@@ -36,7 +37,7 @@ def _make_analyzer():
 
 
 SAMPLE_FACTUAL = {
-    "products_shown": ["Endpoint Security", "XDR"],
+    "products_demonstrated": ["Endpoint Security", "XDR"],
     "features_demonstrated": [],
     "visitor_questions": [],
     "key_moments": [
@@ -51,11 +52,11 @@ SAMPLE_FACTUAL = {
 SAMPLE_RECOMMENDATIONS = {
     "session_score": 8,
     "executive_summary": "Jane showed strong interest in endpoint policy and XDR detection rules. Schedule a deep-dive within the week.",
-    "visitor_interests": [
+    "key_interests": [
         {"topic": "Endpoint policy", "confidence": "high", "evidence": "Asked 3 questions"},
         {"topic": "XDR rules", "confidence": "medium", "evidence": "Spent 2 min exploring"},
     ],
-    "recommended_follow_up": [
+    "follow_up_actions": [
         "Send EP policy best practices guide",
         "Schedule XDR deep-dive",
     ],
@@ -68,21 +69,28 @@ class TestBuildSummaryJson(unittest.TestCase):
         self.analyzer = _make_analyzer()
         self.summary = self.analyzer._build_summary_json(SAMPLE_FACTUAL, SAMPLE_RECOMMENDATIONS)
 
+    def test_visitor_name_present(self):
+        self.assertEqual(self.summary["visitor_name"], "Jane Doe")
+
+    def test_products_demonstrated(self):
+        self.assertEqual(self.summary["products_demonstrated"], ["Endpoint Security", "XDR"])
+
+    def test_key_interests(self):
+        self.assertEqual(len(self.summary["key_interests"]), 2)
+        self.assertEqual(self.summary["key_interests"][0]["topic"], "Endpoint policy")
+
+    def test_follow_up_actions(self):
+        self.assertEqual(len(self.summary["follow_up_actions"]), 2)
+        self.assertIn("EP policy", self.summary["follow_up_actions"][0])
+
+    def test_demo_duration_seconds(self):
+        self.assertEqual(self.summary["demo_duration_seconds"], 1200)
+
     def test_session_score_present(self):
         self.assertEqual(self.summary["session_score"], 8)
 
     def test_executive_summary_present(self):
         self.assertIn("strong interest", self.summary["executive_summary"])
-
-    def test_products_shown_unchanged(self):
-        self.assertEqual(self.summary["products_shown"], ["Endpoint Security", "XDR"])
-
-    def test_visitor_interests_unchanged(self):
-        self.assertEqual(len(self.summary["visitor_interests"]), 2)
-        self.assertEqual(self.summary["visitor_interests"][0]["topic"], "Endpoint policy")
-
-    def test_recommended_follow_up_unchanged(self):
-        self.assertEqual(len(self.summary["recommended_follow_up"]), 2)
 
     def test_key_moments_capped_at_three(self):
         self.assertEqual(len(self.summary["key_moments"]), 3)
@@ -96,9 +104,6 @@ class TestBuildSummaryJson(unittest.TestCase):
         timestamps = [m["timestamp"] for m in self.summary["key_moments"]]
         self.assertEqual(timestamps, ["02:30", "05:10", "08:45"])
 
-    def test_duration_calculated_from_metadata(self):
-        self.assertEqual(self.summary["demo_duration_minutes"], 20)
-
     def test_session_score_defaults_to_zero(self):
         no_score = {k: v for k, v in SAMPLE_RECOMMENDATIONS.items() if k != "session_score"}
         summary = self.analyzer._build_summary_json(SAMPLE_FACTUAL, no_score)
@@ -108,6 +113,28 @@ class TestBuildSummaryJson(unittest.TestCase):
         no_summary = {k: v for k, v in SAMPLE_RECOMMENDATIONS.items() if k != "executive_summary"}
         summary = self.analyzer._build_summary_json(SAMPLE_FACTUAL, no_summary)
         self.assertEqual(summary["executive_summary"], "")
+
+    def test_no_old_field_names(self):
+        self.assertNotIn("products_shown", self.summary)
+        self.assertNotIn("visitor_interests", self.summary)
+        self.assertNotIn("recommended_follow_up", self.summary)
+        self.assertNotIn("demo_duration_minutes", self.summary)
+
+    def test_fallback_from_old_field_names(self):
+        """LLM may still return old field names -- analyzer should handle gracefully."""
+        old_factual = {**SAMPLE_FACTUAL, "products_shown": ["XDR"]}
+        del old_factual["products_demonstrated"]
+        old_recs = {
+            "session_score": 5,
+            "executive_summary": "Test.",
+            "visitor_interests": [{"topic": "XDR", "confidence": "low", "evidence": "brief"}],
+            "recommended_follow_up": ["Follow up"],
+            "sdr_notes": "notes",
+        }
+        summary = self.analyzer._build_summary_json(old_factual, old_recs)
+        self.assertEqual(summary["products_demonstrated"], ["XDR"])
+        self.assertEqual(summary["key_interests"][0]["topic"], "XDR")
+        self.assertEqual(summary["follow_up_actions"], ["Follow up"])
 
 
 class TestBuildFollowUpJson(unittest.TestCase):
@@ -123,6 +150,49 @@ class TestBuildFollowUpJson(unittest.TestCase):
 
     def test_tags_from_interests(self):
         self.assertTrue(len(self.follow_up["tags"]) > 0)
+
+
+class TestValidator(unittest.TestCase):
+    def _valid_summary(self):
+        analyzer = _make_analyzer()
+        return analyzer._build_summary_json(SAMPLE_FACTUAL, SAMPLE_RECOMMENDATIONS)
+
+    def test_valid_summary_passes(self):
+        errors = validate_summary(self._valid_summary())
+        self.assertEqual(errors, [])
+
+    def test_missing_required_field(self):
+        summary = self._valid_summary()
+        del summary["visitor_name"]
+        errors = validate_summary(summary)
+        self.assertTrue(any("visitor_name" in e for e in errors))
+
+    def test_wrong_type_products(self):
+        summary = self._valid_summary()
+        summary["products_demonstrated"] = "not an array"
+        errors = validate_summary(summary)
+        self.assertTrue(any("products_demonstrated" in e for e in errors))
+
+    def test_invalid_confidence_enum(self):
+        summary = self._valid_summary()
+        summary["key_interests"] = [{"topic": "X", "confidence": "maybe", "evidence": "e"}]
+        errors = validate_summary(summary)
+        self.assertTrue(any("confidence" in e for e in errors))
+
+    def test_session_score_out_of_range(self):
+        summary = self._valid_summary()
+        summary["session_score"] = 11
+        errors = validate_summary(summary)
+        self.assertTrue(any("maximum" in e for e in errors))
+
+    def test_validate_or_raise(self):
+        summary = self._valid_summary()
+        del summary["session_id"]
+        with self.assertRaises(ValidationError):
+            validate_summary_or_raise(summary)
+
+    def test_validate_or_raise_passes(self):
+        validate_summary_or_raise(self._valid_summary())
 
 
 if __name__ == "__main__":
