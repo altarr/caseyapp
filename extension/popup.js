@@ -317,8 +317,9 @@ document.getElementById('mgmtConnectBtn').addEventListener('click', function() {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
-    .then(function(events) {
+    .then(function(data) {
       // Populate events dropdown
+      var events = data.events || data || [];
       var select = document.getElementById('mgmtEvent');
       select.innerHTML = '';
       events.forEach(function(evt) {
