@@ -1,0 +1,368 @@
+/* ================================================================
+   BoothApp Presenter — Mobile Responsive Styles
+   Targets screens under 768px width.
+   Include in all presenter pages via:
+     <link rel="stylesheet" href="styles/mobile.css">
+   ================================================================ */
+
+/* ── Base: larger fonts & spacing for readability ───────────────── */
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+    padding: 0.75rem !important;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  h1 {
+    font-size: 1.4rem !important;
+  }
+
+  h2 {
+    font-size: 1.1rem !important;
+  }
+
+  /* ── Touch targets: minimum 44px ───────────────────────────────── */
+  a, button, .btn, .filter-btn, .badge, thead th {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Preserve block display for buttons that need it */
+  button, .btn, .filter-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* ── Header: stack and simplify ────────────────────────────────── */
+  header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* ── Tables: full-width with horizontal scroll ─────────────────── */
+  .table-wrap,
+  .panel-body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 500px;
+  }
+
+  td, th {
+    padding: 0.6rem 0.5rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Hide non-essential columns: Engagement/Score (5th col) */
+  /* Sessions list: hide Engagement column */
+  #session-table thead th:nth-child(5),
+  #session-table tbody td:nth-child(5) {
+    display: none;
+  }
+
+  /* Admin session table: hide Engagement (5th) and Actions (6th keeps) */
+  .panel #session-table thead th:nth-child(5),
+  .panel #session-table tbody td:nth-child(5) {
+    display: none;
+  }
+
+  /* Analytics tables: hide rank column */
+  .table-card table thead th:first-child,
+  .table-card table tbody td:first-child {
+    display: none;
+  }
+
+  /* ── Cards: stack vertically ───────────────────────────────────── */
+  .layout {
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  /* Force all grid cards to single column */
+  .visitor-card,
+  .timeline-card,
+  .transcript-card,
+  .analysis-card {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  /* Analytics charts grid */
+  .charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  .chart-card.full-width {
+    grid-column: 1 !important;
+  }
+
+  /* KPI cards: 2 columns on mobile */
+  .kpi-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem;
+  }
+
+  .kpi-card {
+    padding: 0.8rem;
+  }
+
+  .kpi-card .value {
+    font-size: 1.3rem;
+  }
+
+  .kpi-card .label {
+    font-size: 0.65rem;
+  }
+
+  /* Admin status grid: stack to 2 cols */
+  .status-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .status-cell {
+    border-bottom: 1px solid #21262d;
+  }
+
+  .status-cell .value {
+    font-size: 1.2rem;
+  }
+
+  /* ── Detail panel (expanded session row) ───────────────────────── */
+  .detail-panel {
+    grid-template-columns: 1fr !important;
+    padding: 1rem;
+  }
+
+  .detail-actions {
+    flex-wrap: wrap;
+  }
+
+  .detail-actions a {
+    flex: 1 1 auto;
+    text-align: center;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Topbar (session-viewer) ───────────────────────────────────── */
+  .topbar {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: sticky;
+    top: 56px;
+    z-index: 99;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar-right a,
+  .topbar-right span {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ── Session-viewer scrollable areas ───────────────────────────── */
+  .timeline-scroll,
+  .transcript-scroll,
+  .analysis-scroll {
+    max-height: 400px;
+  }
+
+  .tl-thumb {
+    width: 80px;
+    height: 45px;
+  }
+
+  /* ── Visitor card on session-viewer ────────────────────────────── */
+  .visitor-info {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .visitor-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  .visitor-details h2 {
+    font-size: 18px !important;
+  }
+
+  .score-badge {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .score-badge .score-value {
+    font-size: 28px;
+  }
+
+  /* ── Filter bar ────────────────────────────────────────────────── */
+  .filter-bar {
+    gap: 0.4rem;
+  }
+
+  .filter-btn {
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 0.85rem;
+  }
+
+  /* ── Score bars ────────────────────────────────────────────────── */
+  .score-track {
+    width: 40px;
+  }
+
+  .score-bar {
+    gap: 0.3rem;
+  }
+
+  /* ── Setup screen ──────────────────────────────────────────────── */
+  .setup {
+    margin: 3rem auto;
+    padding: 0 1rem;
+  }
+
+  .setup button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .setup input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  /* ── Activity log (admin) ──────────────────────────────────────── */
+  .log-table td {
+    font-size: 0.78rem !important;
+    padding: 0.35rem 0.5rem !important;
+  }
+
+  /* ── Panel headers ─────────────────────────────────────────────── */
+  .panel-header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .panel-header h2 {
+    font-size: 0.85rem;
+  }
+
+  /* ── Action buttons in admin ───────────────────────────────────── */
+  .action-cell {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .action-cell .btn {
+    width: 100%;
+    text-align: center;
+    min-height: 44px;
+  }
+}
+
+/* ── Extra small: 480px and below ────────────────────────────────── */
+@media (max-width: 480px) {
+  body {
+    padding: 0.5rem !important;
+  }
+
+  .kpi-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Hide more columns on very small screens: Date (3rd col) */
+  #session-table thead th:nth-child(3),
+  #session-table tbody td:nth-child(3) {
+    display: none;
+  }
+
+  /* Transcript timestamps hidden on tiny screens */
+  .t-ts {
+    display: none;
+  }
+
+  .tl-time {
+    display: none;
+  }
+
+  .tl-thumb {
+    display: none;
+  }
+}
+
+/* ── Fullscreen toggle button ────────────────────────────────────── */
+.fullscreen-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 200;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #8b949e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.fullscreen-toggle:hover {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #58a6ff;
+}
+
+.fullscreen-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Hide on non-session-viewer pages by default (JS adds .has-fullscreen to body) */
+.fullscreen-toggle {
+  display: none;
+}
+
+body.has-fullscreen .fullscreen-toggle {
+  display: flex;
+}

@@ -7,6 +7,7 @@
 <title>BoothApp — Session Viewer</title>
 <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
 <script src="auth.js"></script>
+<link rel="stylesheet" href="styles/mobile.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -926,5 +927,28 @@ if (!BoothAuth.requireAwsCreds()) {
 })();
 </script>
 <script src="lib/shortcuts.js"></script>
+<!-- Fullscreen toggle -->
+<button class="fullscreen-toggle" id="fullscreen-toggle" title="Toggle fullscreen">
+  <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+</button>
+<script>
+(function() {
+  document.body.classList.add("has-fullscreen");
+  var btn = document.getElementById("fullscreen-toggle");
+  var expandSvg = '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+  var shrinkSvg = '<svg viewBox="0 0 24 24"><path d="M4 14h6v6m10-10h-6V4m0 16l6-6M14 4l-6 6"/></svg>';
+  btn.addEventListener("click", function() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(function() {});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+  document.addEventListener("fullscreenchange", function() {
+    btn.innerHTML = document.fullscreenElement ? shrinkSvg : expandSvg;
+    btn.title = document.fullscreenElement ? "Exit fullscreen" : "Toggle fullscreen";
+  });
+})();
+</script>
 </body>
 </html>
