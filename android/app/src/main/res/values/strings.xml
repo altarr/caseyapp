@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BoothApp</string>
+    <string name="capture_badge">Capture Badge</string>
+    <string name="start_session">Start Session</string>
+    <string name="end_session">End Session</string>
+    <string name="retake">Retake</string>
+    <string name="visitor_name">Visitor Name</string>
+    <string name="visitor_company">Company</string>
+    <string name="demo_pc">Demo PC</string>
+    <string name="se_name">SE Name</string>
+    <string name="processing">Processing...</string>
+    <string name="session_active">Session Active</string>
+    <string name="no_session">No Active Session</string>
+    <string name="settings">Settings</string>
+    <string name="orchestrator_url">Orchestrator URL</string>
+    <string name="save">Save</string>
+    <string name="camera_permission_required">Camera permission is required to scan badges</string>
+    <string name="ocr_extracting">Extracting badge info...</string>
+    <string name="upload_badge">Uploading badge photo...</string>
+    <string name="session_created">Session created: %s</string>
+    <string name="session_ended">Session ended</string>
+    <string name="error_no_url">Set orchestrator URL in settings first</string>
+    <string name="error_session">Error: %s</string>
+</resources>

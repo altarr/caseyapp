@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Trend Micro Brand Colors -->
+    <color name="tm_red">#D40020</color>
+    <color name="tm_red_dark">#B8001B</color>
+    <color name="tm_red_light">#FF1744</color>
+    <color name="tm_dark">#1A1A2E</color>
+    <color name="tm_dark_surface">#222240</color>
+    <color name="tm_dark_card">#2A2A4A</color>
+    <color name="tm_white">#FFFFFF</color>
+    <color name="tm_gray_light">#E0E0E0</color>
+    <color name="tm_gray">#9E9E9E</color>
+    <color name="tm_gray_dark">#616161</color>
+    <color name="tm_green">#4CAF50</color>
+    <color name="tm_amber">#FFC107</color>
+
+    <!-- Theme colors -->
+    <color name="colorPrimary">@color/tm_red</color>
+    <color name="colorPrimaryDark">@color/tm_red_dark</color>
+    <color name="colorAccent">@color/tm_red_light</color>
+    <color name="colorBackground">@color/tm_dark</color>
+    <color name="colorSurface">@color/tm_dark_surface</color>
+    <color name="colorOnPrimary">@color/tm_white</color>
+    <color name="colorOnSurface">@color/tm_white</color>
+</resources>
