@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 // Load .env if present (simple key=value parser, no extra dependency)
 const envPath = path.join(__dirname, '.env');
@@ -153,6 +154,99 @@ app.use(batchAnalyzeRouter({ bucket: S3_BUCKET }));
 // --- Screenshots API ---
 const { createRouter: screenshotsRouter } = require('./lib/screenshots');
 app.use(screenshotsRouter({ bucket: S3_BUCKET }));
+
+// --- Session creation API (web fallback for Android app) ---
+const s3 = new S3Client({ region: AWS_REGION });
+
+function generateSessionId() {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+async function s3Put(key, body) {
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET, Key: key,
+    Body: JSON.stringify(body, null, 2),
+    ContentType: 'application/json',
+  }));
+}
+
+app.post('/api/create-session', async (req, res) => {
+  try {
+    const { visitor_name, company, demo_pc, se_name } = req.body || {};
+    if (!visitor_name) return res.status(400).json({ error: 'visitor_name required' });
+    const pc = demo_pc || 'booth-pc-1';
+    if (!/^[a-zA-Z0-9_-]{1,50}$/.test(pc)) return res.status(400).json({ error: 'Invalid demo_pc' });
+
+    const session_id = generateSessionId();
+    const now = new Date().toISOString();
+
+    const metadata = {
+      session_id, visitor_name, visitor_company: company || null,
+      badge_photo: null, started_at: now, ended_at: null,
+      demo_pc: pc, se_name: se_name || null,
+      audio_consent: true, status: 'active',
+    };
+
+    await Promise.all([
+      s3Put(`sessions/${session_id}/metadata.json`, metadata),
+      s3Put(`sessions/${session_id}/state.json`, {
+        session_id, current_state: 'active', updated_at: now,
+        history: [{ from: null, to: 'active', at: now }],
+      }),
+      s3Put(`commands/${pc}/start.json`, {
+        session_id, demo_pc: pc, started_at: now,
+      }),
+      s3Put('active-session.json', {
+        session_id, active: true, started_at: now,
+        visitor_name, stop_audio: false,
+      }),
+    ]);
+
+    console.log(`[session] created ${session_id} for ${visitor_name}`);
+    res.json({ session_id, metadata });
+  } catch (err) {
+    console.error('[session] create error:', err.message);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+app.post('/api/end-session', async (req, res) => {
+  try {
+    const { session_id, demo_pc } = req.body || {};
+    if (!session_id) return res.status(400).json({ error: 'session_id required' });
+    const pc = demo_pc || 'booth-pc-1';
+    const now = new Date().toISOString();
+
+    // Fetch existing metadata to preserve all fields
+    let existing = {};
+    try {
+      const resp = await s3.send(new GetObjectCommand({
+        Bucket: S3_BUCKET, Key: `sessions/${session_id}/metadata.json`,
+      }));
+      existing = JSON.parse(await resp.Body.transformToString());
+    } catch (_) {}
+
+    await Promise.all([
+      s3Put(`sessions/${session_id}/metadata.json`, {
+        ...existing,
+        session_id, ended_at: now, status: 'completed',
+        upload_complete: true, demo_pc: pc,
+      }),
+      s3Put(`commands/${pc}/end.json`, {
+        session_id, demo_pc: pc, ended_at: now,
+      }),
+      s3.send(new DeleteObjectCommand({
+        Bucket: S3_BUCKET, Key: 'active-session.json',
+      })),
+    ]);
+
+    console.log(`[session] ended ${session_id}`);
+    res.json({ session_id, status: 'completed', ended_at: now });
+  } catch (err) {
+    console.error('[session] end error:', err.message);
+    res.status(500).json({ error: 'Failed to end session' });
+  }
+});
 
 // --- Static files ---
 app.use('/analysis', express.static(path.join(__dirname, '..', 'analysis')));

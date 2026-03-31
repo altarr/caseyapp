@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="components/error-boundary.js"></script>
+<script src="components/nav.js"></script>
+<title>BoothApp — New Session</title>
+<link rel="stylesheet" href="styles/mobile.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --bg-card-hover: #1c2333;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-red: #f85149;
+    --accent-yellow: #d29922;
+    --accent-purple: #a371f7;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  .page-header {
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+  }
+
+  .page-header p {
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+    font-size: 0.9rem;
+  }
+
+  .card {
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .form-group label .required {
+    color: var(--accent-red);
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-group input:focus {
+    border-color: var(--accent-blue);
+  }
+
+  .form-group input::placeholder {
+    color: var(--text-dim);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1.4rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent-blue);
+    color: #fff;
+  }
+
+  .btn-danger {
+    background: var(--accent-red);
+    color: #fff;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* Result panel */
+  .result {
+    display: none;
+    margin-top: 1rem;
+  }
+
+  .result.visible { display: block; }
+
+  .session-id-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--accent-green);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+  }
+
+  .session-id-display .sid {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent-green);
+    letter-spacing: 0.05em;
+  }
+
+  .session-id-display .copy-btn {
+    margin-left: auto;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .session-id-display .copy-btn:hover { color: var(--text-primary); }
+
+  .result-links {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .result-links a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  .result-links a:hover { text-decoration: underline; }
+
+  .status-msg {
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+  }
+
+  .status-msg.error {
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+  }
+
+  .status-msg.success {
+    background: rgba(63, 185, 80, 0.1);
+    border: 1px solid var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .active-session-card {
+    display: none;
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-green);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+
+  .active-session-card.visible { display: block; }
+
+  .active-session-card h2 {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .active-session-card .meta {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .active-session-card .meta span {
+    color: var(--text-primary);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>New Session</h1>
+  <p>Create a demo session for a booth visitor. Web fallback for the Android app.</p>
+</div>
+
+<div class="card" id="create-form-card">
+  <form id="session-form">
+    <div class="form-group">
+      <label>Visitor Name <span class="required">*</span></label>
+      <input type="text" id="visitor_name" placeholder="e.g. Sarah Mitchell" required autocomplete="off">
+    </div>
+
+    <div class="form-group">
+      <label>Company</label>
+      <input type="text" id="company" placeholder="e.g. Acme Corp" autocomplete="off">
+    </div>
+
+    <div class="form-group">
+      <label>SE Name</label>
+      <input type="text" id="se_name" placeholder="e.g. Casey Mondoux" autocomplete="off">
+    </div>
+
+    <div class="form-group">
+      <label>Demo PC <span class="required">*</span></label>
+      <input type="text" id="demo_pc" placeholder="e.g. booth-pc-1" required autocomplete="off">
+    </div>
+
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary" id="create-btn">Start Session</button>
+    </div>
+
+    <div id="create-status"></div>
+  </form>
+</div>
+
+<div class="active-session-card" id="active-card">
+  <h2>Session Active</h2>
+  <div class="session-id-display">
+    <span class="sid" id="active-sid"></span>
+    <button class="copy-btn" id="copy-btn">Copy</button>
+  </div>
+  <div class="meta">
+    Visitor: <span id="active-visitor"></span><br>
+    Demo PC: <span id="active-pc"></span><br>
+    Started: <span id="active-time"></span>
+  </div>
+  <div class="result-links">
+    <a id="link-viewer" href="#" target="_blank">Open Session Viewer</a>
+    <a id="link-dashboard" href="/" target="_blank">Dashboard</a>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-danger" id="end-btn">End Session</button>
+    <button class="btn btn-outline" id="new-btn">New Session</button>
+  </div>
+  <div id="end-status"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // Restore saved preferences
+  var seNameInput = document.getElementById('se_name');
+  var demoPcInput = document.getElementById('demo_pc');
+  seNameInput.value = localStorage.getItem('boothapp_se_name') || '';
+  demoPcInput.value = localStorage.getItem('boothapp_demo_pc') || 'booth-pc-1';
+
+  var activeSession = null;
+
+  // Create session
+  document.getElementById('session-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('create-btn');
+    var statusEl = document.getElementById('create-status');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating...';
+    statusEl.innerHTML = '';
+
+    var seName = seNameInput.value.trim();
+    var demoPc = demoPcInput.value.trim();
+
+    // Save preferences
+    if (seName) localStorage.setItem('boothapp_se_name', seName);
+    if (demoPc) localStorage.setItem('boothapp_demo_pc', demoPc);
+
+    fetch('/api/create-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        visitor_name: document.getElementById('visitor_name').value.trim(),
+        company: document.getElementById('company').value.trim() || undefined,
+        demo_pc: demoPc,
+        se_name: seName || undefined
+      })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btn.textContent = 'Start Session';
+
+      if (!res.ok) {
+        statusEl.innerHTML = '<div class="status-msg error">' + (res.data.error || 'Failed') + '</div>';
+        return;
+      }
+
+      activeSession = res.data;
+      showActiveSession(res.data);
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'Start Session';
+      statusEl.innerHTML = '<div class="status-msg error">Network error: ' + err.message + '</div>';
+    });
+  });
+
+  function showActiveSession(data) {
+    document.getElementById('create-form-card').style.display = 'none';
+    var card = document.getElementById('active-card');
+    card.classList.add('visible');
+
+    document.getElementById('active-sid').textContent = data.session_id;
+    document.getElementById('active-visitor').textContent = data.metadata.visitor_name;
+    document.getElementById('active-pc').textContent = data.metadata.demo_pc;
+    document.getElementById('active-time').textContent = new Date(data.metadata.started_at).toLocaleTimeString();
+    document.getElementById('link-viewer').href = '/session-viewer.html?session=' + data.session_id;
+  }
+
+  // Copy session ID
+  document.getElementById('copy-btn').addEventListener('click', function() {
+    var sid = document.getElementById('active-sid').textContent;
+    navigator.clipboard.writeText(sid).then(function() {
+      document.getElementById('copy-btn').textContent = 'Copied!';
+      setTimeout(function() { document.getElementById('copy-btn').textContent = 'Copy'; }, 1500);
+    });
+  });
+
+  // End session
+  document.getElementById('end-btn').addEventListener('click', function() {
+    if (!activeSession) return;
+    var btn = document.getElementById('end-btn');
+    var statusEl = document.getElementById('end-status');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Ending...';
+
+    fetch('/api/end-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: activeSession.session_id,
+        demo_pc: activeSession.metadata.demo_pc
+      })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btn.textContent = 'End Session';
+
+      if (!res.ok) {
+        statusEl.innerHTML = '<div class="status-msg error">' + (res.data.error || 'Failed') + '</div>';
+        return;
+      }
+
+      statusEl.innerHTML = '<div class="status-msg success">Session ended. Analysis will begin shortly.</div>';
+      btn.style.display = 'none';
+      activeSession = null;
+    })
+    .catch(function(err) {
+      btn.disabled = false;
+      btn.textContent = 'End Session';
+      statusEl.innerHTML = '<div class="status-msg error">Network error: ' + err.message + '</div>';
+    });
+  });
+
+  // New session
+  document.getElementById('new-btn').addEventListener('click', function() {
+    document.getElementById('active-card').classList.remove('visible');
+    document.getElementById('create-form-card').style.display = 'block';
+    document.getElementById('end-status').innerHTML = '';
+    document.getElementById('end-btn').style.display = '';
+    document.getElementById('visitor_name').value = '';
+    document.getElementById('company').value = '';
+    activeSession = null;
+  });
+})();
+</script>
+</body>
+</html>

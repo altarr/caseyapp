@@ -3,6 +3,7 @@
 
   var NAV_LINKS = [
     { label: 'Home', href: '/' },
+    { label: 'New Session', href: '/create-session.html' },
     { label: 'Analytics', href: '/analytics.html' },
     { label: 'Architecture', href: '/architecture.html' },
     { label: 'Demo Script', href: '/demo-script.html' },
