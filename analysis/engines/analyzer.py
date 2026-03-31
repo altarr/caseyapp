@@ -2,6 +2,8 @@ import json
 import os
 import base64
 import re
+import time
+import logging
 from datetime import datetime, timezone
 
 from .claude_client import get_client
@@ -12,10 +14,49 @@ from .prompts import (
     RECOMMENDATIONS_PROMPT,
     render_html_report,
 )
+from .validator import validate_summary_or_raise
 
 MODEL = os.environ.get("ANALYSIS_MODEL", "claude-sonnet-4-6")
 MAX_TOKENS = 4096
 MAX_SCREENSHOTS = 10
+
+API_MAX_RETRIES = 3
+API_BASE_DELAY_S = 5
+
+logger = logging.getLogger(__name__)
+
+
+def _is_retryable_api_error(err):
+    """Check if an API/Bedrock error is transient and worth retrying."""
+    import anthropic
+    if isinstance(err, anthropic.RateLimitError):
+        return True
+    if isinstance(err, anthropic.APIStatusError) and err.status_code in (429, 500, 502, 503, 529):
+        return True
+    if isinstance(err, anthropic.APIConnectionError):
+        return True
+    if isinstance(err, anthropic.APITimeoutError):
+        return True
+    err_str = str(err).lower()
+    if "throttling" in err_str or "too many requests" in err_str or "service unavailable" in err_str:
+        return True
+    return False
+
+
+def _call_with_retry(label, fn):
+    """Call fn() with exponential backoff on retryable API errors."""
+    for attempt in range(1, API_MAX_RETRIES + 1):
+        try:
+            return fn()
+        except Exception as err:
+            if attempt == API_MAX_RETRIES or not _is_retryable_api_error(err):
+                raise
+            delay = API_BASE_DELAY_S * (2 ** (attempt - 1))
+            logger.warning(
+                "%s: attempt %d/%d failed (%s), retrying in %ds...",
+                label, attempt, API_MAX_RETRIES, err, delay,
+            )
+            time.sleep(delay)
 
 
 class SessionAnalyzer:
@@ -35,6 +76,7 @@ class SessionAnalyzer:
         factual = self._pass1_factual_extraction(timeline_text, screenshot_map)
         recommendations = self._pass2_recommendations(factual)
         summary = self._build_summary_json(factual, recommendations)
+        validate_summary_or_raise(summary)
         follow_up = self._build_follow_up_json(recommendations)
         html = render_html_report(summary, follow_up, factual)
         return {
@@ -197,14 +239,17 @@ class SessionAnalyzer:
             ),
         })
 
-        with client.messages.stream(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_FACTUAL,
-            messages=[{"role": "user", "content": user_content}],
-            thinking={"type": "adaptive"},
-        ) as stream:
-            message = stream.get_final_message()
+        def _do_pass1():
+            with client.messages.stream(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_FACTUAL,
+                messages=[{"role": "user", "content": user_content}],
+                thinking={"type": "adaptive"},
+            ) as stream:
+                return stream.get_final_message()
+
+        message = _call_with_retry("pass1_factual", _do_pass1)
 
         text = next(
             (b.text for b in message.content if hasattr(b, "text")),
@@ -224,14 +269,17 @@ class SessionAnalyzer:
             se_name=se_name,
         )
 
-        with client.messages.stream(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_RECOMMENDATIONS,
-            messages=[{"role": "user", "content": prompt}],
-            thinking={"type": "adaptive"},
-        ) as stream:
-            message = stream.get_final_message()
+        def _do_pass2():
+            with client.messages.stream(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_RECOMMENDATIONS,
+                messages=[{"role": "user", "content": prompt}],
+                thinking={"type": "adaptive"},
+            ) as stream:
+                return stream.get_final_message()
+
+        message = _call_with_retry("pass2_recommendations", _do_pass2)
 
         text = next(
             (b.text for b in message.content if hasattr(b, "text")),
@@ -245,26 +293,26 @@ class SessionAnalyzer:
 
         started = self._metadata.get("started_at", "")
         ended = self._metadata.get("ended_at", "")
-        duration_minutes = 0
+        duration_seconds = 0
         if started and ended:
             try:
                 fmt = "%Y-%m-%dT%H:%M:%SZ"
                 delta = datetime.strptime(ended, fmt) - datetime.strptime(started, fmt)
-                duration_minutes = round(delta.total_seconds() / 60)
+                duration_seconds = round(delta.total_seconds())
             except ValueError:
-                duration_minutes = factual.get("session_stats", {}).get("duration_seconds", 0) // 60
+                duration_seconds = factual.get("session_stats", {}).get("duration_seconds", 0)
 
         tenant_url = self._tenant.get("tenant_url", "")
 
         return {
             "session_id": session_id,
             "visitor_name": visitor_name,
-            "demo_duration_minutes": duration_minutes,
+            "products_demonstrated": factual.get("products_demonstrated", factual.get("products_shown", [])),
+            "key_interests": recommendations.get("key_interests", recommendations.get("visitor_interests", [])),
+            "follow_up_actions": recommendations.get("follow_up_actions", recommendations.get("recommended_follow_up", [])),
+            "demo_duration_seconds": duration_seconds,
             "session_score": recommendations.get("session_score", 0),
             "executive_summary": recommendations.get("executive_summary", ""),
-            "products_shown": factual.get("products_shown", []),
-            "visitor_interests": recommendations.get("visitor_interests", []),
-            "recommended_follow_up": recommendations.get("recommended_follow_up", []),
             "key_moments": [
                 {
                     "timestamp": m.get("timestamp_rel", ""),
@@ -283,7 +331,7 @@ class SessionAnalyzer:
         visitor_email = self._metadata.get("visitor_email", "")
         tenant_url = self._tenant.get("tenant_url", "")
 
-        interests = recommendations.get("visitor_interests", [])
+        interests = recommendations.get("key_interests", recommendations.get("visitor_interests", []))
         tags = list({
             i["topic"].lower().split()[0]
             for i in interests
