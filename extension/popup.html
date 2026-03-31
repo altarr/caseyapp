@@ -585,7 +585,7 @@
       margin-bottom: 16px;
     }
 
-    .qr-image-wrap img {
+    .qr-image-wrap svg {
       width: 200px;
       height: 200px;
       display: block;
@@ -739,7 +739,7 @@
       <div class="qr-title">Scan with BoothApp</div>
       <div class="qr-subtitle">Point your phone camera at this QR code</div>
       <div class="qr-image-wrap">
-        <img id="qrImage" alt="QR Code" />
+        <div id="qrImage" style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;"></div>
       </div>
       <div class="qr-close-btn-wrap">
         <button class="qr-close-btn" id="qrCloseBtn">Close</button>

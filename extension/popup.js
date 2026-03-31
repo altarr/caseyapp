@@ -291,12 +291,18 @@ document.getElementById('pairBtn').addEventListener('click', function() {
     };
 
     var json = JSON.stringify(payload);
-    var dataUrl = QRCode.toDataURL(json, 280);
 
-    if (dataUrl) {
-      document.getElementById('qrImage').src = dataUrl;
-      document.getElementById('qrOverlay').classList.add('visible');
-    }
+    // Generate QR code using qrcode-generator (Kazuhiko Arase, MIT)
+    // typeNumber 0 = auto-detect version, 'M' = medium error correction
+    var qr = qrcode(0, 'M');
+    qr.addData(json);
+    qr.make();
+
+    // Render as SVG (no canvas dependency)
+    var svgTag = qr.createSvgTag(4, 0);
+    var container = document.getElementById('qrImage');
+    container.innerHTML = svgTag;
+    document.getElementById('qrOverlay').classList.add('visible');
   });
 });
 
