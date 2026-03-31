@@ -1,0 +1,15 @@
+{
+  "description": "BoothApp demo resources for tracking and cleanup",
+  "demo_date": "2026-04-01",
+  "cleanup_tag": "boothapp-cleanup=demo-2026-04-01",
+  "s3_bucket": "boothapp-sessions-752266476357",
+  "managed_prefixes": [
+    "tenant-pool/",
+    "sessions/DEMO",
+    "sessions/SIM",
+    "commands/",
+    "active-session.json"
+  ],
+  "cleanup_command": "bash scripts/demo-cleanup.sh",
+  "setup_command": "bash scripts/setup-demo-tenants.sh"
+}
