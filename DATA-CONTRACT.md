@@ -41,7 +41,8 @@ sessions/<session-id>/
   "demo_pc": "booth-pc-3",
   "se_name": "Casey Mondoux",
   "audio_consent": true,
-  "status": "completed"
+  "status": "completed",
+  "tags": ["hot-lead", "follow-up-needed"]
 }
 ```
 
