@@ -25,10 +25,11 @@
 'use strict';
 
 const http = require('http');
-const { listSessions, isSessionComplete, isAlreadyClaimed, writeMarker, updateMetadata } = require('./lib/s3');
+const { listSessions, isSessionComplete, isAlreadyClaimed, writeMarker, updateMetadata, getJson } = require('./lib/s3');
 const { triggerPipeline } = require('./lib/pipeline');
 const { sendNotification } = require('./lib/notify');
 const { withRetry } = require('./lib/retry');
+const { validateSession } = require('../infra/validator');
 const { spawn } = require('child_process');
 const path = require('path');
 const health = require('./watcher-health');
@@ -149,7 +150,32 @@ async function pollOnce() {
         }
       }
 
-      log(`  ${sessionId}: COMPLETE — claiming and triggering analysis`);
+      // Validate session data before proceeding to analysis
+      let metadata, clicks, transcript;
+      try {
+        [metadata, clicks, transcript] = await Promise.all([
+          getJson(BUCKET, `sessions/${sessionId}/metadata.json`),
+          getJson(BUCKET, `sessions/${sessionId}/clicks/clicks.json`),
+          getJson(BUCKET, `sessions/${sessionId}/transcript/transcript.json`),
+        ]);
+      } catch (err) {
+        log(`  ${sessionId}: ERROR fetching session data for validation — ${err.message}`);
+        return;
+      }
+
+      const validation = validateSession(metadata, clicks, transcript);
+      if (validation.warnings.length > 0) {
+        validation.warnings.forEach((w) => log(`  ${sessionId}: WARN ${w}`));
+      }
+      if (!validation.valid) {
+        health.recordFailed(sessionId);
+        validation.errors.forEach((e) => log(`  ${sessionId}: VALIDATION ERROR ${e}`));
+        log(`  ${sessionId}: skipping analysis — ${validation.errors.length} validation error(s)`);
+        dispatched.add(sessionId); // don't re-check every poll cycle
+        return;
+      }
+
+      log(`  ${sessionId}: COMPLETE — validation passed, claiming and triggering analysis`);
 
       // Write claim marker before launching pipeline to prevent double-dispatch
       // on concurrent watcher instances or rapid restarts
