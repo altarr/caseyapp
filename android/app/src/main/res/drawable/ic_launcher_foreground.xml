@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Trend Micro red shield/camera icon -->
+    <path
+        android:fillColor="#D40020"
+        android:pathData="M54,24L30,36v18c0,16.6 10.2,32.1 24,36c13.8,-3.9 24,-19.4 24,-36V36L54,24z" />
+    <!-- Camera lens circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,48m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+    <path
+        android:fillColor="#D40020"
+        android:pathData="M54,48m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>
