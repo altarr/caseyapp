@@ -4,8 +4,15 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 
+const RONE_KEY = process.env.RONE_AI_API_KEY;
+const RONE_URL = process.env.RONE_AI_BASE_URL;
+
 const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.RONE_AI_API_KEY,
+  apiKey: RONE_KEY || process.env.ANTHROPIC_API_KEY,
+  ...(RONE_URL && {
+    baseURL: RONE_URL,
+    defaultHeaders: { 'Authorization': `Bearer ${RONE_KEY}` },
+  }),
 });
 const MODEL = process.env.ANALYSIS_MODEL || 'claude-sonnet-4-6';
 
