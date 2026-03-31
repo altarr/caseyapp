@@ -546,6 +546,7 @@ if (!BoothAuth.requireAwsCreds()) {
       <a href="replay.html" id="link-replay">Replay</a>
       <a href="session.html" id="link-live">Live View</a>
       <a href="email-generator.html" id="link-email">Email</a>
+      <a href="#" id="link-prep">Meeting Prep</a>
       <a href="#" id="link-print" style="cursor:pointer">Print Report</a>
       <span id="auth-user" style="font-family:monospace"></span>
       <a href="#" id="logout-link">logout</a>
@@ -636,6 +637,7 @@ if (!BoothAuth.requireAwsCreds()) {
   document.getElementById("link-replay").href = "replay.html?session=" + encodeURIComponent(sessionId);
   document.getElementById("link-live").href = "session.html?session=" + encodeURIComponent(sessionId);
   document.getElementById("link-email").href = "email-generator.html?session=" + encodeURIComponent(sessionId);
+  document.getElementById("link-prep").href = "meeting-prep.html?session=" + encodeURIComponent(sessionId);
   document.getElementById("link-print").addEventListener("click", function (e) {
     e.preventDefault();
     openPrintReport();
