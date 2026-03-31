@@ -22,15 +22,15 @@ SAMPLE_SUMMARY = {
     "session_id": "TEST-001",
     "visitor_name": "Jane Doe",
     "se_name": "Casey M",
-    "demo_duration_minutes": 17,
+    "demo_duration_seconds": 1020,
     "session_score": 8,
     "executive_summary": "Strong interest in endpoint security.",
-    "products_shown": ["Endpoint Security", "XDR"],
-    "visitor_interests": [
+    "products_demonstrated": ["Endpoint Security", "XDR"],
+    "key_interests": [
         {"topic": "BYOD", "confidence": "high", "evidence": "Asked 3 questions"},
         {"topic": "XDR", "confidence": "medium", "evidence": "Explored workbench"},
     ],
-    "recommended_follow_up": ["Send POC guide", "Schedule deep-dive"],
+    "follow_up_actions": ["Send POC guide", "Schedule deep-dive"],
     "key_moments": [
         {"timestamp": "02:30", "description": "Asked about BYOD", "impact": "Key concern"},
     ],
