@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="components/error-boundary.js"></script>
+<script src="components/nav.js"></script>
+<title>BoothApp — Meeting Prep Brief</title>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+<script src="auth.js"></script>
+<link rel="stylesheet" href="styles/mobile.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #484f58;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #f78166;
+    --radius: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* -- Loading / Error screens -- */
+  #loading, #error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 16px;
+    padding: 24px;
+  }
+  #loading .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #error { color: var(--red); }
+  #error .msg { max-width: 500px; text-align: center; color: var(--text2); }
+
+  .hidden { display: none !important; }
+
+  /* -- Brief container -- */
+  .brief {
+    max-width: 800px;
+    margin: 24px auto;
+    padding: 0 24px;
+  }
+
+  .brief-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .brief-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .brief-header .brief-meta {
+    font-size: 0.8rem;
+    color: var(--text3);
+    text-align: right;
+  }
+
+  .brief-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .btn:hover { color: var(--text); border-color: var(--accent); }
+  .btn-primary { background: var(--accent-dim); color: #fff; border-color: var(--accent-dim); }
+  .btn-primary:hover { background: var(--accent); }
+  .btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* -- Section cards -- */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .section-title .icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .section-body {
+    padding: 16px 18px;
+  }
+
+  /* -- Visitor card -- */
+  .visitor-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .visitor-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .visitor-info h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .visitor-info .detail {
+    font-size: 0.82rem;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  .visitor-info .detail strong { color: var(--text); font-weight: 500; }
+
+  /* -- Score badge -- */
+  .score-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .score-badge.high { background: rgba(63,185,80,0.15); color: var(--green); }
+  .score-badge.mid { background: rgba(210,153,34,0.15); color: var(--yellow); }
+  .score-badge.low { background: rgba(248,81,73,0.15); color: var(--red); }
+
+  /* -- Tags / chips -- */
+  .chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin: 2px 4px 2px 0;
+  }
+  .chip.blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .chip.purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .chip.green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .chip.orange { background: rgba(247,129,102,0.15); color: var(--orange); }
+  .chip.yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
+
+  /* -- Interest item -- */
+  .interest-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .interest-item:last-child { border-bottom: none; }
+
+  .confidence-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .confidence-dot.high { background: var(--green); }
+  .confidence-dot.medium { background: var(--yellow); }
+  .confidence-dot.low { background: var(--red); }
+
+  .interest-topic {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .interest-evidence {
+    font-size: 0.78rem;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  /* -- Talking points -- */
+  .talking-point {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .talking-point:last-child { border-bottom: none; }
+
+  .tp-number {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .tp-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* -- Action items -- */
+  .action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .action-item:last-child { border-bottom: none; }
+
+  .action-check {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .action-text {
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+
+  /* -- Key moments -- */
+  .moment-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .moment-item:last-child { border-bottom: none; }
+
+  .moment-time {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+    min-width: 50px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .moment-desc {
+    font-size: 0.85rem;
+    color: var(--text);
+  }
+  .moment-impact {
+    font-size: 0.78rem;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  /* -- Notes -- */
+  .notes-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    line-height: 1.6;
+  }
+
+  .empty-state {
+    font-size: 0.82rem;
+    color: var(--text3);
+    font-style: italic;
+    padding: 8px 0;
+  }
+
+  /* -- Print styles -- */
+  @media print {
+    body {
+      background: #fff;
+      color: #111;
+      font-size: 11pt;
+    }
+    #ba-nav, .brief-actions, .btn { display: none !important; }
+    .brief { max-width: 100%; padding: 0; margin: 0; }
+    .section {
+      background: #fff;
+      border: 1px solid #ddd;
+      break-inside: avoid;
+    }
+    .section-title { background: #f5f5f5; color: #111; border-color: #ddd; }
+    .section-body { color: #333; }
+    .visitor-info h2, .interest-topic, .tp-text, .action-text, .moment-desc, .notes-text {
+      color: #111;
+    }
+    .visitor-info .detail, .interest-evidence, .moment-impact { color: #555; }
+    .chip { border: 1px solid #ccc; background: #f5f5f5; color: #333; }
+    .score-badge { border: 1px solid #ccc; }
+    .score-badge.high { background: #e6f9ed; color: #1a7f37; }
+    .score-badge.mid { background: #fff8e1; color: #7a6200; }
+    .score-badge.low { background: #ffeef0; color: #a40e26; }
+    .visitor-avatar { background: #ddd; color: #333; }
+    .tp-number { background: #555; }
+    .confidence-dot.high { background: #1a7f37; }
+    .confidence-dot.medium { background: #7a6200; }
+    .confidence-dot.low { background: #a40e26; }
+    .brief-header { border-bottom: 2px solid #111; padding-bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text2); font-size:0.9rem;">Loading meeting brief...</div>
+</div>
+
+<div id="error" class="hidden">
+  <div style="font-size:1.5rem; margin-bottom:8px;">!</div>
+  <div class="msg" id="error-msg">Session not found</div>
+  <a href="/" class="btn" style="margin-top:16px;">Back to Dashboard</a>
+</div>
+
+<div id="app" class="hidden">
+  <div class="brief">
+
+    <div class="brief-header">
+      <div>
+        <h1>Pre-Meeting Brief</h1>
+        <div class="brief-meta" id="brief-meta"></div>
+      </div>
+      <div class="brief-actions">
+        <button class="btn" id="btn-print" title="Print">
+          <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+        <a class="btn" id="btn-session" title="View full session">
+          <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          Full Session
+        </a>
+        <button class="btn btn-primary" id="btn-copy" title="Copy as text">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          Copy
+        </button>
+      </div>
+    </div>
+
+    <!-- Visitor Overview -->
+    <div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:var(--accent)">V</div>
+        Visitor Overview
+      </div>
+      <div class="section-body" id="sec-visitor"></div>
+    </div>
+
+    <!-- Demo Recap -->
+    <div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:var(--purple)">D</div>
+        Demo Recap
+      </div>
+      <div class="section-body" id="sec-recap"></div>
+    </div>
+
+    <!-- Key Interests -->
+    <div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:var(--green)">I</div>
+        Key Interests
+      </div>
+      <div class="section-body" id="sec-interests"></div>
+    </div>
+
+    <!-- Key Moments -->
+    <div class="section" id="sec-moments-wrap">
+      <div class="section-title">
+        <div class="icon" style="background:var(--yellow)">M</div>
+        Key Moments
+      </div>
+      <div class="section-body" id="sec-moments"></div>
+    </div>
+
+    <!-- Talking Points -->
+    <div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:var(--orange)">T</div>
+        Suggested Talking Points
+      </div>
+      <div class="section-body" id="sec-talking"></div>
+    </div>
+
+    <!-- Follow-Up Actions -->
+    <div class="section">
+      <div class="section-title">
+        <div class="icon" style="background:var(--red)">A</div>
+        Follow-Up Actions
+      </div>
+      <div class="section-body" id="sec-actions"></div>
+    </div>
+
+    <!-- SE / Manager Notes -->
+    <div class="section" id="sec-notes-wrap">
+      <div class="section-title">
+        <div class="icon" style="background:var(--text3)">N</div>
+        Session Notes
+      </div>
+      <div class="section-body" id="sec-notes"></div>
+    </div>
+
+    <!-- Visitor Feedback -->
+    <div class="section" id="sec-feedback-wrap">
+      <div class="section-title">
+        <div class="icon" style="background:var(--accent-dim)">F</div>
+        Visitor Feedback
+      </div>
+      <div class="section-body" id="sec-feedback"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // -- Auth gate --
+  if (!BoothAuth.requireLogin()) return;
+  if (!BoothAuth.requireAwsCreds()) {
+    window.location.href = "sessions.html";
+    return;
+  }
+
+  // -- Parse session ID --
+  var params = new URLSearchParams(window.location.search);
+  var sessionId = params.get("session");
+  if (!sessionId) {
+    showError("No session ID provided. Use ?session=ID");
+    return;
+  }
+
+  // -- AWS S3 setup --
+  var BUCKET = "boothapp-sessions-752266476357";
+  var REGION = "us-east-1";
+  var ak = localStorage.getItem("boothapp_aws_ak");
+  var sk = localStorage.getItem("boothapp_aws_sk");
+  AWS.config.update({ accessKeyId: ak, secretAccessKey: sk, region: REGION });
+  var s3 = new AWS.S3({ params: { Bucket: BUCKET } });
+
+  // -- DOM refs --
+  var loadingEl = document.getElementById("loading");
+  var errorEl = document.getElementById("error");
+  var appEl = document.getElementById("app");
+
+  function esc(str) {
+    var d = document.createElement("div");
+    d.textContent = String(str || "");
+    return d.innerHTML;
+  }
+
+  function show(screen) {
+    loadingEl.style.display = screen === "loading" ? "flex" : "none";
+    errorEl.style.display   = screen === "error"   ? "flex" : "none";
+    appEl.style.display     = screen === "app"     ? "block" : "none";
+  }
+
+  function showError(msg) {
+    document.getElementById("error-msg").textContent = msg;
+    show("error");
+  }
+
+  function fetchS3Json(key) {
+    return new Promise(function (resolve, reject) {
+      s3.getObject({ Key: key }, function (err, data) {
+        if (err) { reject(err); return; }
+        try { resolve(JSON.parse(data.Body.toString())); }
+        catch (e) { reject(e); }
+      });
+    });
+  }
+
+  function formatDuration(startIso, endIso) {
+    if (!startIso) return "--";
+    var end = endIso || new Date().toISOString();
+    var ms = new Date(end).getTime() - new Date(startIso).getTime();
+    var mins = Math.round(ms / 60000);
+    return mins + " min";
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "--";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "--";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+      " " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  // -- Load all data --
+  var prefix = "sessions/" + sessionId + "/";
+
+  var metadataP = fetchS3Json(prefix + "metadata.json").catch(function () { return null; });
+  var summaryP  = fetchS3Json(prefix + "output/summary.json").catch(function () { return null; });
+  var followUpP = fetchS3Json(prefix + "output/follow-up.json").catch(function () { return null; });
+  var feedbackP = fetchS3Json(prefix + "feedback.json").catch(function () { return null; });
+  var notesP    = fetchS3Json(prefix + "output/notes.json").catch(function () { return null; });
+
+  Promise.all([metadataP, summaryP, followUpP, feedbackP, notesP])
+    .then(function (results) {
+      var meta     = results[0];
+      var summary  = results[1];
+      var followUp = results[2];
+      var feedback = results[3];
+      var notes    = results[4];
+
+      if (!meta) {
+        showError("Session not found: " + sessionId);
+        return;
+      }
+
+      show("app");
+      renderBrief(meta, summary, followUp, feedback, notes);
+    })
+    .catch(function (err) {
+      showError("Error loading session: " + (err.message || err));
+    });
+
+  // -- Render the brief --
+  function renderBrief(meta, summary, followUp, feedback, notes) {
+    // Header meta
+    var metaEl = document.getElementById("brief-meta");
+    metaEl.innerHTML = "Session " + esc(sessionId) + "<br>" + esc(formatDate(meta.started_at));
+
+    // Session link
+    document.getElementById("btn-session").href = "session-viewer.html?session=" + encodeURIComponent(sessionId);
+
+    // -- Visitor Overview --
+    var visitorHtml = '<div class="visitor-row">';
+    var initials = (meta.visitor_name || "?").split(" ").map(function (w) { return w.charAt(0); }).join("").toUpperCase().slice(0, 2);
+    visitorHtml += '<div class="visitor-avatar">' + esc(initials) + '</div>';
+    visitorHtml += '<div class="visitor-info">';
+    visitorHtml += '<h2>' + esc(meta.visitor_name || "Unknown Visitor") + '</h2>';
+    visitorHtml += '<div class="detail">';
+
+    if (meta.visitor_title) visitorHtml += esc(meta.visitor_title) + '<br>';
+    if (meta.visitor_company) visitorHtml += esc(meta.visitor_company) + '<br>';
+
+    visitorHtml += '<strong>SE:</strong> ' + esc(meta.se_name || "--") +
+      ' &nbsp;|&nbsp; <strong>Duration:</strong> ' + esc(formatDuration(meta.started_at, meta.ended_at)) +
+      ' &nbsp;|&nbsp; <strong>Demo PC:</strong> ' + esc(meta.demo_pc || "--");
+
+    if (summary && summary.session_score != null) {
+      var score = Number(summary.session_score);
+      var cls = score >= 7 ? "high" : score >= 4 ? "mid" : "low";
+      visitorHtml += '<br><span class="score-badge ' + cls + '">Score: ' + esc(summary.session_score) + '/10</span>';
+    }
+
+    // Tags
+    if (meta.tags && meta.tags.length) {
+      visitorHtml += '<br>';
+      for (var t = 0; t < meta.tags.length; t++) {
+        visitorHtml += '<span class="chip orange">' + esc(meta.tags[t]) + '</span>';
+      }
+    }
+
+    // Follow-up priority/tags
+    if (followUp) {
+      if (followUp.priority) {
+        var priColor = followUp.priority === "high" ? "green" : followUp.priority === "medium" ? "yellow" : "blue";
+        visitorHtml += '<br><strong>Priority:</strong> <span class="chip ' + priColor + '">' + esc(followUp.priority) + '</span>';
+      }
+      if (followUp.sdr_notes) {
+        visitorHtml += '<br><strong>SDR:</strong> ' + esc(followUp.sdr_notes);
+      }
+    }
+
+    visitorHtml += '</div></div></div>';
+    document.getElementById("sec-visitor").innerHTML = visitorHtml;
+
+    // -- Demo Recap --
+    var recapHtml = '';
+    if (summary && summary.executive_summary) {
+      recapHtml += '<div style="font-size:0.9rem;color:var(--text);line-height:1.65;margin-bottom:12px;">' +
+        esc(summary.executive_summary) + '</div>';
+    } else {
+      recapHtml += '<div class="empty-state">No analysis summary available yet.</div>';
+    }
+
+    if (summary && summary.products_demonstrated && summary.products_demonstrated.length) {
+      recapHtml += '<div style="margin-top:8px;">';
+      for (var p = 0; p < summary.products_demonstrated.length; p++) {
+        recapHtml += '<span class="chip purple">' + esc(summary.products_demonstrated[p]) + '</span>';
+      }
+      recapHtml += '</div>';
+    }
+    document.getElementById("sec-recap").innerHTML = recapHtml;
+
+    // -- Key Interests --
+    var interestsHtml = '';
+    var interests = (summary && summary.key_interests) ? summary.key_interests : [];
+    if (interests.length === 0) {
+      interestsHtml = '<div class="empty-state">No interest data available.</div>';
+    } else {
+      for (var i = 0; i < interests.length; i++) {
+        var item = interests[i];
+        var conf = (item.confidence || "medium").toLowerCase();
+        interestsHtml += '<div class="interest-item">' +
+          '<div class="confidence-dot ' + esc(conf) + '"></div>' +
+          '<div>' +
+            '<div class="interest-topic">' + esc(item.topic) + '</div>' +
+            (item.evidence ? '<div class="interest-evidence">' + esc(item.evidence) + '</div>' : '') +
+          '</div></div>';
+      }
+    }
+    document.getElementById("sec-interests").innerHTML = interestsHtml;
+
+    // -- Key Moments --
+    var moments = (summary && summary.key_moments) ? summary.key_moments : [];
+    if (moments.length === 0) {
+      document.getElementById("sec-moments-wrap").style.display = "none";
+    } else {
+      var momentsHtml = '';
+      for (var m = 0; m < moments.length; m++) {
+        var mo = moments[m];
+        momentsHtml += '<div class="moment-item">' +
+          '<div class="moment-time">' + esc(mo.timestamp || "--") + '</div>' +
+          '<div>' +
+            '<div class="moment-desc">' + esc(mo.description) + '</div>' +
+            (mo.impact ? '<div class="moment-impact">' + esc(mo.impact) + '</div>' : '') +
+          '</div></div>';
+      }
+      document.getElementById("sec-moments").innerHTML = momentsHtml;
+    }
+
+    // -- Talking Points (generated from interests + products + feedback) --
+    var talkingPoints = generateTalkingPoints(meta, summary, followUp, feedback);
+    var talkingHtml = '';
+    if (talkingPoints.length === 0) {
+      talkingHtml = '<div class="empty-state">Not enough data to generate talking points.</div>';
+    } else {
+      for (var tp = 0; tp < talkingPoints.length; tp++) {
+        talkingHtml += '<div class="talking-point">' +
+          '<div class="tp-number">' + (tp + 1) + '</div>' +
+          '<div class="tp-text">' + esc(talkingPoints[tp]) + '</div>' +
+          '</div>';
+      }
+    }
+    document.getElementById("sec-talking").innerHTML = talkingHtml;
+
+    // -- Follow-Up Actions --
+    var actions = (summary && summary.follow_up_actions) ? summary.follow_up_actions : [];
+    var actionsHtml = '';
+    if (actions.length === 0) {
+      actionsHtml = '<div class="empty-state">No follow-up actions generated.</div>';
+    } else {
+      for (var a = 0; a < actions.length; a++) {
+        actionsHtml += '<div class="action-item">' +
+          '<div class="action-check"></div>' +
+          '<div class="action-text">' + esc(actions[a]) + '</div>' +
+          '</div>';
+      }
+    }
+    document.getElementById("sec-actions").innerHTML = actionsHtml;
+
+    // -- SE / Manager Notes --
+    if (notes && notes.text) {
+      document.getElementById("sec-notes").innerHTML =
+        '<div class="notes-text">' + esc(notes.text) + '</div>' +
+        (notes.updated_by ? '<div style="margin-top:8px;font-size:0.75rem;color:var(--text3);">-- ' + esc(notes.updated_by) + ', ' + esc(formatDate(notes.updated_at)) + '</div>' : '');
+    } else {
+      document.getElementById("sec-notes-wrap").style.display = "none";
+    }
+
+    // -- Visitor Feedback --
+    if (feedback && (feedback.rating || feedback.products_interested || feedback.additional_comments)) {
+      var fbHtml = '';
+      if (feedback.rating != null) {
+        var label = feedback.rating_label || ("Rating: " + feedback.rating);
+        fbHtml += '<div style="margin-bottom:8px;">';
+        for (var s = 1; s <= 5; s++) {
+          fbHtml += '<span style="color:' + (s <= feedback.rating ? 'var(--yellow)' : 'var(--text3)') + ';font-size:1.1rem;">*</span>';
+        }
+        fbHtml += ' <span style="font-size:0.82rem;color:var(--text2);">' + esc(label) + '</span></div>';
+      }
+      if (feedback.products_interested && feedback.products_interested.length) {
+        fbHtml += '<div style="margin-bottom:8px;"><strong style="font-size:0.8rem;color:var(--text2);">Interested in:</strong><br>';
+        for (var fi = 0; fi < feedback.products_interested.length; fi++) {
+          fbHtml += '<span class="chip blue">' + esc(feedback.products_interested[fi]) + '</span>';
+        }
+        fbHtml += '</div>';
+      }
+      if (feedback.additional_comments) {
+        fbHtml += '<div class="notes-text">"' + esc(feedback.additional_comments) + '"</div>';
+      }
+      if (feedback.contact_preference) {
+        fbHtml += '<div style="margin-top:8px;font-size:0.78rem;color:var(--text2);">Prefers contact via: ' + esc(feedback.contact_preference) + '</div>';
+      }
+      document.getElementById("sec-feedback").innerHTML = fbHtml;
+    } else {
+      document.getElementById("sec-feedback-wrap").style.display = "none";
+    }
+
+    // -- Button handlers --
+    document.getElementById("btn-print").addEventListener("click", function () {
+      window.print();
+    });
+
+    document.getElementById("btn-copy").addEventListener("click", function () {
+      var text = buildPlainText(meta, summary, followUp, feedback, notes, talkingPoints);
+      navigator.clipboard.writeText(text).then(function () {
+        var btn = document.getElementById("btn-copy");
+        btn.textContent = "Copied!";
+        setTimeout(function () { btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy'; }, 2000);
+      });
+    });
+  }
+
+  // -- Generate talking points from available data --
+  function generateTalkingPoints(meta, summary, followUp, feedback) {
+    var points = [];
+
+    // Opener: reference the demo
+    if (meta.visitor_name && meta.se_name) {
+      points.push("Open by referencing the demo " + meta.visitor_name + " had with " + meta.se_name + " at the booth -- ask what stood out to them since.");
+    }
+
+    // High-confidence interests become talking points
+    var interests = (summary && summary.key_interests) ? summary.key_interests : [];
+    for (var i = 0; i < interests.length; i++) {
+      if ((interests[i].confidence || "").toLowerCase() === "high") {
+        points.push("Deep-dive on " + interests[i].topic + " -- they showed strong interest (" + (interests[i].evidence || "multiple signals") + ").");
+      }
+    }
+
+    // Products demonstrated -> ask about their current stack
+    var products = (summary && summary.products_demonstrated) ? summary.products_demonstrated : [];
+    if (products.length > 0) {
+      points.push("Ask about their current tooling for " + products.join(", ") + " -- identify gaps Vision One can fill.");
+    }
+
+    // Feedback comments suggest specific interest
+    if (feedback && feedback.additional_comments) {
+      points.push('Visitor specifically mentioned: "' + feedback.additional_comments + '" -- address this directly.');
+    }
+
+    // Products they expressed interest in (from feedback) that weren't demoed
+    if (feedback && feedback.products_interested && products.length > 0) {
+      var undemoed = feedback.products_interested.filter(function (p) {
+        return products.indexOf(p) === -1;
+      });
+      if (undemoed.length > 0) {
+        points.push("They also expressed interest in " + undemoed.join(", ") + " (not covered in demo) -- offer a focused session on these.");
+      }
+    }
+
+    // V1 tenant link as a hook
+    if (summary && summary.v1_tenant_link) {
+      points.push("Remind them their V1 tenant is still active -- encourage hands-on exploration before it expires.");
+    }
+
+    // Close with next steps from follow-up actions
+    var actions = (summary && summary.follow_up_actions) ? summary.follow_up_actions : [];
+    if (actions.length > 0) {
+      points.push("Close by confirming next steps: " + actions[0] + (actions.length > 1 ? " (and " + (actions.length - 1) + " more action items)." : "."));
+    }
+
+    return points;
+  }
+
+  // -- Plain text version for clipboard --
+  function buildPlainText(meta, summary, followUp, feedback, notes, talkingPoints) {
+    var lines = [];
+    lines.push("PRE-MEETING BRIEF");
+    lines.push("Session: " + sessionId + "  |  " + formatDate(meta.started_at));
+    lines.push("=".repeat(60));
+    lines.push("");
+
+    lines.push("VISITOR");
+    lines.push("  Name: " + (meta.visitor_name || "--"));
+    if (meta.visitor_title) lines.push("  Title: " + meta.visitor_title);
+    if (meta.visitor_company) lines.push("  Company: " + meta.visitor_company);
+    lines.push("  SE: " + (meta.se_name || "--"));
+    lines.push("  Duration: " + formatDuration(meta.started_at, meta.ended_at));
+    if (summary && summary.session_score != null) lines.push("  Score: " + summary.session_score + "/10");
+    if (followUp && followUp.priority) lines.push("  Priority: " + followUp.priority);
+    lines.push("");
+
+    if (summary && summary.executive_summary) {
+      lines.push("DEMO RECAP");
+      lines.push("  " + summary.executive_summary);
+      if (summary.products_demonstrated && summary.products_demonstrated.length) {
+        lines.push("  Products: " + summary.products_demonstrated.join(", "));
+      }
+      lines.push("");
+    }
+
+    var interests = (summary && summary.key_interests) ? summary.key_interests : [];
+    if (interests.length > 0) {
+      lines.push("KEY INTERESTS");
+      for (var i = 0; i < interests.length; i++) {
+        var item = interests[i];
+        lines.push("  [" + (item.confidence || "?") + "] " + item.topic + (item.evidence ? " -- " + item.evidence : ""));
+      }
+      lines.push("");
+    }
+
+    if (talkingPoints.length > 0) {
+      lines.push("TALKING POINTS");
+      for (var t = 0; t < talkingPoints.length; t++) {
+        lines.push("  " + (t + 1) + ". " + talkingPoints[t]);
+      }
+      lines.push("");
+    }
+
+    var actions = (summary && summary.follow_up_actions) ? summary.follow_up_actions : [];
+    if (actions.length > 0) {
+      lines.push("FOLLOW-UP ACTIONS");
+      for (var a = 0; a < actions.length; a++) {
+        lines.push("  [ ] " + actions[a]);
+      }
+      lines.push("");
+    }
+
+    if (notes && notes.text) {
+      lines.push("SE NOTES");
+      lines.push("  " + notes.text);
+      lines.push("");
+    }
+
+    if (feedback && feedback.additional_comments) {
+      lines.push("VISITOR FEEDBACK");
+      if (feedback.rating) lines.push("  Rating: " + feedback.rating + "/5" + (feedback.rating_label ? " (" + feedback.rating_label + ")" : ""));
+      lines.push('  Comment: "' + feedback.additional_comments + '"');
+    }
+
+    return lines.join("\n");
+  }
+
+})();
+</script>
+</body>
+</html>
