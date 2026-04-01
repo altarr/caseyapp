@@ -3,52 +3,80 @@
 // Records microphone audio via offscreen document.
 // Polls S3 for session lifecycle via SigV4 signed requests.
 
-// ─── Audio Recording via Offscreen Document ─────────────────────────────────
+// ─── Audio Recording via Offscreen Document (port-based) ────────────────────
 
 let offscreenReady = false;
 let audioRecordingActive = false;
+let audioPort = null;
+let audioResolve = null; // for stop callback
 
 async function ensureOffscreen() {
-  if (offscreenReady) return;
+  if (offscreenReady && audioPort) return;
   try {
     const exists = await chrome.offscreen.hasDocument();
-    if (exists) { offscreenReady = true; return; }
-  } catch (_) {}
-  try {
-    await chrome.offscreen.createDocument({
-      url: 'offscreen.html',
-      reasons: ['USER_MEDIA'],
-      justification: 'Recording microphone for demo session',
-    });
+    if (!exists) {
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['USER_MEDIA'],
+        justification: 'Recording microphone for demo session',
+      });
+    }
     offscreenReady = true;
-    console.log('Phantom Recall: offscreen document created');
+    console.log('Phantom Recall: offscreen ready');
   } catch (e) {
     if (e.message?.includes('single offscreen')) offscreenReady = true;
     else console.error('Phantom Recall: offscreen error:', e);
   }
 }
 
+// Listen for the offscreen document to connect via port
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'audio-recorder') {
+    audioPort = port;
+    console.log('Phantom Recall: audio recorder connected');
+    port.onMessage.addListener((msg) => {
+      if (msg.type === 'started') {
+        console.log('Phantom Recall: audio started:', msg.ok);
+      }
+      if (msg.type === 'stopped') {
+        console.log('Phantom Recall: audio stopped, size:', msg.size);
+        if (audioResolve) { audioResolve(msg); audioResolve = null; }
+      }
+      if (msg.type === 'status') {
+        console.log('Phantom Recall: audio status:', msg.recording);
+      }
+    });
+    port.onDisconnect.addListener(() => { audioPort = null; });
+  }
+});
+
 async function startAudioRecording() {
   await ensureOffscreen();
-  try {
-    const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'start-recording' });
-    console.log('Phantom Recall: audio start response:', resp);
-    return resp?.ok || false;
-  } catch (e) {
-    console.error('Phantom Recall: audio start failed:', e);
-    return false;
-  }
+  // Wait briefly for port to connect
+  for (let i = 0; i < 20 && !audioPort; i++) await new Promise(r => setTimeout(r, 100));
+  if (!audioPort) { console.error('Phantom Recall: no audio port'); return false; }
+
+  const { audioDeviceId } = await chrome.storage.local.get(['audioDeviceId']);
+  audioPort.postMessage({ type: 'start', deviceId: audioDeviceId || '' });
+  return true;
 }
 
 async function stopAudioAndUpload() {
-  try {
-    const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop-recording' });
-    if (!resp?.ok || !resp?.data) { console.log('Phantom Recall: no audio data'); return; }
+  if (!audioPort) return;
 
-    // Convert base64 data URL to blob and POST to packager
+  const resp = await new Promise((resolve) => {
+    audioResolve = resolve;
+    audioPort.postMessage({ type: 'stop' });
+    // Timeout after 10s
+    setTimeout(() => { if (audioResolve) { audioResolve(null); audioResolve = null; } }, 10000);
+  });
+
+  if (!resp?.ok || !resp?.data) { console.log('Phantom Recall: no audio data'); return; }
+
+  try {
     const fetchResp = await fetch(resp.data);
     const blob = await fetchResp.blob();
-    const ext = (resp.type || 'audio/webm').includes('webm') ? 'webm' : 'ogg';
+    const ext = (resp.mimeType || 'audio/webm').includes('webm') ? 'webm' : 'ogg';
 
     await fetch(`${PACKAGER_URL}/audio`, {
       method: 'POST',
@@ -612,6 +640,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } catch (err) {
         sendResponse({ status: 'error', error: err.message });
       }
+    })();
+    return true;
+  }
+
+  if (message.type === 'list-audio-devices') {
+    (async () => {
+      await ensureOffscreen();
+      for (let i = 0; i < 20 && !audioPort; i++) await new Promise(r => setTimeout(r, 100));
+      if (!audioPort) { sendResponse({ devices: [] }); return; }
+
+      const handler = (msg) => {
+        if (msg.type === 'devices') {
+          sendResponse(msg);
+        }
+      };
+      audioPort.onMessage.addListener(handler);
+      audioPort.postMessage({ type: 'list-devices' });
     })();
     return true;
   }

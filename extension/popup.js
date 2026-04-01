@@ -586,3 +586,41 @@ document.getElementById('qrOverlay').addEventListener('click', function(e) {
     this.classList.remove('visible');
   }
 });
+
+// ─── Audio Device Selection ──────────────────────────────────────────────────
+
+(function() {
+  var select = document.getElementById('audioDevice');
+  if (!select) return;
+
+  // Load saved device
+  chrome.storage.local.get(['audioDeviceId'], function(data) {
+    if (data.audioDeviceId) select.value = data.audioDeviceId;
+  });
+
+  // Ask background to list devices via offscreen port
+  chrome.runtime.sendMessage({ type: 'list-audio-devices' }, function(resp) {
+    if (chrome.runtime.lastError) return;
+    if (resp && resp.devices) {
+      populateDevices(resp.devices);
+    }
+  });
+
+  function populateDevices(devices) {
+    select.innerHTML = '<option value="">Default microphone</option>';
+    devices.forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label;
+      select.appendChild(opt);
+    });
+    // Restore saved selection
+    chrome.storage.local.get(['audioDeviceId'], function(data) {
+      if (data.audioDeviceId) select.value = data.audioDeviceId;
+    });
+  }
+
+  select.addEventListener('change', function() {
+    chrome.storage.local.set({ audioDeviceId: select.value });
+  });
+})();

@@ -716,7 +716,7 @@
         <div class="s3-dot" id="phoneDot"></div>
         <span class="s3-status-text" id="phoneText">PHONE</span>
       </div>
-      <div class="s3-status" title="Microphone recording">
+      <div class="s3-status" title="Microphone recording" style="cursor:pointer" id="micStatus">
         <div class="s3-dot" id="micDot"></div>
         <span class="s3-status-text" id="micText">MIC</span>
       </div>
@@ -795,6 +795,19 @@
       </div>
       <div class="qr-close-btn-wrap">
         <button class="qr-close-btn" id="qrCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Device Selector -->
+  <div class="s3-section" id="audioSection">
+    <div class="s3-section-title">Microphone</div>
+    <div class="s3-body">
+      <div class="s3-field">
+        <label class="s3-label">Audio Source</label>
+        <select class="s3-input" id="audioDevice" style="width:100%;padding:6px 8px;font-size:12px">
+          <option value="">Loading devices...</option>
+        </select>
       </div>
     </div>
   </div>
