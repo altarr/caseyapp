@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Phantom Recall — Audio Recorder</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;color:#e5e5e5;font-family:'Inter',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:16px;padding:2.5rem;max-width:400px;width:100%;text-align:center}
+  h1{font-size:1.2rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;background:linear-gradient(135deg,#d71920,#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.5rem}
+  .status{font-size:0.85rem;color:#888;margin-bottom:1.5rem}
+  .mic-ring{width:120px;height:120px;border-radius:50%;border:3px solid #1a1a1a;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;transition:border-color 0.3s,box-shadow 0.3s}
+  .mic-ring.recording{border-color:#d71920;box-shadow:0 0 20px rgba(215,25,32,0.3);animation:pulse 2s infinite}
+  .mic-ring.waiting{border-color:#ff9500}
+  .mic-icon{font-size:2.5rem}
+  .timer{font-family:monospace;font-size:1.8rem;font-weight:700;margin-bottom:0.5rem}
+  .session-info{font-size:0.8rem;color:#888;margin-bottom:1rem}
+  select{width:100%;background:#111;border:1px solid #333;border-radius:10px;padding:10px 12px;color:#e5e5e5;font-size:13px;margin-bottom:1rem;outline:none}
+  select:focus{border-color:#d71920}
+  label{display:block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#888;margin-bottom:6px;text-align:left}
+  .btn{display:inline-block;background:linear-gradient(135deg,#d71920,#ff9500);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer}
+  .btn:hover{opacity:0.9}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+  @keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(215,25,32,0.3)}50%{box-shadow:0 0 40px rgba(215,25,32,0.5)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Phantom Recall</h1>
+  <div class="status" id="status">Initializing...</div>
+
+  <div class="mic-ring" id="micRing">
+    <div class="mic-icon" id="micIcon">&#127908;</div>
+  </div>
+
+  <div class="timer" id="timer">--:--</div>
+  <div class="session-info" id="sessionInfo">No active session</div>
+
+  <label>Microphone</label>
+  <select id="micSelect"><option value="">Loading...</option></select>
+
+  <button class="btn" id="enableBtn">Enable Microphone</button>
+</div>
+
+<script>
+var mediaRecorder = null;
+var audioChunks = [];
+var recording = false;
+var sessionActive = false;
+var recordingStartTime = null;
+var timerInterval = null;
+var selectedDeviceId = '';
+
+var statusEl = document.getElementById('status');
+var micRing = document.getElementById('micRing');
+var timerEl = document.getElementById('timer');
+var sessionEl = document.getElementById('sessionInfo');
+var micSelect = document.getElementById('micSelect');
+var enableBtn = document.getElementById('enableBtn');
+
+// Load available microphones
+async function loadDevices() {
+  try {
+    // Need a brief getUserMedia call to get labeled devices
+    var tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tempStream.getTracks().forEach(function(t) { t.stop(); });
+
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    var audioInputs = devices.filter(function(d) { return d.kind === 'audioinput'; });
+
+    micSelect.innerHTML = '';
+    audioInputs.forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || 'Microphone ' + d.deviceId.slice(0, 8);
+      micSelect.appendChild(opt);
+    });
+
+    // Restore saved selection
+    var saved = localStorage.getItem('phantomrecall_mic');
+    if (saved) micSelect.value = saved;
+
+    statusEl.textContent = 'Microphone ready. Waiting for session...';
+    micRing.classList.add('waiting');
+    enableBtn.style.display = 'none';
+  } catch (err) {
+    statusEl.textContent = 'Click "Enable Microphone" to allow access';
+  }
+}
+
+enableBtn.addEventListener('click', loadDevices);
+
+micSelect.addEventListener('change', function() {
+  selectedDeviceId = micSelect.value;
+  localStorage.setItem('phantomrecall_mic', selectedDeviceId);
+});
+
+// Start recording
+async function startRecording() {
+  if (recording) return;
+  selectedDeviceId = micSelect.value;
+
+  var constraints = { audio: { echoCancellation: true, noiseSuppression: true } };
+  if (selectedDeviceId) constraints.audio.deviceId = { exact: selectedDeviceId };
+
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+    audioChunks = [];
+
+    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+    mediaRecorder.ondataavailable = function(e) {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+    mediaRecorder.start(5000);
+    recording = true;
+    recordingStartTime = Date.now();
+
+    micRing.classList.remove('waiting');
+    micRing.classList.add('recording');
+    statusEl.textContent = 'Recording...';
+
+    timerInterval = setInterval(updateTimer, 1000);
+  } catch (err) {
+    statusEl.textContent = 'Mic error: ' + err.message;
+  }
+}
+
+// Stop recording and upload
+async function stopRecording() {
+  if (!mediaRecorder || !recording) return;
+
+  return new Promise(function(resolve) {
+    mediaRecorder.onstop = async function() {
+      var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      mediaRecorder.stream.getTracks().forEach(function(t) { t.stop(); });
+      mediaRecorder = null;
+      recording = false;
+      audioChunks = [];
+
+      clearInterval(timerInterval);
+      micRing.classList.remove('recording');
+      micRing.classList.add('waiting');
+      statusEl.textContent = 'Uploading audio (' + (blob.size / 1024 / 1024).toFixed(1) + ' MB)...';
+
+      // Upload to packager
+      try {
+        await fetch('/audio', {
+          method: 'POST',
+          headers: { 'X-Filename': 'recording.webm' },
+          body: blob
+        });
+        statusEl.textContent = 'Audio uploaded. Waiting for next session...';
+      } catch (err) {
+        statusEl.textContent = 'Upload failed: ' + err.message;
+      }
+      resolve();
+    };
+    mediaRecorder.stop();
+  });
+}
+
+function updateTimer() {
+  if (!recordingStartTime) return;
+  var elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+  var m = Math.floor(elapsed / 60);
+  var s = elapsed % 60;
+  timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+// Poll packager for session state
+async function pollSession() {
+  try {
+    var resp = await fetch('/status');
+    var data = await resp.json();
+
+    if (data.active && data.session_id) {
+      sessionEl.textContent = 'Session: ' + data.session_id;
+      if (!sessionActive) {
+        sessionActive = true;
+        startRecording();
+      }
+    } else {
+      if (sessionActive) {
+        sessionActive = false;
+        await stopRecording();
+        sessionEl.textContent = 'No active session';
+        timerEl.textContent = '--:--';
+        recordingStartTime = null;
+      }
+    }
+  } catch (err) {
+    statusEl.textContent = 'Packager not reachable';
+  }
+}
+
+// Init
+loadDevices();
+setInterval(pollSession, 2000);
+pollSession();
+</script>
+</body>
+</html>

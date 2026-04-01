@@ -85,6 +85,14 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, manager.getStatus());
     }
 
+    // GET /recorder — audio recorder page
+    if (method === 'GET' && url === '/recorder') {
+      cors(res);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(require('fs').readFileSync(require('path').join(__dirname, 'recorder.html')));
+      return;
+    }
+
     // 404
     json(res, 404, { error: 'Not found' });
   } catch (err) {
