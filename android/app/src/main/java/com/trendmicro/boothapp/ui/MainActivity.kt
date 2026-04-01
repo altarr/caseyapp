@@ -299,12 +299,19 @@ class MainActivity : AppCompatActivity() {
                 binding.tvVisitorInfo.visibility = View.VISIBLE
 
                 // Start audio recording
-                if (!audioOptedOut && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
                     == PackageManager.PERMISSION_GRANTED) {
                     audioFile = audioRecorder.start(response.sessionId)
                     if (audioFile != null) {
+                        toast("Recording audio")
                         Log.d(TAG, "Audio recording started: ${audioFile?.absolutePath}")
+                    } else {
+                        toast("Audio recording failed to start")
+                        Log.e(TAG, "audioRecorder.start returned null")
                     }
+                } else {
+                    toast("No audio permission")
+                    Log.w(TAG, "RECORD_AUDIO permission not granted")
                 }
 
                 // Start session timer
@@ -446,20 +453,37 @@ class MainActivity : AppCompatActivity() {
 
         // Stop audio recording first
         val recording = audioRecorder.stop()
+        Log.d(TAG, "Audio file: ${recording?.absolutePath}, exists=${recording?.exists()}, size=${recording?.length()}")
 
         lifecycleScope.launch {
             val api = SessionApi(url, useManagement = prefs.hasManagement())
 
             // Upload audio before ending session
             if (recording != null && recording.exists() && recording.length() > 0) {
-                toast("Uploading audio...")
+                toast("Uploading audio (${recording.length() / 1024} KB)...")
                 try {
                     val uploadResult = api.uploadAudio(sessionId, recording)
-                    uploadResult.onSuccess { Log.d(TAG, "Audio uploaded: ${recording.length() / 1024} KB") }
-                    uploadResult.onFailure { e -> Log.e(TAG, "Audio upload failed: ${e.message}") }
+                    uploadResult.onSuccess {
+                        toast("Audio uploaded")
+                        Log.d(TAG, "Audio uploaded: ${recording.length() / 1024} KB")
+                    }
+                    uploadResult.onFailure { e ->
+                        toast("Audio upload failed: ${e.message}")
+                        Log.e(TAG, "Audio upload failed: ${e.message}")
+                    }
                 } catch (e: Exception) {
+                    toast("Audio error: ${e.message}")
                     Log.e(TAG, "Audio upload error: ${e.message}")
                 }
+            } else {
+                val reason = when {
+                    recording == null -> "no recording file"
+                    !recording.exists() -> "file doesn't exist"
+                    recording.length() == 0L -> "file is empty"
+                    else -> "unknown"
+                }
+                toast("No audio to upload: $reason")
+                Log.w(TAG, "Skipping audio upload: $reason")
             }
 
             // Now end the session
