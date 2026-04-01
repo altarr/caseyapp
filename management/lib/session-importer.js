@@ -25,9 +25,9 @@ async function listS3Sessions(bucket) {
   const prefixes = (resp.CommonPrefixes || []).map(p => p.Prefix.replace('sessions/', '').replace(/\/$/, '')).filter(Boolean);
 
   for (const sessionId of prefixes) {
-    // Check if already imported
+    // Skip if already fully imported (has screenshots)
     const existing = db.getSession(sessionId);
-    if (existing) continue;
+    if (existing && existing.screenshot_count > 0) continue;
 
     // Try to read package-manifest.json
     try {

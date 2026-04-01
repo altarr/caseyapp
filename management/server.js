@@ -762,7 +762,7 @@ app.post('/api/sessions/:id/end', async (req, res) => {
       } catch (err) {
         console.error(`[auto-analyze] Failed for ${session_id}: ${err.message}`);
       }
-    }, 15000); // 15 second delay for uploads to finish
+    }, 45000); // 45 second delay for uploads to finish
 
   } catch (err) {
     res.status(500).json({ error: err.message });
