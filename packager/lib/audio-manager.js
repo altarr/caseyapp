@@ -31,19 +31,23 @@ class AudioManager {
 
       const lines = output.split('\n');
       const audioDevices = [];
-      let inAudio = false;
 
       for (const line of lines) {
-        if (line.includes('DirectShow audio devices')) { inAudio = true; continue; }
-        if (line.includes('DirectShow video devices')) { inAudio = false; continue; }
-        if (!inAudio) continue;
-
-        const match = line.match(/"([^"]+)"/);
-        if (match && !line.includes('Alternative name')) {
-          const name = match[1];
-          const lower = name.toLowerCase();
-          const score = MIC_KEYWORDS.reduce((s, kw) => s + (lower.includes(kw) ? 1 : 0), 0);
-          audioDevices.push({ name, score });
+        // Match lines with "(audio)" tag — ffmpeg 8.x format
+        if (line.includes('(audio)')) {
+          const match = line.match(/"([^"]+)"/);
+          if (match && !line.includes('Alternative name')) {
+            const name = match[1];
+            const lower = name.toLowerCase();
+            const score = MIC_KEYWORDS.reduce((s, kw) => s + (lower.includes(kw) ? 1 : 0), 0) + 1; // +1 so built-in mics get score 1
+            audioDevices.push({ name, score });
+          }
+          continue;
+        }
+        // Also check legacy format "DirectShow audio devices"
+        if (line.includes('DirectShow audio devices') || line.includes('dshow audio')) {
+          // Next lines until video section are audio devices
+          continue;
         }
       }
 
