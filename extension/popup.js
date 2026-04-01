@@ -123,6 +123,19 @@ function refreshStatus() {
       s3Text.classList.remove('active');
     }
 
+    // Mic recording indicator
+    var micDot = document.getElementById('micDot');
+    var micText = document.getElementById('micText');
+    if (micDot) {
+      if (response.session_active && response.audio_recording) {
+        micDot.classList.add('active');
+        micText.classList.add('active');
+      } else {
+        micDot.classList.remove('active');
+        micText.classList.remove('active');
+      }
+    }
+
     // Phone paired indicator — check if phone has scanned this QR
     var phoneDot = document.getElementById('phoneDot');
     var phoneText = document.getElementById('phoneText');

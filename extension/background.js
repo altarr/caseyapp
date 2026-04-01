@@ -624,6 +624,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           mgmt_polling: mgmtConfigured,
           polling_session_id: pollingSessionId || '',
           error_message: errorMessage,
+          audio_recording: audioRecordingActive,
           packager_connected: !!packagerStatus,
           packager_status: packagerStatus,
         });
