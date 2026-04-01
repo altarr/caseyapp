@@ -705,6 +705,41 @@ app.post('/api/sessions/:id/end', async (req, res) => {
     if (session) db.upsertSession({ ...session, status: 'completed' });
 
     res.json({ session_id, status: 'completed', ended_at: now });
+
+    // Auto-import and analyze after a delay (wait for packager + phone audio upload)
+    setTimeout(async () => {
+      try {
+        console.log(`[auto-analyze] Waiting for session ${session_id} data...`);
+        // Wait for zip to appear in S3 (packager uploads after session ends)
+        const { importSession } = require('./lib/session-importer');
+        const { analyzeSession } = require('./lib/session-analyzer');
+
+        // Retry import up to 6 times (30 seconds total)
+        let imported = null;
+        for (let i = 0; i < 6; i++) {
+          try {
+            // Delete existing DB entry so re-import picks up fresh data
+            db.getDb().prepare('DELETE FROM sessions WHERE session_id = ?').run(session_id);
+            imported = await importSession(session_id, S3_BUCKET, null);
+            if (imported && imported.screenshot_count > 0) break;
+          } catch (_) {}
+          await new Promise(r => setTimeout(r, 5000));
+        }
+
+        if (!imported || imported.screenshot_count === 0) {
+          console.log(`[auto-analyze] No screenshots found for ${session_id}, skipping analysis`);
+          return;
+        }
+
+        console.log(`[auto-analyze] Imported ${session_id}: ${imported.screenshot_count} screenshots, audio: ${imported.has_audio}`);
+        const summary = await analyzeSession(session_id);
+        await s3Put(`sessions/${session_id}/output/summary.txt`, summary);
+        console.log(`[auto-analyze] Session ${session_id} analyzed and summary uploaded`);
+      } catch (err) {
+        console.error(`[auto-analyze] Failed for ${session_id}: ${err.message}`);
+      }
+    }, 15000); // 15 second delay for uploads to finish
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
