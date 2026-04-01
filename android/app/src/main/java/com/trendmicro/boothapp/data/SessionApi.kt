@@ -130,6 +130,30 @@ class SessionApi(private val baseUrl: String, private val useManagement: Boolean
             }
         }
 
+    suspend fun uploadAudio(sessionId: String, audioFile: File): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            try {
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("session_id", sessionId)
+                    .addFormDataPart(
+                        "audio", audioFile.name,
+                        audioFile.asRequestBody("audio/mp4".toMediaType())
+                    )
+                    .build()
+
+                val httpRequest = Request.Builder()
+                    .url("$baseUrl$apiPrefix/sessions/$sessionId/audio")
+                    .post(requestBody)
+                    .build()
+
+                val response = client.newCall(httpRequest).execute()
+                Result.success(response.isSuccessful)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     @Suppress("UNCHECKED_CAST")
     suspend fun scanBadge(imageFile: File, eventId: Int): Result<Map<String, String>> =
         withContext(Dispatchers.IO) {

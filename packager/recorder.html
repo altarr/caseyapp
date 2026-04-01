@@ -39,7 +39,7 @@
   <label>Microphone</label>
   <select id="micSelect"><option value="">Loading...</option></select>
 
-  <button class="btn" id="enableBtn">Enable Microphone</button>
+  <button class="btn" id="enableBtn" style="display:none">Enable Microphone</button>
 </div>
 
 <script>
@@ -50,6 +50,7 @@ var sessionActive = false;
 var recordingStartTime = null;
 var timerInterval = null;
 var selectedDeviceId = '';
+var micReady = false;
 
 var statusEl = document.getElementById('status');
 var micRing = document.getElementById('micRing');
@@ -61,7 +62,7 @@ var enableBtn = document.getElementById('enableBtn');
 // Load available microphones
 async function loadDevices() {
   try {
-    // Need a brief getUserMedia call to get labeled devices
+    // Request mic access to get labeled device list
     var tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     tempStream.getTracks().forEach(function(t) { t.stop(); });
 
@@ -69,6 +70,7 @@ async function loadDevices() {
     var audioInputs = devices.filter(function(d) { return d.kind === 'audioinput'; });
 
     micSelect.innerHTML = '';
+    micSelect.disabled = false;
     audioInputs.forEach(function(d) {
       var opt = document.createElement('option');
       opt.value = d.deviceId;
@@ -79,12 +81,16 @@ async function loadDevices() {
     // Restore saved selection
     var saved = localStorage.getItem('phantomrecall_mic');
     if (saved) micSelect.value = saved;
+    selectedDeviceId = micSelect.value;
 
+    micReady = true;
+    enableBtn.style.display = 'none';
     statusEl.textContent = 'Microphone ready. Waiting for session...';
     micRing.classList.add('waiting');
-    enableBtn.style.display = 'none';
   } catch (err) {
-    statusEl.textContent = 'Click "Enable Microphone" to allow access';
+    statusEl.textContent = 'Microphone access denied. Click below to retry.';
+    enableBtn.style.display = '';
+    enableBtn.textContent = 'Allow Microphone';
   }
 }
 

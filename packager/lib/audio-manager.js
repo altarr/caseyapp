@@ -1,129 +1,85 @@
 'use strict';
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
-
-// USB/wireless mic keywords for auto-detection scoring
-const MIC_KEYWORDS = [
-  'usb', 'wireless', 'microphone', 'headset', 'yeti', 'blue',
-  'rode', 'shure', 'samson', 'audio-technica', 'fifine', 'hyperx',
-];
+const fs = require('fs');
 
 class AudioManager {
   constructor() {
     this.process = null;
     this.recording = false;
     this.wavPath = null;
-    this.device = null;
-  }
-
-  detectMic() {
-    if (process.env.AUDIO_DEVICE) {
-      this.device = process.env.AUDIO_DEVICE;
-      console.log(`  [audio] Using override device: ${this.device}`);
-      return this.device;
-    }
-
-    try {
-      const output = execSync(
-        'ffmpeg -list_devices true -f dshow -i dummy 2>&1',
-        { encoding: 'utf-8', timeout: 10000 }
-      ).toString();
-
-      const lines = output.split('\n');
-      const audioDevices = [];
-
-      for (const line of lines) {
-        // Match lines with "(audio)" tag — ffmpeg 8.x format
-        if (line.includes('(audio)')) {
-          const match = line.match(/"([^"]+)"/);
-          if (match && !line.includes('Alternative name')) {
-            const name = match[1];
-            const lower = name.toLowerCase();
-            const score = MIC_KEYWORDS.reduce((s, kw) => s + (lower.includes(kw) ? 1 : 0), 0) + 1; // +1 so built-in mics get score 1
-            audioDevices.push({ name, score });
-          }
-          continue;
-        }
-        // Also check legacy format "DirectShow audio devices"
-        if (line.includes('DirectShow audio devices') || line.includes('dshow audio')) {
-          // Next lines until video section are audio devices
-          continue;
-        }
-      }
-
-      audioDevices.sort((a, b) => b.score - a.score);
-
-      if (audioDevices.length > 0) {
-        this.device = audioDevices[0].name;
-        console.log(`  [audio] Detected mic: ${this.device} (score: ${audioDevices[0].score})`);
-        return this.device;
-      }
-    } catch (_) {}
-
-    console.log('  [audio] No microphone detected');
-    return null;
+    this.stopFile = null;
   }
 
   async start(outputDir) {
     if (this.recording) return true;
 
-    const device = this.detectMic();
-    if (!device) return false;
-
     this.wavPath = path.join(outputDir, 'recording.wav');
+    this.stopFile = path.join(outputDir, 'stop-recording');
+
+    // Remove stale stop file
+    try { fs.unlinkSync(this.stopFile); } catch (_) {}
+
+    const scriptPath = path.join(__dirname, 'record-audio.ps1');
 
     return new Promise((resolve) => {
-      const args = [
-        '-y', '-f', 'dshow',
-        '-i', `audio=${device}`,
-        '-ar', '44100', '-ac', '2', '-acodec', 'pcm_s16le',
-        this.wavPath,
-      ];
-
-      this.process = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      this.process = spawn('powershell.exe', [
+        '-ExecutionPolicy', 'Bypass',
+        '-File', scriptPath,
+        '-OutputFile', this.wavPath,
+        '-StopFile', this.stopFile,
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
       let started = false;
-      const onData = (chunk) => {
-        const text = chunk.toString();
-        if (!started && (text.includes('Press [q]') || text.includes('size='))) {
+
+      this.process.stdout.on('data', (chunk) => {
+        const text = chunk.toString().trim();
+        console.log(`  [audio] ${text}`);
+        if (!started && text.includes('RECORDING')) {
           started = true;
           this.recording = true;
-          console.log(`  [audio] Recording started → ${this.wavPath}`);
           resolve(true);
         }
-      };
+      });
 
-      this.process.stderr.on('data', onData);
-      this.process.stdout.on('data', onData);
+      this.process.stderr.on('data', (chunk) => {
+        console.error(`  [audio] err: ${chunk.toString().trim()}`);
+      });
 
       this.process.on('error', (err) => {
-        console.error(`  [audio] ffmpeg error: ${err.message}`);
+        console.error(`  [audio] process error: ${err.message}`);
         this.recording = false;
         if (!started) resolve(false);
       });
 
-      this.process.on('close', () => {
+      this.process.on('close', (code) => {
         this.recording = false;
         this.process = null;
+        if (!started) resolve(false);
       });
 
-      // Timeout: if not started in 10s, give up
+      // Timeout
       setTimeout(() => { if (!started) { this.kill(); resolve(false); } }, 10000);
     });
   }
 
   async stop() {
-    if (!this.process || !this.recording) return this.wavPath;
+    if (!this.recording || !this.stopFile) return this.wavPath;
 
+    // Signal stop by creating the stop file
+    try {
+      fs.writeFileSync(this.stopFile, 'stop');
+    } catch (_) {}
+
+    // Wait for process to exit
     return new Promise((resolve) => {
-      // Graceful stop: send 'q' to ffmpeg
-      try { this.process.stdin.write('q'); } catch (_) {}
+      if (!this.process) { this.recording = false; resolve(this.wavPath); return; }
 
       const timeout = setTimeout(() => {
-        console.log('  [audio] Graceful stop timed out, sending SIGTERM');
+        console.log('  [audio] Stop timeout, killing process');
         this.kill();
         resolve(this.wavPath);
-      }, 5000);
+      }, 10000);
 
       this.process.on('close', () => {
         clearTimeout(timeout);
@@ -136,34 +92,10 @@ class AudioManager {
 
   kill() {
     if (this.process) {
-      try { this.process.kill('SIGTERM'); } catch (_) {}
+      try { this.process.kill(); } catch (_) {}
       this.process = null;
       this.recording = false;
     }
-  }
-
-  async convertToMp3(wavPath) {
-    const mp3Path = wavPath.replace(/\.wav$/i, '.mp3');
-
-    return new Promise((resolve, reject) => {
-      console.log('  [audio] Converting WAV → MP3 ...');
-      const proc = spawn('ffmpeg', [
-        '-y', '-i', wavPath,
-        '-codec:a', 'libmp3lame', '-qscale:a', '2',
-        mp3Path,
-      ]);
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          console.log(`  [audio] MP3 ready: ${mp3Path}`);
-          resolve(mp3Path);
-        } else {
-          reject(new Error(`ffmpeg MP3 conversion exited with code ${code}`));
-        }
-      });
-
-      proc.on('error', reject);
-    });
   }
 }
 

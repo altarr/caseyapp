@@ -23,6 +23,7 @@ import com.trendmicro.boothapp.data.AppPreferences
 import com.trendmicro.boothapp.data.S3Uploader
 import com.trendmicro.boothapp.data.SessionApi
 import com.trendmicro.boothapp.databinding.ActivityMainBinding
+import com.trendmicro.boothapp.audio.AudioRecorder
 import com.trendmicro.boothapp.ocr.BadgeOcrProcessor
 import kotlinx.coroutines.launch
 import java.io.File
@@ -43,8 +44,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: AppPreferences
     private lateinit var cameraManager: CameraManager
     private lateinit var ocrProcessor: BadgeOcrProcessor
+    private lateinit var audioRecorder: AudioRecorder
 
     private var capturedBadgeFile: File? = null
+    private var audioFile: File? = null
     private var capturedBitmap: Bitmap? = null
     private var activeSessionId: String? = null
     private var activeDemoPc: String? = null
@@ -85,6 +88,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Log.d(TAG, "Audio permission granted")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -93,9 +104,11 @@ class MainActivity : AppCompatActivity() {
         prefs = AppPreferences(this)
         cameraManager = CameraManager(this)
         ocrProcessor = BadgeOcrProcessor()
+        audioRecorder = AudioRecorder(this)
 
         setupUI()
         checkCameraPermission()
+        checkAudioPermission()
     }
 
     private fun setupUI() {
@@ -143,6 +156,13 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED -> startCameraPreview()
             else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun checkAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -278,6 +298,15 @@ class MainActivity : AppCompatActivity() {
                 binding.tvVisitorInfo.text = displayInfo
                 binding.tvVisitorInfo.visibility = View.VISIBLE
 
+                // Start audio recording
+                if (!audioOptedOut && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED) {
+                    audioFile = audioRecorder.start(response.sessionId)
+                    if (audioFile != null) {
+                        Log.d(TAG, "Audio recording started: ${audioFile?.absolutePath}")
+                    }
+                }
+
                 // Start session timer
                 sessionStartTime = SystemClock.elapsedRealtime()
                 binding.tvDuration.visibility = View.VISIBLE
@@ -386,6 +415,7 @@ class MainActivity : AppCompatActivity() {
 
             result.onSuccess {
                 audioOptedOut = true
+                audioRecorder.stop() // Stop recording but don't delete
                 binding.btnStopAudio.text = getString(R.string.audio_stopped)
                 toast(getString(R.string.audio_stop_success))
             }
@@ -419,6 +449,17 @@ class MainActivity : AppCompatActivity() {
             val result = api.endSession(sessionId, activeDemoPc)
 
             result.onSuccess {
+                // Stop audio and upload
+                val recording = audioRecorder.stop()
+                if (recording != null && recording.exists() && recording.length() > 0 && sessionId != null) {
+                    toast("Uploading audio...")
+                    try {
+                        api.uploadAudio(sessionId, recording)
+                        Log.d(TAG, "Audio uploaded: ${recording.length() / 1024} KB")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Audio upload failed", e)
+                    }
+                }
                 toast(getString(R.string.session_ended))
                 resetToIdle()
             }
@@ -433,10 +474,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun resetToIdle() {
         timerHandler.removeCallbacks(timerRunnable)
+        if (audioRecorder.isRecording) audioRecorder.stop()
         activeSessionId = null
         activeDemoPc = null
         capturedBadgeFile = null
         capturedBitmap = null
+        audioFile = null
         audioOptedOut = false
 
         binding.tvStatus.text = getString(R.string.no_session)

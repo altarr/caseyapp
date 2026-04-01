@@ -711,6 +711,40 @@ app.post('/api/sessions/:id/stop-audio', async (req, res) => {
   }
 });
 
+// Audio upload from phone
+const audioUpload = multer({
+  dest: path.join(__dirname, 'data', 'audio-uploads'),
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB
+});
+
+app.post('/api/sessions/:id/audio', audioUpload.single('audio'), async (req, res) => {
+  try {
+    const session_id = req.params.id;
+    if (!req.file) return res.status(400).json({ error: 'No audio file' });
+
+    // Upload to S3
+    const fs = require('fs');
+    const audioData = fs.readFileSync(req.file.path);
+    const ext = req.file.originalname?.split('.').pop() || 'm4a';
+    const s3Key = `sessions/${session_id}/audio/recording.${ext}`;
+
+    await mgmtS3.send(new MgmtPutCmd({
+      Bucket: S3_BUCKET, Key: s3Key,
+      Body: audioData,
+      ContentType: req.file.mimetype || 'audio/mp4',
+    }));
+
+    // Cleanup temp file
+    try { fs.unlinkSync(req.file.path); } catch (_) {}
+
+    console.log(`[audio] Uploaded ${s3Key} (${(audioData.length / 1024 / 1024).toFixed(1)} MB)`);
+    res.json({ ok: true, key: s3Key, size: audioData.length });
+  } catch (err) {
+    console.error('[audio] Upload error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Active session polling (for extension)
 app.get('/api/sessions/active', async (req, res) => {
   try {
