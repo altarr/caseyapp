@@ -46,6 +46,7 @@
           <th>Company</th>
           <th>Screenshots</th>
           <th>Audio</th>
+          <th>Analyzed</th>
           <th>Contact Match</th>
           <th>Imported</th>
           <th></th>
@@ -94,6 +95,7 @@
           '<td style="cursor:pointer" class="session-click">' + (s.visitor_company||'-') + '</td>' +
           '<td>' + s.screenshot_count + '</td>' +
           '<td>' + (s.has_audio ? '<span class="badge badge-green">Yes</span>' : s.audio_opted_out ? '<span class="badge badge-red">Opted out</span>' : '<span class="badge badge-amber">No</span>') + '</td>' +
+          '<td>' + (s.status === 'analyzed' ? '<span class="badge badge-green">Yes</span>' : '<span class="badge" style="background:rgba(136,136,136,0.15);color:#888">No</span>') + '</td>' +
           '<td>' + matchBadge + '</td>' +
           '<td style="font-size:0.8rem;color:var(--text-muted)">' + (s.imported_at||'') + '</td>' +
           '<td><button class="btn btn-outline btn-sm" style="border-color:var(--error);color:var(--error);padding:4px 8px;font-size:10px" onclick="event.stopPropagation();deleteSession(\'' + s.session_id + '\')">Delete</button></td>' +
