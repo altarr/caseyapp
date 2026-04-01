@@ -1,37 +1,42 @@
 // CaseyApp offscreen document — records microphone audio via MediaRecorder.
-// Communicates with background.js via chrome.runtime messages.
+// Listens for start/stop commands from background service worker.
 
 let mediaRecorder = null;
 let audioChunks = [];
 let recording = false;
 
+// Listen for messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'audio-start') {
-    startRecording().then(ok => sendResponse({ ok })).catch(err => sendResponse({ ok: false, error: err.message }));
+  console.log('[offscreen] received:', message.type);
+
+  if (message.target !== 'offscreen') return false;
+
+  if (message.type === 'start-recording') {
+    startRecording()
+      .then(() => sendResponse({ ok: true }))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 
-  if (message.type === 'audio-stop') {
-    stopRecording().then(blob => {
-      // Convert blob to base64 and send back
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        sendResponse({ ok: true, data: reader.result, size: blob.size, type: blob.type });
-      };
-      reader.readAsDataURL(blob);
-    }).catch(err => sendResponse({ ok: false, error: err.message }));
+  if (message.type === 'stop-recording') {
+    stopRecording()
+      .then(result => sendResponse(result))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 
-  if (message.type === 'audio-status') {
+  if (message.type === 'recording-status') {
     sendResponse({ recording, chunks: audioChunks.length });
     return false;
   }
+
+  return false;
 });
 
 async function startRecording() {
-  if (recording) return true;
+  if (recording) return;
 
+  console.log('[offscreen] requesting microphone...');
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       channelCount: 1,
@@ -44,7 +49,6 @@ async function startRecording() {
 
   audioChunks = [];
 
-  // Prefer webm/opus, fall back to whatever is available
   const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? 'audio/webm;codecs=opus'
     : MediaRecorder.isTypeSupported('audio/webm')
@@ -54,34 +58,36 @@ async function startRecording() {
   mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
 
   mediaRecorder.ondataavailable = (event) => {
-    if (event.data.size > 0) {
-      audioChunks.push(event.data);
-    }
+    if (event.data.size > 0) audioChunks.push(event.data);
   };
 
-  mediaRecorder.start(5000); // Collect data every 5 seconds
+  mediaRecorder.start(5000);
   recording = true;
-  console.log('[CaseyApp Audio] Recording started, mime:', mediaRecorder.mimeType);
-  return true;
+  console.log('[offscreen] recording started, mime:', mediaRecorder.mimeType);
 }
 
 async function stopRecording() {
   if (!mediaRecorder || !recording) {
-    return new Blob(audioChunks, { type: 'audio/webm' });
+    return { ok: true, data: null, size: 0 };
   }
 
   return new Promise((resolve) => {
     mediaRecorder.onstop = () => {
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-      console.log('[CaseyApp Audio] Recording stopped, size:', blob.size);
+      console.log('[offscreen] recording stopped, size:', blob.size);
 
-      // Stop all tracks
       mediaRecorder.stream.getTracks().forEach(t => t.stop());
       mediaRecorder = null;
       recording = false;
-      audioChunks = [];
 
-      resolve(blob);
+      // Convert to base64 data URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve({ ok: true, data: reader.result, size: blob.size, type: blob.type });
+      };
+      reader.readAsDataURL(blob);
+
+      audioChunks = [];
     };
     mediaRecorder.stop();
   });

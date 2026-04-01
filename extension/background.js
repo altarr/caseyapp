@@ -10,17 +10,22 @@ let offscreenCreated = false;
 async function ensureOffscreen() {
   if (offscreenCreated) return;
   try {
+    const existing = await chrome.offscreen.hasDocument();
+    if (existing) { offscreenCreated = true; return; }
+  } catch (_) {}
+  try {
     await chrome.offscreen.createDocument({
       url: 'offscreen.html',
       reasons: ['USER_MEDIA'],
       justification: 'Recording microphone audio for demo session capture',
     });
     offscreenCreated = true;
+    console.log('CaseyApp: offscreen document created');
   } catch (e) {
     if (e.message?.includes('Only a single offscreen')) {
-      offscreenCreated = true; // already exists
+      offscreenCreated = true;
     } else {
-      console.error('CaseyApp: offscreen error:', e.message);
+      console.error('CaseyApp: offscreen create failed:', e.message);
     }
   }
 }
@@ -28,7 +33,7 @@ async function ensureOffscreen() {
 async function startAudioRecording() {
   await ensureOffscreen();
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'audio-start' }, (resp) => {
+    chrome.runtime.sendMessage({ target: 'offscreen', type: 'start-recording' }, (resp) => {
       if (chrome.runtime.lastError) {
         console.warn('CaseyApp: audio start error:', chrome.runtime.lastError.message);
         resolve(false);
@@ -42,13 +47,12 @@ async function startAudioRecording() {
 
 async function stopAudioRecording() {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'audio-stop' }, (resp) => {
+    chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop-recording' }, (resp) => {
       if (chrome.runtime.lastError || !resp?.ok) {
-        console.warn('CaseyApp: audio stop error');
+        console.warn('CaseyApp: audio stop error:', chrome.runtime.lastError?.message);
         resolve(null);
         return;
       }
-      // resp.data is a data URL (base64 encoded webm)
       resolve(resp);
     });
   });
@@ -635,8 +639,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // Don't respond to audio-* messages — those are for the offscreen document
-  if (message.type && message.type.startsWith('audio-')) return false;
+  // Don't respond to offscreen messages
+  if (message.target === 'offscreen') return false;
+  if (message.type && message.type.startsWith('start-recording')) return false;
+  if (message.type && message.type.startsWith('stop-recording')) return false;
 
   sendResponse({ status: 'ok' });
 });
