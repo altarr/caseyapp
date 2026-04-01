@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "V1-Helper",
-  "version": "1.1.0",
-  "description": "BoothApp demo capture extension: tracks clicks, captures screenshots, and records browsing activity during trade show demos for AI-powered follow-up generation.",
+  "name": "CaseyApp",
+  "version": "2.0.0",
+  "description": "CaseyApp demo capture: screenshots, audio recording, and click tracking for AI-powered follow-up.",
   "permissions": [
     "activeTab",
     "tabs",
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "host_permissions": ["<all_urls>"],
   "icons": {

@@ -1,6 +1,79 @@
 // CaseyApp background service worker
 // Captures timed screenshots and POSTs them to the local packager service.
+// Records microphone audio via offscreen document.
 // Polls S3 for session lifecycle via SigV4 signed requests.
+
+// ─── Offscreen Audio Recording ──────────────────────────────────────────────
+
+let offscreenCreated = false;
+
+async function ensureOffscreen() {
+  if (offscreenCreated) return;
+  try {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['USER_MEDIA'],
+      justification: 'Recording microphone audio for demo session capture',
+    });
+    offscreenCreated = true;
+  } catch (e) {
+    if (e.message?.includes('Only a single offscreen')) {
+      offscreenCreated = true; // already exists
+    } else {
+      console.error('CaseyApp: offscreen error:', e.message);
+    }
+  }
+}
+
+async function startAudioRecording() {
+  await ensureOffscreen();
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'audio-start' }, (resp) => {
+      if (chrome.runtime.lastError) {
+        console.warn('CaseyApp: audio start error:', chrome.runtime.lastError.message);
+        resolve(false);
+        return;
+      }
+      console.log('CaseyApp: audio recording started:', resp?.ok);
+      resolve(resp?.ok || false);
+    });
+  });
+}
+
+async function stopAudioRecording() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'audio-stop' }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.ok) {
+        console.warn('CaseyApp: audio stop error');
+        resolve(null);
+        return;
+      }
+      // resp.data is a data URL (base64 encoded webm)
+      resolve(resp);
+    });
+  });
+}
+
+async function postAudioToPackager(audioResp) {
+  if (!audioResp?.data) return;
+  try {
+    // Convert data URL to blob
+    const response = await fetch(audioResp.data);
+    const blob = await response.blob();
+    const ext = audioResp.type?.includes('webm') ? 'webm' : 'ogg';
+
+    await fetch(`${PACKAGER_URL}/audio`, {
+      method: 'POST',
+      headers: { 'X-Filename': `recording.${ext}` },
+      body: blob,
+    });
+    console.log('CaseyApp: audio uploaded to packager, size:', blob.size);
+  } catch (err) {
+    console.warn('CaseyApp: audio upload failed:', err.message);
+  }
+}
+
+let audioRecordingActive = false;
 
 // ─── Management Server Polling ───────────────────────────────────────────────
 // Primary session source — falls back to S3 if not configured.
@@ -286,14 +359,24 @@ async function handleSessionData(data) {
         }
       });
 
-      // Start timed screenshots
+      // Start timed screenshots + audio recording
       startTimedScreenshots();
+      startAudioRecording().then(ok => {
+        audioRecordingActive = ok;
+        if (ok) console.log('CaseyApp: audio recording started with session');
+      });
     } else if (data.stop_audio !== undefined) {
       const { v1helper_session } = await chrome.storage.local.get(['v1helper_session']);
       if (v1helper_session && v1helper_session.active) {
         chrome.storage.local.set({
           v1helper_session: { ...v1helper_session, stop_audio: data.stop_audio }
         });
+        // Stop audio recording if requested
+        if (data.stop_audio && audioRecordingActive) {
+          const audioData = await stopAudioRecording();
+          if (audioData) await postAudioToPackager(audioData);
+          audioRecordingActive = false;
+        }
       }
     }
   } else {
@@ -301,8 +384,15 @@ async function handleSessionData(data) {
       const endedSessionId = pollingSessionId;
       pollingSessionId = null;
 
-      // Stop screenshots
+      // Stop screenshots + audio
       stopTimedScreenshots();
+
+      // Stop audio and upload to packager
+      if (audioRecordingActive) {
+        const audioData = await stopAudioRecording();
+        if (audioData) await postAudioToPackager(audioData);
+        audioRecordingActive = false;
+      }
 
       // Notify content scripts
       chrome.tabs.query({}, (tabs) => {

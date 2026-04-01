@@ -35,10 +35,16 @@ async function packageAndUpload({ sessionDir, sessionId, visitorName, audioOpted
       archive.directory(screenshotsDir, 'screenshots');
     }
 
-    // Add MP3 if audio was not opted out
-    const mp3Path = path.join(sessionDir, 'recording.mp3');
-    if (!audioOptedOut && fs.existsSync(mp3Path)) {
-      archive.file(mp3Path, { name: 'audio/recording.mp3' });
+    // Add audio (WebM from extension, or MP3/WAV from legacy recorder)
+    if (!audioOptedOut) {
+      const audioFiles = ['recording.webm', 'recording.mp3', 'recording.wav'];
+      for (const af of audioFiles) {
+        const audioPath = path.join(sessionDir, af);
+        if (fs.existsSync(audioPath)) {
+          archive.file(audioPath, { name: 'audio/' + af });
+          break; // only include one
+        }
+      }
     }
 
     // Add clicks
@@ -81,7 +87,8 @@ async function packageAndUpload({ sessionDir, sessionId, visitorName, audioOpted
   // Build and upload manifest
   const screenshotsDir = path.join(sessionDir, 'screenshots');
   const screenshotFiles = fs.existsSync(screenshotsDir) ? fs.readdirSync(screenshotsDir) : [];
-  const mp3Exists = !audioOptedOut && fs.existsSync(path.join(sessionDir, 'recording.mp3'));
+  const hasAudio = !audioOptedOut && ['recording.webm', 'recording.mp3', 'recording.wav']
+    .some(f => fs.existsSync(path.join(sessionDir, f)));
   const clicksExist = fs.existsSync(path.join(sessionDir, 'clicks.json'));
 
   const manifest = {
@@ -90,7 +97,7 @@ async function packageAndUpload({ sessionDir, sessionId, visitorName, audioOpted
     zip_key: zipKey,
     zip_size_bytes: zipStat.size,
     screenshot_count: screenshotFiles.length,
-    has_audio: mp3Exists,
+    has_audio: hasAudio,
     has_clicks: clicksExist,
     audio_opted_out: audioOptedOut,
     created_at: new Date().toISOString(),

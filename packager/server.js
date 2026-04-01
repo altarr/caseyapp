@@ -50,6 +50,16 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, count: manager.screenshotCount });
     }
 
+    // POST /audio — receives WebM audio from extension
+    if (method === 'POST' && url === '/audio') {
+      if (!manager.session) return json(res, 409, { error: 'No active session' });
+
+      const filename = req.headers['x-filename'] || 'recording.webm';
+      const body = await readBody(req);
+      manager.addAudio(filename, body);
+      return json(res, 200, { ok: true, size: body.length });
+    }
+
     // POST /clicks
     if (method === 'POST' && url === '/clicks') {
       if (!manager.session) return json(res, 409, { error: 'No active session' });
