@@ -3,8 +3,63 @@
 // Records microphone audio via offscreen document.
 // Polls S3 for session lifecycle via SigV4 signed requests.
 
-// Audio recording is handled locally by the packager service via ffmpeg.
-// The extension only handles screenshots + clicks.
+// ─── Audio Recording via Offscreen Document ─────────────────────────────────
+
+let offscreenReady = false;
+let audioRecordingActive = false;
+
+async function ensureOffscreen() {
+  if (offscreenReady) return;
+  try {
+    const exists = await chrome.offscreen.hasDocument();
+    if (exists) { offscreenReady = true; return; }
+  } catch (_) {}
+  try {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['USER_MEDIA'],
+      justification: 'Recording microphone for demo session',
+    });
+    offscreenReady = true;
+    console.log('CaseyApp: offscreen document created');
+  } catch (e) {
+    if (e.message?.includes('single offscreen')) offscreenReady = true;
+    else console.error('CaseyApp: offscreen error:', e);
+  }
+}
+
+async function startAudioRecording() {
+  await ensureOffscreen();
+  try {
+    const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'start-recording' });
+    console.log('CaseyApp: audio start response:', resp);
+    return resp?.ok || false;
+  } catch (e) {
+    console.error('CaseyApp: audio start failed:', e);
+    return false;
+  }
+}
+
+async function stopAudioAndUpload() {
+  try {
+    const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop-recording' });
+    if (!resp?.ok || !resp?.data) { console.log('CaseyApp: no audio data'); return; }
+
+    // Convert base64 data URL to blob and POST to packager
+    const fetchResp = await fetch(resp.data);
+    const blob = await fetchResp.blob();
+    const ext = (resp.type || 'audio/webm').includes('webm') ? 'webm' : 'ogg';
+
+    await fetch(`${PACKAGER_URL}/audio`, {
+      method: 'POST',
+      headers: { 'X-Filename': `recording.${ext}` },
+      body: blob,
+    });
+    console.log('CaseyApp: audio uploaded, size:', blob.size);
+  } catch (e) {
+    console.error('CaseyApp: audio upload failed:', e);
+  }
+}
 
 // ─── Management Server Polling ───────────────────────────────────────────────
 // Primary session source — falls back to S3 if not configured.
@@ -290,14 +345,22 @@ async function handleSessionData(data) {
         }
       });
 
-      // Start timed screenshots (audio handled by packager)
+      // Start timed screenshots + audio
       startTimedScreenshots();
+      startAudioRecording().then(ok => {
+        audioRecordingActive = ok;
+        console.log('CaseyApp: audio started:', ok);
+      });
     } else if (data.stop_audio !== undefined) {
       const { v1helper_session } = await chrome.storage.local.get(['v1helper_session']);
       if (v1helper_session && v1helper_session.active) {
         chrome.storage.local.set({
           v1helper_session: { ...v1helper_session, stop_audio: data.stop_audio }
         });
+        if (data.stop_audio && audioRecordingActive) {
+          await stopAudioAndUpload();
+          audioRecordingActive = false;
+        }
       }
     }
   } else {
@@ -305,8 +368,12 @@ async function handleSessionData(data) {
       const endedSessionId = pollingSessionId;
       pollingSessionId = null;
 
-      // Stop screenshots (packager handles audio stop via S3 polling)
+      // Stop screenshots + audio
       stopTimedScreenshots();
+      if (audioRecordingActive) {
+        await stopAudioAndUpload();
+        audioRecordingActive = false;
+      }
 
       // Notify content scripts
       chrome.tabs.query({}, (tabs) => {
@@ -538,6 +605,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           mgmt_polling: mgmtConfigured,
           polling_session_id: pollingSessionId || '',
           error_message: errorMessage,
+          audio_recording: audioRecordingActive,
           packager_connected: !!packagerStatus,
           packager_status: packagerStatus,
         });
