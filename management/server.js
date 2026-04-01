@@ -306,11 +306,28 @@ app.post('/api/sessions/import-all', async (req, res) => {
   }
 });
 
+app.get('/api/sessions/:id/screenshots', (req, res) => {
+  const session = db.getSession(req.params.id);
+  if (!session || !session.local_path) return res.json({ files: [] });
+  const dir = path.join(session.local_path, 'screenshots');
+  if (!fs.existsSync(dir)) return res.json({ files: [] });
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.jpg') || f.endsWith('.png')).sort();
+  res.json({ files });
+});
+
 app.get('/api/sessions/:id/screenshots/:filename', (req, res) => {
   const session = db.getSession(req.params.id);
   if (!session || !session.local_path) return res.status(404).json({ error: 'Not found' });
   const filePath = path.join(session.local_path, 'screenshots', req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Screenshot not found' });
+  res.sendFile(filePath);
+});
+
+app.get('/api/sessions/:id/audio/:filename', (req, res) => {
+  const session = db.getSession(req.params.id);
+  if (!session || !session.local_path) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(session.local_path, 'audio', req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Audio not found' });
   res.sendFile(filePath);
 });
 

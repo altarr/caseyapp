@@ -166,17 +166,25 @@
         '<p><strong>Audio:</strong> ' + (s.has_audio ? 'Yes' : s.audio_opted_out ? 'Opted out' : 'No') + '</p>' +
         '</div>';
 
-      // Screenshot thumbnails
-      if (s.screenshot_count > 0 && s.local_path) {
-        html += '<h3 style="color:var(--red);font-size:0.85rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:1rem 0 0.5rem">Screenshots</h3>';
-        html += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
-        for (var i = 0; i < Math.min(s.screenshot_count, 20); i++) {
-          var mins = Math.floor(i / 60);
-          var secs = i % 60;
-          var fname = 'screenshot_' + String(mins).padStart(2,'0') + 'm' + String(secs).padStart(2,'0') + 's000.jpg';
-          html += '<img src="/api/sessions/' + sid + '/screenshots/' + fname + '" style="width:150px;height:auto;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display=\'none\'">';
-        }
-        html += '</div>';
+      // Audio player
+      if (s.has_audio) {
+        html += '<h3 style="color:var(--red);font-size:0.85rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:1rem 0 0.5rem">Audio</h3>';
+        html += '<audio controls style="width:100%;max-width:500px"><source src="/api/sessions/' + sid + '/audio/recording.m4a" type="audio/mp4"><source src="/api/sessions/' + sid + '/audio/recording.wav" type="audio/wav">No audio support</audio>';
+      }
+
+      // Screenshot thumbnails — load actual filenames from API
+      if (s.screenshot_count > 0) {
+        html += '<h3 style="color:var(--red);font-size:0.85rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:1rem 0 0.5rem">Screenshots (' + s.screenshot_count + ')</h3>';
+        html += '<div id="screenshot-grid" style="display:flex;flex-wrap:wrap;gap:8px">Loading...</div>';
+
+        // Fetch actual filenames
+        api('GET', '/sessions/' + sid + '/screenshots').then(function(sdata) {
+          var grid = document.getElementById('screenshot-grid');
+          if (!sdata.files || !sdata.files.length) { grid.innerHTML = '<p style="color:var(--text-dim)">No screenshots found on server</p>'; return; }
+          grid.innerHTML = sdata.files.map(function(fname) {
+            return '<img src="/api/sessions/' + sid + '/screenshots/' + fname + '" style="width:150px;height:auto;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open(this.src)" title="' + fname + '">';
+          }).join('');
+        });
       }
 
       // Matches
