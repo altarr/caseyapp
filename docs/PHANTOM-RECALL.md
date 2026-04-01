@@ -18,8 +18,7 @@
 8. [Authentication](#8-authentication)
 9. [Deployment](#9-deployment)
 10. [AWS Resources](#10-aws-resources)
-11. [Brand Guidelines Reference](#11-brand-guidelines-reference)
-12. [Troubleshooting](#12-troubleshooting)
+12. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -1133,70 +1132,8 @@ Note: The S3 bucket itself and session data are not deleted by the cleanup comma
 aws s3 rb s3://boothapp-sessions-752266476357 --force --region us-east-1
 ```
 
----
 
-## 11. Brand Guidelines Reference
-
-The product uses the **TrendAI** brand identity. Full brand guide at `brand/BRAND_GUIDE.md`.
-
-### Quick Color Reference
-
-| Name | Hex | Use |
-|------|-----|-----|
-| TrendAI Red | `#d71920` | Primary brand color, buttons, accents, links, live indicators |
-| TrendAI Red Dark | `#b81419` | Hover states |
-| Amber | `#ff9500` | Secondary accent, gradient endpoint, warnings |
-| Signal | `#2e0fe4` | Secondary color |
-| Black | `#000000` | Page backgrounds |
-| White | `#ffffff` | Text on dark backgrounds |
-| Card Background | `#0a0a0a` | Card/panel backgrounds |
-| Border | `#1a1a1a` | Card borders, dividers |
-| Input Background | `#111111` | Form inputs |
-| Input Border | `#333333` | Input field borders |
-| Primary Text | `#e5e5e5` | Headings, body text |
-| Secondary Text | `#888888` | Labels, captions |
-
-### Primary Gradient (Buttons, CTAs)
-
-```css
-background: linear-gradient(135deg, #d71920 0%, #ff9500 100%);
-```
-
-### Typography
-
-| Context | Font | Source |
-|---------|------|--------|
-| Page headings | Gotham Bold (fallback: Work Sans Bold) | Adobe Fonts |
-| Body text | Work Sans | Google Fonts |
-| Product UI | Inter | Google Fonts |
-| Buttons/labels | Work Sans 700, uppercase, letter-spacing 0.06em | |
-
-### Key Component Styles
-
-- **Buttons:** Gradient background, white text, 10px border-radius, uppercase, 0.06em letter-spacing
-- **Cards:** `#0a0a0a` background, 1px `#1a1a1a` border, 16px border-radius
-- **Inputs:** `#111` background, 1px `#333` border, 10px border-radius, focus border `#d71920`
-- **Theme:** Dark mode is the default for all digital applications
-
-### Logo Files Used
-
-| File | Use |
-|------|-----|
-| `brand/digital/logos/icon/favicon.png` | Browser favicon |
-| `brand/digital/logos/horizontal/TrendAI-Logo-White-RGB.png` | App header logo (dark backgrounds) |
-| `brand/digital/logos/horizontal/TrendAI-Logo-Full-Color-RGB.png` | Light background contexts |
-| `brand/digital/logos/icon/TrendAI-Logo-Icon-Full-Color-RGB.png` | QR code center overlay |
-
-### QR Code Styles
-
-Three branded presets with TrendAI logo overlay (requires error correction level H):
-- **Red:** `#d71920` modules on white -- primary style
-- **Black:** Black modules on white -- monochrome
-- **White:** White modules on `#1a1a1a` -- dark mode
-
----
-
-## 12. Troubleshooting
+## 11. Troubleshooting
 
 ### Management Server
 
