@@ -31,6 +31,7 @@
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="import-all-btn">Import All New Sessions</button>
       <button class="btn btn-outline btn-sm" id="refresh-btn">Refresh List</button>
+      <button class="btn btn-sm" style="background:var(--error);color:#fff" id="clear-all-btn">Clear All Sessions</button>
     </div>
     <div id="import-status" style="margin-top:0.75rem"></div>
   </div>
@@ -119,6 +120,22 @@
   });
 
   document.getElementById('refresh-btn').addEventListener('click', loadSessions);
+
+  // Clear all sessions
+  document.getElementById('clear-all-btn').addEventListener('click', function() {
+    if (!confirm('Are you sure you want to delete ALL sessions from S3 and the database? This cannot be undone.')) return;
+    if (!confirm('Really sure? This deletes all session data permanently.')) return;
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Clearing...';
+    api('POST', '/sessions/clear-all').then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Clear All Sessions';
+      if (data.error) { alert('Error: ' + data.error); return; }
+      document.getElementById('import-status').innerHTML = '<span class="badge badge-green">' + data.deleted + ' objects deleted</span>';
+      loadSessions();
+    });
+  });
 
   // Session detail
   document.getElementById('sessions-body').addEventListener('click', function(e) {

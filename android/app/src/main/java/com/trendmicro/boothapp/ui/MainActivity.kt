@@ -444,22 +444,28 @@ class MainActivity : AppCompatActivity() {
         showProgress(true)
         binding.btnEndSession.isEnabled = false
 
+        // Stop audio recording first
+        val recording = audioRecorder.stop()
+
         lifecycleScope.launch {
             val api = SessionApi(url, useManagement = prefs.hasManagement())
+
+            // Upload audio before ending session
+            if (recording != null && recording.exists() && recording.length() > 0) {
+                toast("Uploading audio...")
+                try {
+                    val uploadResult = api.uploadAudio(sessionId, recording)
+                    uploadResult.onSuccess { Log.d(TAG, "Audio uploaded: ${recording.length() / 1024} KB") }
+                    uploadResult.onFailure { e -> Log.e(TAG, "Audio upload failed: ${e.message}") }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Audio upload error: ${e.message}")
+                }
+            }
+
+            // Now end the session
             val result = api.endSession(sessionId, activeDemoPc)
 
             result.onSuccess {
-                // Stop audio and upload
-                val recording = audioRecorder.stop()
-                if (recording != null && recording.exists() && recording.length() > 0 && sessionId != null) {
-                    toast("Uploading audio...")
-                    try {
-                        api.uploadAudio(sessionId, recording)
-                        Log.d(TAG, "Audio uploaded: ${recording.length() / 1024} KB")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Audio upload failed", e)
-                    }
-                }
                 toast(getString(R.string.session_ended))
                 resetToIdle()
             }

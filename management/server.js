@@ -745,6 +745,54 @@ app.post('/api/sessions/:id/audio', audioUpload.single('audio'), async (req, res
   }
 });
 
+// Clear all sessions (S3 + DB)
+app.post('/api/sessions/clear-all', async (req, res) => {
+  try {
+    const { S3Client: ClearS3, ListObjectsV2Command, DeleteObjectsCommand } = require('@aws-sdk/client-s3');
+    const clearS3 = new ClearS3({ region: process.env.AWS_REGION || 'us-east-1' });
+
+    // Delete all S3 session objects
+    let deleted = 0;
+    let continuationToken;
+    do {
+      const list = await clearS3.send(new ListObjectsV2Command({
+        Bucket: S3_BUCKET, Prefix: 'sessions/',
+        ContinuationToken: continuationToken,
+      }));
+      if (list.Contents && list.Contents.length > 0) {
+        await clearS3.send(new DeleteObjectsCommand({
+          Bucket: S3_BUCKET,
+          Delete: { Objects: list.Contents.map(o => ({ Key: o.Key })) },
+        }));
+        deleted += list.Contents.length;
+      }
+      continuationToken = list.NextContinuationToken;
+    } while (continuationToken);
+
+    // Also delete active-session.json and commands
+    try { await s3Del('active-session.json'); } catch (_) {}
+    try {
+      const cmdList = await clearS3.send(new ListObjectsV2Command({ Bucket: S3_BUCKET, Prefix: 'commands/' }));
+      if (cmdList.Contents && cmdList.Contents.length > 0) {
+        await clearS3.send(new DeleteObjectsCommand({
+          Bucket: S3_BUCKET,
+          Delete: { Objects: cmdList.Contents.map(o => ({ Key: o.Key })) },
+        }));
+        deleted += cmdList.Contents.length;
+      }
+    } catch (_) {}
+
+    // Clear DB sessions
+    db.getDb().prepare('DELETE FROM session_contacts').run();
+    db.getDb().prepare('DELETE FROM sessions').run();
+
+    console.log(`[sessions] Cleared ${deleted} S3 objects + DB sessions`);
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Active session polling (for extension)
 app.get('/api/sessions/active', async (req, res) => {
   try {
