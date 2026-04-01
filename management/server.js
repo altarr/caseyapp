@@ -676,6 +676,30 @@ app.post('/api/sessions/create', async (req, res) => {
       status: 'active',
     });
 
+    // Auto-create contact from badge scan data
+    const nameParts = (visitor_name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    if (firstName) {
+      const contactId = db.insertContact({
+        event_id: event_id || null,
+        first_name: firstName,
+        last_name: lastName,
+        email: visitor_email || '',
+        company: visitor_company || '',
+        title: visitor_title || '',
+        phone: visitor_phone || '',
+        source: 'badge-scan',
+      });
+      // Auto-link session to contact
+      db.createMatch({
+        session_id, contact_id: contactId,
+        match_confidence: 1.0,
+        match_method: 'badge-scan',
+        match_reasoning: 'Automatically linked from badge scan',
+      });
+    }
+
     console.log(`[session] created ${session_id} for ${visitor_name} (event ${event_id})`);
     res.json({ session_id, metadata });
   } catch (err) {
@@ -880,6 +904,93 @@ app.delete('/api/sessions/:id', async (req, res) => {
 
     console.log(`[session] Deleted ${sessionId}`);
     res.json({ ok: true, deleted: sessionId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate fake sessions for contacts that don't have one
+app.post('/api/sessions/generate-fake', async (req, res) => {
+  try {
+    const { count, event_id } = req.body;
+    const limit = Math.min(count || 20, 100);
+    const eid = event_id || 1;
+
+    // Get contacts without sessions
+    const unmatched = db.getDb().prepare(`
+      SELECT c.* FROM contacts c
+      LEFT JOIN session_contacts sc ON sc.contact_id = c.id
+      WHERE sc.id IS NULL AND c.source = 'csv'
+      LIMIT ?
+    `).all(limit);
+
+    const products = [
+      'Vision One XDR', 'Endpoint Security', 'Cloud Security', 'Email Security',
+      'Network Security', 'Attack Surface Management', 'Zero Trust', 'TippingPoint IPS',
+    ];
+    const interests = [
+      'Consolidating security tools', 'Reducing alert fatigue', 'Cloud migration security',
+      'Ransomware protection', 'SOC automation', 'Compliance reporting', 'Incident response',
+      'Threat intelligence', 'Zero day protection', 'BYOD security policies',
+    ];
+
+    const created = [];
+    for (const contact of unmatched) {
+      const sid = genSessionId();
+      const prodShown = products.sort(() => Math.random() - 0.5).slice(0, 3);
+      const visitorInterests = interests.sort(() => Math.random() - 0.5).slice(0, 2);
+      const score = Math.floor(Math.random() * 5) + 5; // 5-9
+
+      const summary = `VISITOR: ${contact.first_name} ${contact.last_name}
+COMPANY: ${contact.company || 'Unknown'}
+ROLE: ${contact.title || 'Not mentioned'}
+
+DEMO SUMMARY:
+The SE demonstrated ${prodShown.join(', ')} during a ${Math.floor(Math.random() * 10) + 5}-minute session. Key features shown included the unified dashboard, automated threat detection, and policy management capabilities.
+
+CONVERSATION SUMMARY:
+The visitor expressed interest in ${visitorInterests[0].toLowerCase()} and asked detailed questions about ${visitorInterests[1].toLowerCase()}. They mentioned currently using a multi-vendor approach and looking to consolidate. The SE highlighted how Vision One addresses these needs with a single platform.
+
+KEY INTERESTS:
+- ${visitorInterests[0]}: Strong interest based on multiple follow-up questions
+- ${visitorInterests[1]}: Asked about specific implementation details
+
+RECOMMENDED FOLLOW-UP:
+- Send product documentation for ${prodShown[0]}
+- Schedule a deeper technical demo focusing on ${visitorInterests[0].toLowerCase()}
+- Connect with SE for a POC discussion`;
+
+      // Create session in DB
+      db.upsertSession({
+        session_id: sid, event_id: eid,
+        visitor_name: `${contact.first_name} ${contact.last_name}`,
+        visitor_company: contact.company,
+        visitor_title: contact.title,
+        visitor_email: contact.email,
+        status: 'analyzed',
+        screenshot_count: Math.floor(Math.random() * 200) + 50,
+        has_audio: true,
+        local_path: null,
+      });
+
+      // Save fake summary
+      const sessionDir = path.join(__dirname, 'data', 'sessions', sid);
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(path.join(sessionDir, 'summary.txt'), summary);
+      db.upsertSession({ session_id: sid, local_path: sessionDir, status: 'analyzed' });
+
+      // Link to contact
+      db.createMatch({
+        session_id: sid, contact_id: contact.id,
+        match_confidence: 1.0,
+        match_method: 'generated',
+        match_reasoning: 'Auto-generated demo session',
+      });
+
+      created.push({ session_id: sid, contact: `${contact.first_name} ${contact.last_name}` });
+    }
+
+    res.json({ created: created.length, sessions: created });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -265,17 +265,19 @@ function upsertSession(data) {
 // ── Contacts ────────────────────────────────────────────────────────────────
 
 function listContacts(eventId, { search, limit, offset } = {}) {
-  let q = 'SELECT * FROM contacts';
+  let q = `SELECT c.*, sc.session_id as matched_session_id, sc.match_confidence, sc.match_method
+            FROM contacts c
+            LEFT JOIN session_contacts sc ON sc.contact_id = c.id`;
   const params = [];
   const where = [];
-  if (eventId) { where.push('event_id = ?'); params.push(eventId); }
+  if (eventId) { where.push('c.event_id = ?'); params.push(eventId); }
   if (search) {
-    where.push("(first_name || ' ' || last_name LIKE ? OR company LIKE ? OR email LIKE ?)");
+    where.push("(c.first_name || ' ' || c.last_name LIKE ? OR c.company LIKE ? OR c.email LIKE ?)");
     const s = `%${search}%`;
     params.push(s, s, s);
   }
   if (where.length) q += ' WHERE ' + where.join(' AND ');
-  q += ' ORDER BY last_name, first_name';
+  q += ' ORDER BY c.last_name, c.first_name';
   if (limit) { q += ' LIMIT ?'; params.push(limit); }
   if (offset) { q += ' OFFSET ?'; params.push(offset); }
   return getDb().prepare(q).all(params);
