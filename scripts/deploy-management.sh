@@ -25,9 +25,7 @@ echo "[2/4] Uploaded to S3"
 ssh -i "$KEY" -o StrictHostKeyChecking=no "$HOST" "sudo bash -c '
 # Backup state BEFORE stopping
 cp /home/caseyapp/app/management/.env /tmp/mgmt-env-backup 2>/dev/null || true
-cp /home/caseyapp/app/management/data/caseyapp.db /tmp/mgmt-db-backup 2>/dev/null || true
-cp /home/caseyapp/app/management/data/caseyapp.db-wal /tmp/mgmt-wal-backup 2>/dev/null || true
-cp /home/caseyapp/app/management/data/caseyapp.db-shm /tmp/mgmt-shm-backup 2>/dev/null || true
+cp -a /home/caseyapp/app/management/data /tmp/mgmt-data-backup 2>/dev/null || true
 
 systemctl stop caseyapp-management
 
@@ -36,12 +34,13 @@ aws s3 cp s3://$BUCKET/demo-setup/caseyapp-demo.zip /tmp/caseyapp.zip --quiet
 rm -rf /home/caseyapp/app
 unzip -qo /tmp/caseyapp.zip -d /home/caseyapp/app
 
-# Restore state
+# Restore ALL state (env + entire data directory including sessions, DB, uploads)
 cp /tmp/mgmt-env-backup /home/caseyapp/app/management/.env 2>/dev/null || true
-mkdir -p /home/caseyapp/app/management/data
-cp /tmp/mgmt-db-backup /home/caseyapp/app/management/data/caseyapp.db 2>/dev/null || true
-cp /tmp/mgmt-wal-backup /home/caseyapp/app/management/data/caseyapp.db-wal 2>/dev/null || true
-cp /tmp/mgmt-shm-backup /home/caseyapp/app/management/data/caseyapp.db-shm 2>/dev/null || true
+rm -rf /home/caseyapp/app/management/data
+cp -a /tmp/mgmt-data-backup /home/caseyapp/app/management/data 2>/dev/null || true
+mkdir -p /home/caseyapp/app/management/data/sessions
+mkdir -p /home/caseyapp/app/management/data/badge-samples
+mkdir -p /home/caseyapp/app/management/data/uploads
 
 chown -R caseyapp:caseyapp /home/caseyapp/app
 cd /home/caseyapp/app/management && su -s /bin/bash caseyapp -c \"npm install --production\" 2>&1 | tail -1
