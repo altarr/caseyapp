@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phantom Recall — Booth Tracking</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">Phantom Recall</a>
+  <a href="/">Dashboard</a>
+  <a href="/badges.html">Badge Training</a>
+  <a href="/sessions.html">Sessions</a>
+  <a href="/contacts.html">Contacts</a>
+  <a href="/tracking.html" class="active">Booth Tracking</a>
+  <a href="/users.html">Users</a>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem">
+    <span class="nav-user" style="color:var(--text-muted);font-size:0.8rem"></span>
+    <a href="#" class="nav-logout btn btn-outline btn-sm" style="padding:6px 12px">Logout</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Booth Tracking</h1>
+    <p>Live demo PC status and SE performance</p>
+  </div>
+
+  <!-- Demo PCs -->
+  <div class="card">
+    <h2>Demo PCs</h2>
+    <table class="table">
+      <thead>
+        <tr><th>PC ID</th><th>Assigned SE</th><th>Status</th><th>Registered</th></tr>
+      </thead>
+      <tbody id="pcs-body">
+        <tr><td colspan="4" style="color:var(--text-dim)">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SE Stats -->
+  <div class="card">
+    <h2>Sales Engineer Performance</h2>
+    <table class="table">
+      <thead>
+        <tr><th>SE Name</th><th>Demo PC</th><th>Total Demos</th><th>Analyzed</th><th>Last Demo</th><th>Status</th></tr>
+      </thead>
+      <tbody id="se-body">
+        <tr><td colspan="6" style="color:var(--text-dim)">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Add SE -->
+  <div class="card">
+    <h2>Register Sales Engineer</h2>
+    <div class="form-row" style="max-width:600px">
+      <div class="form-group">
+        <label class="field-label">SE Name</label>
+        <input type="text" class="input" id="se-name" placeholder="e.g. Amy McMahon">
+      </div>
+      <div class="form-group">
+        <label class="field-label">Demo PC</label>
+        <input type="text" class="input" id="se-pc" placeholder="e.g. booth-pc-1">
+      </div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:1.25rem">
+        <button class="btn btn-primary btn-sm" id="add-se-btn">Add SE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    return fetch('/api' + path, opts).then(function(r) { return r.json(); });
+  }
+
+  function loadPCs() {
+    api('GET', '/demo-pcs').then(function(data) {
+      var tbody = document.getElementById('pcs-body');
+      if (!data.demo_pcs || !data.demo_pcs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim)">No demo PCs registered</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.demo_pcs.map(function(pc) {
+        var statusBadge = pc.status === 'online'
+          ? '<span class="badge badge-green">Online</span>'
+          : '<span class="badge" style="background:rgba(136,136,136,0.15);color:#888">Offline</span>';
+        return '<tr>' +
+          '<td style="font-family:monospace">' + pc.name + '</td>' +
+          '<td>' + (pc.se_name || '-') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td style="font-size:0.8rem;color:var(--text-muted)">' + (pc.registered_at || '') + '</td>' +
+          '</tr>';
+      }).join('');
+    });
+  }
+
+  function loadSEStats() {
+    api('GET', '/se-stats').then(function(data) {
+      var tbody = document.getElementById('se-body');
+      if (!data.stats || !data.stats.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-dim)">No SEs registered</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.stats.map(function(se) {
+        var statusBadge = se.active
+          ? '<span class="badge badge-green">Active</span>'
+          : '<span class="badge" style="background:rgba(136,136,136,0.15);color:#888">Inactive</span>';
+        return '<tr>' +
+          '<td style="font-weight:600">' + se.name + '</td>' +
+          '<td style="font-family:monospace;font-size:0.85rem">' + (se.pc_name || se.demo_pc || '-') + '</td>' +
+          '<td style="font-size:1.1rem;font-weight:700;color:var(--red)">' + (se.total_demos || 0) + '</td>' +
+          '<td>' + (se.analyzed_demos || 0) + '</td>' +
+          '<td style="font-size:0.8rem;color:var(--text-muted)">' + (se.last_demo || '-') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '</tr>';
+      }).join('');
+    });
+  }
+
+  document.getElementById('add-se-btn').addEventListener('click', function() {
+    var name = document.getElementById('se-name').value.trim();
+    var pc = document.getElementById('se-pc').value.trim();
+    if (!name) return;
+    api('POST', '/sales-engineers', { name: name, event_id: 1, demo_pc: pc }).then(function() {
+      document.getElementById('se-name').value = '';
+      document.getElementById('se-pc').value = '';
+      loadSEStats();
+      loadPCs();
+    });
+  });
+
+  loadPCs();
+  loadSEStats();
+  // Auto-refresh every 30s
+  setInterval(function() { loadPCs(); loadSEStats(); }, 30000);
+})();
+</script>
+<script src="nav-auth.js"></script>
+</body>
+</html>

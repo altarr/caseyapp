@@ -1077,6 +1077,22 @@ app.get('/api/sessions/:id/summary', (req, res) => {
   res.json({ session_id: req.params.id, summary, status: 'analyzed' });
 });
 
+// Sales Engineers & Demo PC tracking
+app.get('/api/se-stats', (req, res) => {
+  res.json({ stats: db.getSEStats() });
+});
+
+app.get('/api/sales-engineers', (req, res) => {
+  res.json({ engineers: db.listSEs(req.query.event_id) });
+});
+
+app.post('/api/sales-engineers', (req, res) => {
+  const { name, event_id, demo_pc } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const id = db.createSE({ name, event_id, demo_pc });
+  res.json({ id, name });
+});
+
 // Active session polling (for extension)
 app.get('/api/sessions/active', async (req, res) => {
   try {

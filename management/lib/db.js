@@ -58,10 +58,22 @@ function initSchema() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS sales_engineers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      event_id INTEGER,
+      demo_pc TEXT,
+      active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS demo_pcs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       event_id INTEGER,
       name TEXT NOT NULL,
+      se_id INTEGER REFERENCES sales_engineers(id),
+      status TEXT DEFAULT 'online',
+      last_heartbeat TEXT,
       registered_at TEXT DEFAULT (datetime('now')),
       UNIQUE(event_id, name)
     );
@@ -359,6 +371,46 @@ function getDemoPc(id) {
   return getDb().prepare('SELECT * FROM demo_pcs WHERE id = ?').get(id);
 }
 
+// ── Sales Engineers ──────────────────────────────────────────────────────────
+
+function listSEs(eventId) {
+  let q = `SELECT se.*,
+    (SELECT COUNT(*) FROM sessions s WHERE s.se_name = se.name) as demo_count,
+    dp.name as pc_name, dp.status as pc_status
+    FROM sales_engineers se
+    LEFT JOIN demo_pcs dp ON dp.se_id = se.id`;
+  const params = [];
+  if (eventId) { q += ' WHERE se.event_id = ?'; params.push(eventId); }
+  q += ' ORDER BY se.name';
+  return getDb().prepare(q).all(params);
+}
+
+function createSE({ name, event_id, demo_pc }) {
+  const result = getDb().prepare(
+    'INSERT INTO sales_engineers (name, event_id, demo_pc) VALUES (?, ?, ?)'
+  ).run(name, event_id || null, demo_pc || null);
+  return result.lastInsertRowid;
+}
+
+function assignSEtoPC(seId, pcId) {
+  getDb().prepare('UPDATE demo_pcs SET se_id = ? WHERE id = ?').run(seId, pcId);
+}
+
+function getSEStats() {
+  return getDb().prepare(`
+    SELECT se.id, se.name, se.demo_pc, se.active,
+      dp.name as pc_name, dp.status as pc_status,
+      COUNT(s.id) as total_demos,
+      SUM(CASE WHEN s.status = 'analyzed' THEN 1 ELSE 0 END) as analyzed_demos,
+      MAX(s.created_at) as last_demo
+    FROM sales_engineers se
+    LEFT JOIN demo_pcs dp ON dp.se_id = se.id
+    LEFT JOIN sessions s ON s.se_name = se.name
+    GROUP BY se.id
+    ORDER BY total_demos DESC
+  `).all();
+}
+
 module.exports = {
   getDb, listEvents, getEvent, createEvent, updateEvent, deleteEvent,
   getActiveEvent, setActiveEvent,
@@ -367,4 +419,5 @@ module.exports = {
   listContacts, getContact, insertContact, contactCount,
   createMatch, getMatchesForSession, getMatchesForContact, unmatchedSessions,
   listDemoPcs, registerDemoPc, getDemoPc,
+  listSEs, createSE, assignSEtoPC, getSEStats,
 };
