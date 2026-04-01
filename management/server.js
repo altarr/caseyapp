@@ -869,6 +869,55 @@ app.post('/api/sessions/clear-all', async (req, res) => {
   }
 });
 
+// Export all sessions as CSV with contact info + summaries
+app.get('/api/sessions/export-csv', (req, res) => {
+  const sessions = db.listSessions();
+  const rows = [['Name', 'Title', 'Company', 'Email', 'Phone', 'Session ID', 'Screenshots', 'Audio', 'Visit Summary', 'Key Findings'].join(',')];
+
+  for (const s of sessions) {
+    // Get matched contact
+    const matches = db.getMatchesForSession(s.session_id);
+    const contact = matches.length > 0 ? db.getContact(matches[0].contact_id) : null;
+
+    // Load summary
+    let visitSummary = '';
+    let keyFindings = '';
+    if (s.local_path) {
+      const sumPath = path.join(s.local_path, 'summary.txt');
+      if (fs.existsSync(sumPath)) {
+        const txt = fs.readFileSync(sumPath, 'utf-8');
+        // Extract sections
+        const demoMatch = txt.match(/DEMO SUMMARY:\n([\s\S]*?)(?=\n\n[A-Z])/);
+        const convMatch = txt.match(/CONVERSATION SUMMARY:\n([\s\S]*?)(?=\n\n[A-Z])/);
+        const interestMatch = txt.match(/KEY INTERESTS:\n([\s\S]*?)(?=\n\n[A-Z])/);
+        const followMatch = txt.match(/RECOMMENDED FOLLOW-UP:\n([\s\S]*?)(?=$|\n\n\[)/);
+
+        visitSummary = [(demoMatch?.[1] || '').trim(), (convMatch?.[1] || '').trim()].filter(Boolean).join(' | ');
+        keyFindings = [(interestMatch?.[1] || '').trim(), (followMatch?.[1] || '').trim()].filter(Boolean).join(' | ');
+      }
+    }
+
+    const esc = (v) => '"' + (v || '').replace(/"/g, '""').replace(/\n/g, ' ') + '"';
+
+    rows.push([
+      esc(contact ? `${contact.first_name} ${contact.last_name}` : s.visitor_name),
+      esc(contact?.title || s.visitor_title || ''),
+      esc(contact?.company || s.visitor_company || ''),
+      esc(contact?.email || s.visitor_email || ''),
+      esc(contact?.phone || s.visitor_phone || ''),
+      esc(s.session_id),
+      s.screenshot_count || 0,
+      s.has_audio ? 'Yes' : 'No',
+      esc(visitSummary),
+      esc(keyFindings),
+    ].join(','));
+  }
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="phantom-recall-sessions-export.csv"');
+  res.send(rows.join('\n'));
+});
+
 // Delete a single session (S3 + DB + local files)
 app.delete('/api/sessions/:id', async (req, res) => {
   try {

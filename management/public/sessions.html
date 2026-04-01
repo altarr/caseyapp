@@ -32,6 +32,7 @@
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" id="import-all-btn">Import All New Sessions</button>
       <button class="btn btn-outline btn-sm" id="refresh-btn">Refresh List</button>
+      <button class="btn btn-outline btn-sm" id="export-btn" style="border-color:var(--green);color:var(--green)">Export Package (CSV)</button>
       <button class="btn btn-sm" style="background:var(--error);color:#fff" id="clear-all-btn">Clear All Sessions</button>
     </div>
     <div id="import-status" style="margin-top:0.75rem"></div>
@@ -125,6 +126,10 @@
   });
 
   document.getElementById('refresh-btn').addEventListener('click', loadSessions);
+
+  document.getElementById('export-btn').addEventListener('click', function() {
+    window.location.href = '/api/sessions/export-csv';
+  });
 
   // Clear all sessions
   document.getElementById('clear-all-btn').addEventListener('click', function() {

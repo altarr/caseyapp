@@ -129,16 +129,15 @@
 
   function loadStats() {
     var eid = activeEventId || document.getElementById('event-select').value;
-    if (!eid) return;
-    api('GET', '/sessions?event_id=' + eid).then(function(d) {
+    api('GET', '/sessions').then(function(d) {
       document.getElementById('stat-sessions').textContent = d.sessions.length;
       var matched = d.sessions.filter(function(s) { return s.contact_id; }).length;
       document.getElementById('stat-matched').textContent = matched;
     });
-    api('GET', '/contacts?event_id=' + eid + '&limit=1').then(function(d) {
+    api('GET', '/contacts?limit=1').then(function(d) {
       document.getElementById('stat-contacts').textContent = d.total || 0;
     });
-    api('GET', '/badges/profiles?event_id=' + eid).then(function(d) {
+    api('GET', '/badges/profiles').then(function(d) {
       document.getElementById('stat-profiles').textContent = d.profiles.length;
     });
   }
