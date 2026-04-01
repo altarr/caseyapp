@@ -106,8 +106,25 @@ async function importSession(sessionId, bucket, eventId) {
   const screenshotsDir = path.join(sessionDir, 'screenshots');
   const screenshotCount = fs.existsSync(screenshotsDir) ? fs.readdirSync(screenshotsDir).filter(f => f.endsWith('.jpg')).length : 0;
 
-  // Check for audio
-  const hasAudio = fs.existsSync(path.join(sessionDir, 'audio', 'recording.mp3'));
+  // Download audio from S3 if it exists (phone uploads separately from zip)
+  const audioFormats = ['recording.m4a', 'recording.wav', 'recording.mp3', 'recording.webm'];
+  const audioDir = path.join(sessionDir, 'audio');
+  fs.mkdirSync(audioDir, { recursive: true });
+  for (const af of audioFormats) {
+    try {
+      const audioResp = await s3.send(new GetObjectCommand({
+        Bucket: bucket, Key: `sessions/${sessionId}/audio/${af}`,
+      }));
+      const chunks = [];
+      for await (const chunk of audioResp.Body) chunks.push(chunk);
+      fs.writeFileSync(path.join(audioDir, af), Buffer.concat(chunks));
+      console.log(`  [import] Downloaded audio: ${af}`);
+      break;
+    } catch (_) {}
+  }
+
+  // Check for audio (any format)
+  const hasAudio = audioFormats.some(af => fs.existsSync(path.join(audioDir, af)));
 
   // Save to DB
   const session = db.upsertSession({
