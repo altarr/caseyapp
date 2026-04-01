@@ -48,6 +48,7 @@
           <th>Audio</th>
           <th>Contact Match</th>
           <th>Imported</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="sessions-body">
@@ -87,14 +88,15 @@
         var matchBadge = s.contact_id
           ? '<span class="badge badge-green">' + Math.round(s.match_confidence*100) + '%</span> ' + (s.contact_name||'')
           : '<span class="badge badge-amber">Unmatched</span>';
-        return '<tr style="cursor:pointer" data-sid="' + s.session_id + '">' +
-          '<td style="font-family:monospace;font-size:0.8rem">' + s.session_id + '</td>' +
-          '<td>' + (s.visitor_name||'-') + '</td>' +
-          '<td>' + (s.visitor_company||'-') + '</td>' +
+        return '<tr data-sid="' + s.session_id + '">' +
+          '<td style="font-family:monospace;font-size:0.8rem;cursor:pointer" class="session-click">' + s.session_id + '</td>' +
+          '<td style="cursor:pointer" class="session-click">' + (s.visitor_name||'-') + '</td>' +
+          '<td style="cursor:pointer" class="session-click">' + (s.visitor_company||'-') + '</td>' +
           '<td>' + s.screenshot_count + '</td>' +
           '<td>' + (s.has_audio ? '<span class="badge badge-green">Yes</span>' : s.audio_opted_out ? '<span class="badge badge-red">Opted out</span>' : '<span class="badge badge-amber">No</span>') + '</td>' +
           '<td>' + matchBadge + '</td>' +
           '<td style="font-size:0.8rem;color:var(--text-muted)">' + (s.imported_at||'') + '</td>' +
+          '<td><button class="btn btn-outline btn-sm" style="border-color:var(--error);color:var(--error);padding:4px 8px;font-size:10px" onclick="event.stopPropagation();deleteSession(\'' + s.session_id + '\')">Delete</button></td>' +
           '</tr>';
       }).join('');
     });
@@ -139,6 +141,7 @@
 
   // Session detail
   document.getElementById('sessions-body').addEventListener('click', function(e) {
+    if (!e.target.classList.contains('session-click')) return;
     var tr = e.target.closest('tr[data-sid]');
     if (!tr) return;
     var sid = tr.dataset.sid;
@@ -220,6 +223,14 @@
       }).catch(function() {});
     });
   }
+
+  window.deleteSession = function(sid) {
+    if (!confirm('Delete session ' + sid + '? This removes it from S3 and the database.')) return;
+    api('DELETE', '/sessions/' + sid).then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      loadSessions();
+    });
+  };
 
   window.analyzeSession = function(sid) {
     var btn = document.getElementById('analyze-btn');

@@ -845,6 +845,46 @@ app.post('/api/sessions/clear-all', async (req, res) => {
   }
 });
 
+// Delete a single session (S3 + DB + local files)
+app.delete('/api/sessions/:id', async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const session = db.getSession(sessionId);
+
+    // Delete from S3
+    const { S3Client: DelS3, ListObjectsV2Command: DelList, DeleteObjectsCommand: DelObjs } = require('@aws-sdk/client-s3');
+    const delS3 = new DelS3({ region: process.env.AWS_REGION || 'us-east-1' });
+    let continuationToken;
+    do {
+      const list = await delS3.send(new DelList({
+        Bucket: S3_BUCKET, Prefix: `sessions/${sessionId}/`,
+        ContinuationToken: continuationToken,
+      }));
+      if (list.Contents && list.Contents.length > 0) {
+        await delS3.send(new DelObjs({
+          Bucket: S3_BUCKET,
+          Delete: { Objects: list.Contents.map(o => ({ Key: o.Key })) },
+        }));
+      }
+      continuationToken = list.NextContinuationToken;
+    } while (continuationToken);
+
+    // Delete local files
+    if (session && session.local_path) {
+      try { fs.rmSync(session.local_path, { recursive: true, force: true }); } catch (_) {}
+    }
+
+    // Delete from DB
+    db.getDb().prepare('DELETE FROM session_contacts WHERE session_id = ?').run(sessionId);
+    db.getDb().prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
+
+    console.log(`[session] Deleted ${sessionId}`);
+    res.json({ ok: true, deleted: sessionId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Session analysis
 app.post('/api/sessions/:id/analyze', async (req, res) => {
   const sessionId = req.params.id;
