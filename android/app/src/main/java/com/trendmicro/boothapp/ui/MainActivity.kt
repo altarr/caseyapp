@@ -178,24 +178,41 @@ class MainActivity : AppCompatActivity() {
                 binding.ivCapturedBadge.setImageBitmap(bitmap)
                 binding.tvCameraHint.text = getString(R.string.ocr_extracting)
 
-                // Run OCR
+                // Run badge extraction — use management AI if available, else local OCR
                 lifecycleScope.launch {
-                    val info = ocrProcessor.process(bitmap)
-                    Log.d(TAG, "OCR result: name='${info.name}' company='${info.company}'")
-
-                    binding.etVisitorName.setText(info.name)
-                    binding.etVisitorCompany.setText(info.company)
+                    if (prefs.hasManagement()) {
+                        // Send badge to management server for AI extraction using trained profile
+                        binding.tvCameraHint.text = "Analyzing badge with AI..."
+                        val api = SessionApi(prefs.managementUrl, useManagement = true)
+                        val scanResult = api.scanBadge(file, prefs.eventId)
+                        scanResult.onSuccess { fields ->
+                            Log.d(TAG, "AI badge scan: $fields")
+                            binding.etVisitorName.setText(fields["name"] ?: "")
+                            binding.etVisitorCompany.setText(fields["company"] ?: "")
+                            // TODO: populate additional fields from profile (title, email, etc.)
+                        }
+                        scanResult.onFailure { err ->
+                            Log.w(TAG, "AI badge scan failed, falling back to OCR: ${err.message}")
+                            val info = ocrProcessor.process(bitmap)
+                            binding.etVisitorName.setText(info.name)
+                            binding.etVisitorCompany.setText(info.company)
+                        }
+                    } else {
+                        // Fallback: local ML Kit OCR
+                        val info = ocrProcessor.process(bitmap)
+                        Log.d(TAG, "OCR result: name='${info.name}' company='${info.company}'")
+                        binding.etVisitorName.setText(info.name)
+                        binding.etVisitorCompany.setText(info.company)
+                    }
 
                     showProgress(false)
                     binding.tvCameraHint.visibility = View.GONE
                     binding.btnStartSession.isEnabled = true
-
-                    // Change capture to retake
                     binding.btnCapture.text = getString(R.string.retake)
 
-                    // Auto-start session if we got a valid name and orchestrator is configured
-                    if (info.name.isNotBlank() && prefs.orchestratorUrl.isNotBlank()) {
-                        Log.d(TAG, "Auto-starting session for: ${info.name}")
+                    val name = binding.etVisitorName.text?.toString()?.trim() ?: ""
+                    if (name.isNotBlank() && prefs.orchestratorUrl.isNotBlank()) {
+                        Log.d(TAG, "Auto-starting session for: $name")
                         toast(getString(R.string.auto_starting_session))
                         startSession()
                     }
@@ -230,13 +247,15 @@ class MainActivity : AppCompatActivity() {
         binding.btnStartSession.isEnabled = false
 
         lifecycleScope.launch {
-            val api = SessionApi(url)
+            val useMgmt = prefs.hasManagement()
+            val api = SessionApi(url, useManagement = useMgmt)
             val request = SessionApi.CreateSessionRequest(
                 visitorName = visitorName,
                 visitorCompany = visitorCompany,
                 badgePhoto = "badge.jpg",
                 demoPc = demoPc,
                 seName = seName,
+                eventId = if (useMgmt) prefs.eventId else null,
                 audioConsent = true
             )
 
@@ -362,7 +381,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnStopAudio.isEnabled = false
 
         lifecycleScope.launch {
-            val api = SessionApi(url)
+            val api = SessionApi(url, useManagement = prefs.hasManagement())
             val result = api.stopAudio(sessionId, activeDemoPc)
 
             result.onSuccess {
@@ -396,7 +415,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnEndSession.isEnabled = false
 
         lifecycleScope.launch {
-            val api = SessionApi(url)
+            val api = SessionApi(url, useManagement = prefs.hasManagement())
             val result = api.endSession(sessionId, activeDemoPc)
 
             result.onSuccess {
