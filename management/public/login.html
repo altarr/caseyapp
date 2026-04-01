@@ -5,18 +5,104 @@
 <link rel="icon" href="/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phantom Recall — Login</title>
-<link rel="stylesheet" href="styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#000;
+    color:#e5e5e5;
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    overflow:hidden;
+  }
+  .bg{
+    position:fixed;inset:0;z-index:0;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 80%, rgba(215,25,32,0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 20%, rgba(255,149,0,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(46,15,228,0.08) 0%, transparent 50%),
+      #000;
+  }
+  .bg-logo{
+    position:fixed;
+    bottom:-15%;left:-10%;
+    width:70vw;height:70vw;max-width:800px;max-height:800px;
+    opacity:0.04;
+    background:url('/phantom-recall-logo.png') no-repeat center;
+    background-size:contain;
+    z-index:0;
+  }
+  .page{
+    position:relative;z-index:1;
+    min-height:100vh;
+    display:flex;flex-direction:column;
+    align-items:center;
+    padding:3rem 1.5rem;
+  }
+  .top-logo{height:28px;margin-bottom:2rem;opacity:0.8}
+  .title{
+    font-family:'Work Sans',system-ui,sans-serif;
+    font-size:3.2rem;font-weight:700;
+    letter-spacing:0.04em;
+    background:linear-gradient(135deg,#d71920 0%,#ff9500 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;
+    margin-bottom:0.5rem;
+    text-align:center;
+  }
+  .subtitle{color:#888;font-size:0.9rem;margin-bottom:3rem;text-align:center}
+  .card{
+    background:rgba(10,10,10,0.85);
+    border:1px solid #1a1a1a;
+    border-radius:16px;
+    padding:2rem 2.5rem;
+    max-width:380px;width:100%;
+    backdrop-filter:blur(20px);
+    box-shadow:0 25px 60px rgba(0,0,0,0.5);
+  }
+  .field-label{
+    display:block;font-size:11px;font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;
+    color:#888;margin-bottom:8px;
+  }
+  .input{
+    width:100%;background:#111;border:1px solid #333;
+    border-radius:10px;padding:12px 14px;font-size:14px;
+    color:#e5e5e5;outline:none;transition:border-color 0.15s;
+    font-family:inherit;
+  }
+  .input::placeholder{color:#444}
+  .input:focus{border-color:#d71920}
+  .form-group{margin-bottom:1.25rem}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;
+    border:none;border-radius:10px;padding:12px 24px;
+    font-size:13px;font-weight:700;letter-spacing:0.06em;
+    text-transform:uppercase;cursor:pointer;
+    transition:opacity 0.15s,transform 0.15s;width:100%;
+  }
+  .btn:hover{opacity:0.9;transform:translateY(-1px)}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  .btn-primary{background:linear-gradient(135deg,#d71920,#ff9500);color:#fff}
+  .spinner{
+    display:inline-block;width:16px;height:16px;
+    border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;
+    border-radius:50%;animation:spin 0.6s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #error{display:none;padding:0.6rem;border-radius:8px;background:rgba(255,107,111,0.1);border:1px solid #ff6b6f;color:#ff6b6f;font-size:0.85rem;margin-bottom:1rem}
+</style>
 </head>
 <body>
-<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding-top:4rem">
-  <!-- Phantom Recall Logo -->
-  <img src="/phantom-recall-logo.png" alt="Phantom Recall" style="width:500px;max-width:90vw;margin-bottom:3rem">
+<div class="bg"></div>
+<div class="bg-logo"></div>
 
-  <div class="card" style="max-width:400px;width:100%">
-    <div style="text-align:center;margin-bottom:2rem">
-      <p style="color:var(--text-muted);font-size:0.85rem">Management Console</p>
-    </div>
+<div class="page">
+  <img src="/trendai-logo-white.png" alt="TrendAI" class="top-logo">
+  <div class="title">Phantom Recall</div>
+  <div class="subtitle">Management Console</div>
 
+  <div class="card">
     <form id="login-form">
       <div class="form-group">
         <label class="field-label">Username</label>
@@ -26,11 +112,10 @@
         <label class="field-label">Password</label>
         <input type="password" class="input" id="password" autocomplete="current-password" required>
       </div>
-      <div id="error" style="display:none;padding:0.6rem;border-radius:8px;background:rgba(255,107,111,0.1);border:1px solid var(--error);color:var(--error);font-size:0.85rem;margin-bottom:1rem"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%" id="login-btn">Sign In</button>
+      <div id="error"></div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
     </form>
   </div>
-
 </div>
 
 <script>
