@@ -810,6 +810,38 @@ app.post('/api/sessions/clear-all', async (req, res) => {
   }
 });
 
+// Session analysis
+app.post('/api/sessions/:id/analyze', async (req, res) => {
+  const sessionId = req.params.id;
+  const session = db.getSession(sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+
+  res.json({ ok: true, analyzing: true, session_id: sessionId });
+
+  // Run analysis async (don't block the response)
+  const { analyzeSession } = require('./lib/session-analyzer');
+  analyzeSession(sessionId).then(summary => {
+    // Upload summary to S3
+    s3Put(`sessions/${sessionId}/output/summary.txt`, summary).catch(() => {});
+    console.log(`[analyze] Session ${sessionId} analysis complete`);
+  }).catch(err => {
+    console.error(`[analyze] Session ${sessionId} failed: ${err.message}`);
+  });
+});
+
+app.get('/api/sessions/:id/summary', (req, res) => {
+  const session = db.getSession(req.params.id);
+  if (!session || !session.local_path) return res.status(404).json({ error: 'Session not found' });
+
+  const summaryPath = path.join(session.local_path, 'summary.txt');
+  if (!fs.existsSync(summaryPath)) {
+    return res.status(404).json({ error: 'Not yet analyzed', status: session.status });
+  }
+
+  const summary = fs.readFileSync(summaryPath, 'utf-8');
+  res.json({ session_id: req.params.id, summary, status: 'analyzed' });
+});
+
 // Active session polling (for extension)
 app.get('/api/sessions/active', async (req, res) => {
   try {

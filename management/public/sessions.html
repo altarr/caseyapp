@@ -198,9 +198,56 @@
         html += '</tbody></table>';
       }
 
+      // Analyze button + summary
+      html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">';
+      html += '<div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:1rem">';
+      html += '<button class="btn btn-primary btn-sm" id="analyze-btn" onclick="analyzeSession(\'' + sid + '\')">Analyze with AI</button>';
+      html += '<span id="analyze-status" style="font-size:0.85rem;color:var(--text-muted)"></span>';
+      html += '</div>';
+      html += '<pre id="summary-text" style="background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:0.85rem;color:var(--text);white-space:pre-wrap;word-wrap:break-word;display:none;max-height:500px;overflow-y:auto"></pre>';
+      html += '</div>';
+
       content.innerHTML = html;
+
+      // Load existing summary if available
+      api('GET', '/sessions/' + sid + '/summary').then(function(sdata) {
+        if (sdata.summary) {
+          document.getElementById('summary-text').textContent = sdata.summary;
+          document.getElementById('summary-text').style.display = 'block';
+          document.getElementById('analyze-btn').textContent = 'Re-analyze';
+          document.getElementById('analyze-status').textContent = 'Analysis complete';
+        }
+      }).catch(function() {});
     });
   }
+
+  window.analyzeSession = function(sid) {
+    var btn = document.getElementById('analyze-btn');
+    var status = document.getElementById('analyze-status');
+    var summaryEl = document.getElementById('summary-text');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+    status.textContent = 'Sending screenshots + audio to Claude...';
+
+    api('POST', '/sessions/' + sid + '/analyze').then(function() {
+      // Poll for summary
+      var poll = setInterval(function() {
+        api('GET', '/sessions/' + sid + '/summary').then(function(data) {
+          if (data.summary) {
+            clearInterval(poll);
+            summaryEl.textContent = data.summary;
+            summaryEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Re-analyze';
+            status.textContent = 'Analysis complete';
+          }
+        }).catch(function() {});
+      }, 3000);
+
+      // Timeout after 2 minutes
+      setTimeout(function() { clearInterval(poll); btn.disabled = false; btn.textContent = 'Analyze with AI'; status.textContent = 'Timed out — try again'; }, 120000);
+    });
+  };
 
   loadSessions();
 })();
