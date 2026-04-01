@@ -106,7 +106,7 @@ var SAMPLE_TRANSCRIPT = {
   "source": "recording.wav",
   "duration_seconds": 1020,
   "entries": [
-    { "timestamp": "00:00:05.000", "speaker": "SE", "text": "Hi Priya, welcome to the Trend Micro booth. I'm Casey. Let me show you Vision One \u2014 our unified security platform." },
+    { "timestamp": "00:00:05.000", "speaker": "SE", "text": "Hi Priya, welcome to the TrendAI booth. I'm Casey. Let me show you Vision One \u2014 our unified security platform." },
     { "timestamp": "00:00:14.000", "speaker": "Visitor", "text": "Thanks. We're a mid-size financial firm, about 3,500 endpoints. Our biggest headache right now is BYOD \u2014 our employees use personal iPhones and Android devices to access corporate email." },
     { "timestamp": "00:00:28.000", "speaker": "SE", "text": "That's exactly one of Vision One's strongest areas. Let me start with Endpoint Security and show you how we handle BYOD specifically." },
     { "timestamp": "00:00:40.000", "speaker": "Visitor", "text": "Great. We looked at CrowdStrike Falcon Go for this but found the mobile coverage was limited." },

@@ -10,7 +10,7 @@ Build an Android app (API 33+) that captures visitor badge photos via CameraX, e
 - [ ] Creates session via Lambda orchestrator POST /sessions
 - [ ] Uploads badge photo to S3 bucket boothapp-sessions-752266476357
 - [ ] Start Session and End Session buttons functional
-- [ ] Trend Micro brand colors and styling applied
+- [ ] TrendAI brand colors and styling applied
 - [ ] AWS SDK used for S3 uploads
 - [ ] App follows DATA-CONTRACT.md schema for metadata.json
 

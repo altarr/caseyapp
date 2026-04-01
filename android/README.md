@@ -48,4 +48,4 @@ com.trendmicro.boothapp/
 - **ML Kit** 16.0.0 -- on-device text recognition
 - **AWS SDK** 2.73.0 -- S3 PutObject for badge photos
 - **OkHttp** 4.12.0 -- REST calls to session orchestrator
-- **Material Components** 1.11.0 -- Trend Micro branded UI
+- **Material Components** 1.11.0 -- TrendAI branded UI

@@ -1,7 +1,7 @@
 """Competitive intelligence engine for booth demo transcripts.
 
 Scans transcript entries for mentions of competitor products and generates
-counter-positioning insights using Trend Micro Vision One strengths.
+counter-positioning insights using TrendAI Vision One strengths.
 
 Usage:
     python -m analysis.engines.competitive <transcript.json> [output.json]
@@ -24,7 +24,7 @@ COMPETITORS = {
         "counter_points": [
             "Vision One provides native XDR across email, endpoints, servers, cloud, and network — CrowdStrike requires third-party integrations for non-endpoint telemetry.",
             "Vision One's attack surface risk management (ASRM) offers continuous risk scoring across the full environment, not just endpoints.",
-            "Trend Micro consistently leads in third-party evaluations (MITRE ATT&CK) with zero configuration changes and zero delayed detections.",
+            "TrendAI consistently leads in third-party evaluations (MITRE ATT&CK) with zero configuration changes and zero delayed detections.",
         ],
     },
     "Palo Alto Networks": {
@@ -38,7 +38,7 @@ COMPETITORS = {
         ],
         "counter_points": [
             "Vision One delivers unified XDR without requiring a costly SIEM migration — Cortex XSIAM bundles SIEM replacement, increasing cost and complexity.",
-            "Trend Micro offers flexible deployment (SaaS, hybrid, on-prem) while Palo Alto pushes cloud-only, leaving gaps for regulated industries.",
+            "TrendAI offers flexible deployment (SaaS, hybrid, on-prem) while Palo Alto pushes cloud-only, leaving gaps for regulated industries.",
             "Vision One's managed XDR (MDR) is included, while Palo Alto charges separately for Unit 42 MDR services.",
         ],
     },
@@ -51,8 +51,8 @@ COMPETITORS = {
         ],
         "counter_points": [
             "Vision One provides native email, network, and cloud telemetry — SentinelOne is primarily endpoint-focused and relies on integrations for broader visibility.",
-            "Trend Micro has 35+ years of threat intelligence and zero-day research through ZDI, the world's largest vendor-agnostic bug bounty program.",
-            "Vision One's virtual patching via Trend Micro's IPS provides immediate protection while SentinelOne lacks native network-layer defense.",
+            "TrendAI has 35+ years of threat intelligence and zero-day research through ZDI, the world's largest vendor-agnostic bug bounty program.",
+            "Vision One's virtual patching via TrendAI's IPS provides immediate protection while SentinelOne lacks native network-layer defense.",
         ],
     },
     "Microsoft Defender": {
@@ -64,7 +64,7 @@ COMPETITORS = {
         ],
         "counter_points": [
             "Vision One provides cross-platform protection (Windows, Mac, Linux, cloud workloads) with equal feature parity — Defender prioritizes the Windows ecosystem.",
-            "Trend Micro operates as an independent security vendor, avoiding the conflict of interest inherent in securing the same OS you also build.",
+            "TrendAI operates as an independent security vendor, avoiding the conflict of interest inherent in securing the same OS you also build.",
             "Vision One offers superior third-party cloud and hybrid environment coverage where Microsoft's telemetry has blind spots.",
         ],
     },
@@ -76,7 +76,7 @@ COMPETITORS = {
         ],
         "counter_points": [
             "Vision One's XDR is purpose-built with native sensors — Fortinet's XDR bolts onto a network-first architecture with limited endpoint depth.",
-            "Trend Micro provides deeper email security and cloud workload protection, areas where Fortinet relies on acquisitions and integrations.",
+            "TrendAI provides deeper email security and cloud workload protection, areas where Fortinet relies on acquisitions and integrations.",
             "Vision One's risk-based approach (ASRM) prioritizes threats by business impact, while Fortinet focuses on network perimeter defense.",
         ],
     },

@@ -1,11 +1,11 @@
 # Improve HTML Report Template
 
 ## Goal
-Transform the analysis pipeline HTML report into a presentation-quality document with Trend Micro branding (red/black), inline SVG logo, executive summary insight cards, detailed timeline, and recommended next steps. The report should look professional enough for an SE to hand to a VP of Security.
+Transform the analysis pipeline HTML report into a presentation-quality document with TrendAI branding (red/black), inline SVG logo, executive summary insight cards, detailed timeline, and recommended next steps. The report should look professional enough for an SE to hand to a VP of Security.
 
 ## Success Criteria
-1. Trend Micro red (#D32F2F) and black branding throughout
-2. Inline SVG of the Trend Micro logo (not a placeholder globe icon)
+1. TrendAI red (#D32F2F) and black branding throughout
+2. Inline SVG of the TrendAI logo (not a placeholder globe icon)
 3. Executive summary section with 3-4 key insight cards at top
 4. Detailed timeline section with timestamps showing what was demoed
 5. Recommended next steps section with actionable follow-ups
@@ -21,7 +21,7 @@ Transform the analysis pipeline HTML report into a presentation-quality document
 
 ## Approach
 - Redesign the template with a clean single-column layout (no sidebar) for better print/presentation
-- Add real Trend Micro logo SVG inline
+- Add real TrendAI logo SVG inline
 - Break executive summary into insight cards (duration, products, engagement, priority)
 - Keep all existing placeholders compatible
 - Add new placeholders if needed for the insight cards

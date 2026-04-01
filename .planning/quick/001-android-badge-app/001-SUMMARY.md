@@ -14,7 +14,7 @@ The Android app was already fully implemented on branch `feat/android-badge-app`
 - `AppPreferences.kt` - EncryptedSharedPreferences for credentials
 - `MainActivity.kt` - Camera preview, capture flow, session state machine
 - `SettingsActivity.kt` - Configuration UI
-- Dark-themed layouts with Trend Micro red (#D40020) branding
+- Dark-themed layouts with TrendAI red (#D40020) branding
 
 ## PR
 #203 - https://github.com/altarr/boothapp/pull/203

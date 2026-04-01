@@ -4,7 +4,7 @@
 No changes required. All 8 success criteria were already implemented.
 
 ## What Exists
-- popup.html: 420px wide popup with Trend Micro red header, animated status circle,
+- popup.html: 420px wide popup with TrendAI red header, animated status circle,
   stats row (clicks + screenshots), session button, session info, collapsible S3 config
 - popup.js: Polls background.js every 1s for session state, manages duration timer,
   handles S3 config save/load via chrome.storage.local, demo pre-fill button

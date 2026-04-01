@@ -13,7 +13,7 @@ All 9 success criteria already satisfied in the existing popup.html and popup.js
 ## What Was Already There
 | Criterion | Status |
 |-----------|--------|
-| Trend Micro red (#D32F2F) | Present in header, button, stats, status circle |
+| TrendAI red (#D32F2F) | Present in header, button, stats, status circle |
 | Status indicator (idle/recording/uploading/error) | 4-state circle with animations |
 | Click counter | Big number stat box, polled from background.js |
 | Screenshot counter | Big number stat box, counted from IndexedDB |

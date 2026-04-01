@@ -1,10 +1,10 @@
 # Popup Demo-Ready Update
 
 ## Goal
-Update Chrome extension popup.html and popup.js to be demo-ready with Trend Micro red theme, status indicator (idle/recording/uploading), click counter, screenshot counter, session timer, Start/Stop button, S3 config input. Vanilla JS only.
+Update Chrome extension popup.html and popup.js to be demo-ready with TrendAI red theme, status indicator (idle/recording/uploading), click counter, screenshot counter, session timer, Start/Stop button, S3 config input. Vanilla JS only.
 
 ## Success Criteria
-1. Trend Micro red (#D32F2F) theme throughout
+1. TrendAI red (#D32F2F) theme throughout
 2. Status indicator shows idle/recording/uploading states with visual distinction
 3. Click counter displays prominently
 4. Screenshot counter displays prominently

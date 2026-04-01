@@ -1,7 +1,7 @@
 # Competitive Intelligence Module
 
 ## Goal
-Create `analysis/engines/competitive.py` that detects competitor product mentions in session transcripts and generates counter-positioning insights using Trend Micro Vision One strengths.
+Create `analysis/engines/competitive.py` that detects competitor product mentions in session transcripts and generates counter-positioning insights using TrendAI Vision One strengths.
 
 ## Success Criteria
 1. Detects mentions of: CrowdStrike (Falcon), Palo Alto (Cortex XDR/XSIAM), SentinelOne, Microsoft Defender, Fortinet

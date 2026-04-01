@@ -10,7 +10,7 @@ Build an Android app that captures visitor badge photos via camera, runs OCR to 
 - [x] Creates session via Lambda orchestrator POST /sessions
 - [x] Uploads badge photo to S3 bucket boothapp-sessions-752266476357
 - [x] Start Session and End Session buttons
-- [x] Trend Micro brand colors and dark theme
+- [x] TrendAI brand colors and dark theme
 - [x] Settings screen for orchestrator URL, AWS credentials, defaults
 - [x] Encrypted storage for AWS credentials
 

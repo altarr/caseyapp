@@ -5,7 +5,7 @@ Add `analysis/engines/email_template.py` that generates a personalized follow-up
 
 ## Success Criteria
 - [ ] `analysis/engines/email_template.py` exists with `render_follow_up_email(summary, follow_up, metadata)` function
-- [ ] Output is a self-contained HTML email using Trend Micro branding/style
+- [ ] Output is a self-contained HTML email using TrendAI branding/style
 - [ ] Email includes: visitor name, products discussed, personalized recommendations, CTA for follow-up meeting
 - [ ] `analyze.py` calls the template generator and writes `follow-up-email.html` to output
 - [ ] Pipeline test passes with sample data

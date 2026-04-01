@@ -554,5 +554,5 @@ boothapp/
 <i>Built for Black Hat, RSA, and re:Invent.</i><br>
 <i>Every demo remembered. Every visitor followed up.</i><br>
 <br>
-<b>Trend Micro -- Hackathon 2026</b>
+<b>TrendAI -- Hackathon 2026</b>
 </p>

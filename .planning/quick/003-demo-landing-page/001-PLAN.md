@@ -4,7 +4,7 @@
 Create a presenter-facing demo status page at `extension/demo.html` that shows real-time session progress by polling `active-session.json` from S3.
 
 ## Success Criteria
-1. Dark theme with Trend Micro red (#D32F2F) accents
+1. Dark theme with TrendAI red (#D32F2F) accents
 2. Shows session status: waiting / recording / processing / complete
 3. Shows visitor name from badge scan
 4. Shows click count

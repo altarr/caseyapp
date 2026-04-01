@@ -182,7 +182,7 @@ Screenshots are taken on every click AND periodically (configurable interval).
 Events are buffered in memory and flushed to S3 as `clicks/clicks.json` and
 `screenshots/*.jpg` when the session ends.
 
-Works on V1 console (handles iframes), any Trend Micro web product, or
+Works on V1 console (handles iframes), any TrendAI web product, or
 any browser-based demo.
 
 ### 3. Audio Recorder (`audio/`)

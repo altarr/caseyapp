@@ -14,7 +14,7 @@
 - **Separate from email-report.js**: The existing JS file generates an SDR-internal email wrapping summary.html. The new Python module generates a visitor-facing follow-up email with different tone and content.
 - **No pipeline-run.js changes needed**: `analyze.py` already writes to S3 during the pipeline's step 4, so the new output file is automatically produced.
 - **Table-based HTML layout**: Email clients (Outlook, Gmail) require table-based layout, not CSS grid/flex. Used `role="presentation"` tables.
-- **Trend Micro red branding**: #D32F2F primary, #B71C1C dark, consistent with existing report.html template.
+- **TrendAI red branding**: #D32F2F primary, #B71C1C dark, consistent with existing report.html template.
 - **Conditional sections**: Products and recommendations sections only render when data exists, avoiding empty boxes.
 
 ## PR

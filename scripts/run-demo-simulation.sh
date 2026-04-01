@@ -365,7 +365,7 @@ cat > "${TMP}/transcript.json" <<ENDJSON
     {
       "timestamp": "00:00:03.000",
       "speaker": "SE",
-      "text": "Hi Sarah, welcome to the Trend Micro booth! I'm Casey. I see you're from Acme Corp -- what's your role there?"
+      "text": "Hi Sarah, welcome to the TrendAI booth! I'm Casey. I see you're from Acme Corp -- what's your role there?"
     },
     {
       "timestamp": "00:00:10.000",

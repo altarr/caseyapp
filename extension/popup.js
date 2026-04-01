@@ -268,8 +268,10 @@ document.getElementById('gearBtn').addEventListener('click', function() {
   var mgmtSection = document.getElementById('mgmtSection');
   var s3Section = document.getElementById('s3Section');
   var gear = document.getElementById('gearBtn');
+  var audioSection = document.getElementById('audioSection');
   var isOpen = mgmtSection.classList.toggle('open');
   s3Section.classList.toggle('open', isOpen);
+  if (audioSection) audioSection.classList.toggle('open', isOpen);
   gear.classList.toggle('open', isOpen);
 });
 

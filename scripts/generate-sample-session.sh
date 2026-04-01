@@ -353,7 +353,7 @@ p_concern = "${P_CONCERN}"
 # Build a realistic demo conversation tailored to the persona
 entries = [
     # -- Opening (0:00 - 1:00) --
-    ("SE", f"Welcome to the Trend Micro booth! I'm Casey. What brings you to the show today?"),
+    ("SE", f"Welcome to the TrendAI booth! I'm Casey. What brings you to the show today?"),
     ("Visitor", f"Hi Casey. I'm {p_name}, {p_title} at {p_company}. We're a {p_industry.lower()} company with about {p_endpoints:,} endpoints. I'm particularly interested in {p_interest}."),
     ("SE", f"Great to meet you, {p_name.split()[0]}. {p_company} sounds like a perfect fit for Vision One. What are you running today for security?"),
     ("Visitor", f"We're currently on {p_current}. Honestly, our biggest pain point is {p_concern}."),

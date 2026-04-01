@@ -7,7 +7,7 @@
 
 ## Key Design Decisions
 - Table-based HTML layout for maximum email client compatibility (Outlook, Gmail, etc.)
-- Trend Micro brand colors (#e94560 gradient header, matching existing email-report.js style)
+- TrendAI brand colors (#e94560 gradient header, matching existing email-report.js style)
 - Personalized intro paragraph based on visitor interests
 - Two CTAs: "Explore Vision One" button + "Schedule a Follow-Up Meeting" outline button
 - Pre-built conditional sections to avoid f-string nesting issues

@@ -1,10 +1,10 @@
 # Demo Landing Page - Summary
 
 ## What was done
-Created `demo/landing/index.html` -- a Trend Micro branded kiosk landing page for booth idle state.
+Created `demo/landing/index.html` -- a TrendAI branded kiosk landing page for booth idle state.
 
 ## Key decisions
-- **Separate from `demo/welcome.html`**: The existing welcome page uses BoothApp branding and has different UX (session monitoring dashboard). The new landing page is a visitor-facing kiosk screen with Trend Micro branding.
+- **Separate from `demo/welcome.html`**: The existing welcome page uses BoothApp branding and has different UX (session monitoring dashboard). The new landing page is a visitor-facing kiosk screen with TrendAI branding.
 - **localStorage for counter**: Session count persists across page refreshes but resets daily. No backend needed for a simple booth counter.
 - **S3 polling retained**: Same pattern as welcome.html -- polls active-session.json to detect when a session starts and show the overlay.
 - **No external dependencies**: Pure HTML/CSS/JS, Google Fonts only. No build step needed.

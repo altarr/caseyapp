@@ -544,7 +544,7 @@
 
     // Header
     html += '<div class="email-header">';
-    html += '<div class="brand">Trend Micro Vision One</div>';
+    html += '<div class="brand">TrendAI Vision One</div>';
     html += '<h1>' + esc(subject) + '</h1>';
     var dateStr = formatDate(s.generated_at || metaData.ended_at);
     if (dateStr) html += '<div class="date">Demo session on ' + esc(dateStr) + '</div>';
@@ -558,7 +558,7 @@
 
     // Intro
     var intro = customIntro || (
-      "Thank you for visiting the Trend Micro booth and taking the time to explore Vision One with us. " +
+      "Thank you for visiting the TrendAI booth and taking the time to explore Vision One with us. " +
       "As promised, here\u2019s a personalized summary of your demo session and recommended next steps."
     );
     html += '<div class="email-intro">' + esc(intro) + '</div>';
@@ -630,7 +630,7 @@
     html += '<div class="email-footer">';
     html += '<div class="team-name">' + esc(senderName) + '</div>';
     if (senderTitle) html += '<div>' + esc(senderTitle) + '</div>';
-    html += '<div style="margin-top:8px;">Trend Micro | Vision One Platform</div>';
+    html += '<div style="margin-top:8px;">TrendAI | Vision One Platform</div>';
     html += '</div>';
 
     document.getElementById("email-preview").innerHTML = html;
@@ -665,7 +665,7 @@
     var customIntro = document.getElementById("custom-intro").value;
 
     var text = "Hi " + firstName + ",\n\n";
-    text += (customIntro || "Thank you for visiting the Trend Micro booth and taking the time to explore Vision One with us. As promised, here's a personalized summary of your demo session and recommended next steps.") + "\n\n";
+    text += (customIntro || "Thank you for visiting the TrendAI booth and taking the time to explore Vision One with us. As promised, here's a personalized summary of your demo session and recommended next steps.") + "\n\n";
 
     if (document.getElementById("inc-products").checked && s.products_demonstrated && s.products_demonstrated.length) {
       text += "WHAT WE COVERED\n";
@@ -700,7 +700,7 @@
 
     text += "---\n" + senderName;
     if (senderTitle) text += "\n" + senderTitle;
-    text += "\nTrend Micro | Vision One Platform\n";
+    text += "\nTrendAI | Vision One Platform\n";
 
     navigator.clipboard.writeText(text).then(function () {
       flashFeedback("copy-feedback", "Copied plain text!");
