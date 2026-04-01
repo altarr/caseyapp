@@ -132,6 +132,10 @@ class MainActivity : AppCompatActivity() {
         if (binding.etSeName.text.isNullOrBlank()) {
             binding.etSeName.setText(prefs.defaultSeName)
         }
+        // Restart camera if no badge captured (QR scan releases camera)
+        if (capturedBadgeFile == null && activeSessionId == null) {
+            checkCameraPermission()
+        }
     }
 
     private fun checkCameraPermission() {
