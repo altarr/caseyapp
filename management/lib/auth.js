@@ -108,7 +108,7 @@ function authMiddleware(req, res, next) {
   const publicPaths = ['/api/auth/login', '/api/health', '/api/demo-pcs/activate',
     '/api/demo-pcs/register', '/api/sessions/', '/api/events', '/api/badges/scan',
     '/login.html', '/change-password.html', '/styles.css', '/brand/', '/favicon.ico',
-    '/phantom-recall-logo.png', '/trendai-logo-white.png', '/nav-auth.js'];
+    '/phantom-recall-logo.png', '/phantom-recall-bg.png', '/trendai-logo-white.png', '/trendai-bg.png', '/nav-auth.js'];
   if (publicPaths.some(p => req.path.startsWith(p))) return next();
 
   const token = req.cookies?.phantomrecall_token || req.headers['x-auth-token'];
