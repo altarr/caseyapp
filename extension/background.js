@@ -635,5 +635,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Don't respond to audio-* messages — those are for the offscreen document
+  if (message.type && message.type.startsWith('audio-')) return false;
+
   sendResponse({ status: 'ok' });
 });
