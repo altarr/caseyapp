@@ -101,7 +101,7 @@ class QrScanActivity : AppCompatActivity() {
                         .addOnSuccessListener { barcodes ->
                             for (barcode in barcodes) {
                                 val raw = barcode.rawValue ?: continue
-                                if (raw.contains("caseyapp-pair") || raw.contains("boothapp-pair")) {
+                                if (raw.contains("phantomrecall-pair") || raw.contains("boothapp-pair")) {
                                     if (handleQrPayload(raw)) {
                                         scanned = true
                                         return@addOnSuccessListener
@@ -130,7 +130,7 @@ class QrScanActivity : AppCompatActivity() {
             val json = gson.fromJson(raw, JsonObject::class.java)
 
             val pairType = json.get("type")?.asString ?: ""
-            if (pairType != "boothapp-pair" && pairType != "caseyapp-pair") return false
+            if (pairType != "boothapp-pair" && pairType != "phantomrecall-pair") return false
 
             val version = json.get("v")?.asInt ?: 1
 

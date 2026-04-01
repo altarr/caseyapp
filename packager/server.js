@@ -98,7 +98,7 @@ manager.startPolling();
 
 server.listen(PORT, HOST, () => {
   console.log('============================================================');
-  console.log('  CaseyApp Packager');
+  console.log('  Phantom Recall Packager');
   console.log(`  Listening on http://${HOST}:${PORT}`);
   console.log(`  S3 Bucket: ${manager.bucket}`);
   console.log('============================================================');

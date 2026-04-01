@@ -533,7 +533,7 @@ document.getElementById('pairBtn').addEventListener('click', function() {
         .catch(function() {
           // Fallback: build v2 payload locally from stored config
           var payload = {
-            type: 'caseyapp-pair',
+            type: 'phantomrecall-pair',
             v: 2,
             managementUrl: config.managementUrl,
             eventId: config.eventId ? parseInt(config.eventId, 10) : null,

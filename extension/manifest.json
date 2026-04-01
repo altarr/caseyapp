@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CaseyApp",
+  "name": "Phantom Recall",
   "version": "2.0.0",
-  "description": "CaseyApp demo capture: screenshots, audio recording, and click tracking for AI-powered follow-up.",
+  "description": "Phantom Recall demo capture: screenshots, audio recording, and click tracking for AI-powered follow-up.",
   "permissions": [
     "activeTab",
     "tabs",
@@ -22,7 +22,7 @@
       "48": "icon48.png",
       "128": "icon128.png"
     },
-    "default_title": "V1-Helper"
+    "default_title": "Phantom Recall"
   },
   "background": {
     "service_worker": "background.js"

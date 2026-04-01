@@ -1,7 +1,7 @@
 {
-  "name": "caseyapp-packager",
+  "name": "phantomrecall-packager",
   "version": "1.0.0",
-  "description": "CaseyApp demo PC packager — collects screenshots + audio, packages and uploads to S3",
+  "description": "Phantom Recall demo PC packager — collects screenshots + audio, packages and uploads to S3",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

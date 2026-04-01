@@ -1,4 +1,4 @@
-// CaseyApp offscreen document — records microphone audio via MediaRecorder.
+// Phantom Recall offscreen document — records microphone audio via MediaRecorder.
 // Listens for start/stop commands from background service worker.
 
 let mediaRecorder = null;

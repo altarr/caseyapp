@@ -1,4 +1,4 @@
-# CaseyApp Demo PC Installer
+# Phantom Recall Demo PC Installer
 # Self-contained: bundles Node.js, ffmpeg, and app code.
 # Prompts for management server URL and pairing code.
 param(
@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$InstallDir = "C:\CaseyApp"
+$InstallDir = "C:\Phantom Recall"
 
 trap {
     Write-Host ""
@@ -19,7 +19,7 @@ trap {
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Red
-Write-Host "    CaseyApp Demo PC Installer" -ForegroundColor White
+Write-Host "    Phantom Recall Demo PC Installer" -ForegroundColor White
 Write-Host "  ============================================" -ForegroundColor Red
 Write-Host ""
 
@@ -190,7 +190,7 @@ WshShell.CurrentDirectory = "$InstallDir\packager"
 WshShell.Run "cmd /c set PATH=C:\Program Files\nodejs;$ffmpegDir;C:\Program Files\Amazon\AWSCLIV2;%PATH% && cd /d $InstallDir\packager && node server.js > $InstallDir\logs\packager.log 2>&1", 0, False
 WshShell.CurrentDirectory = "$InstallDir"
 WshShell.Run "cmd /c set PATH=C:\Program Files\nodejs;C:\Program Files\Amazon\AWSCLIV2;%PATH% && cd /d $InstallDir && node presenter/server.js > $InstallDir\logs\presenter.log 2>&1", 0, False
-"@ | Out-File -FilePath "$startup\CaseyApp.vbs" -Encoding ascii
+"@ | Out-File -FilePath "$startup\Phantom Recall.vbs" -Encoding ascii
 
 Write-Host "  [OK] Auto-start configured" -ForegroundColor Green
 

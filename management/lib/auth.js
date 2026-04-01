@@ -110,7 +110,7 @@ function authMiddleware(req, res, next) {
     '/login.html', '/styles.css', '/brand/', '/favicon.ico'];
   if (publicPaths.some(p => req.path.startsWith(p))) return next();
 
-  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const token = req.cookies?.phantomrecall_token || req.headers['x-auth-token'];
   const user = getSessionUser(token);
 
   if (!user) {

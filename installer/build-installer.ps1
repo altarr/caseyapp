@@ -1,12 +1,12 @@
-# Builds the CaseyApp installer package.
+# Builds the PhantomRecall installer package.
 # Creates a self-contained zip with app code + install script.
 # The user extracts the zip and runs install.ps1.
 
 $ErrorActionPreference = "Stop"
 $BuildDir = "$PSScriptRoot\build"
-$OutputFile = "$PSScriptRoot\CaseyApp-Installer.zip"
+$OutputFile = "$PSScriptRoot\PhantomRecall-Installer.zip"
 
-Write-Host "Building CaseyApp installer..." -ForegroundColor Cyan
+Write-Host "Building PhantomRecall installer..." -ForegroundColor Cyan
 
 # Clean
 if (Test-Path $BuildDir) { Remove-Item -Recurse -Force $BuildDir }
@@ -58,9 +58,15 @@ Copy-Item "$PSScriptRoot\install.ps1" "$BuildDir\install.ps1"
 # Create the launcher batch file (double-click to install)
 @"
 @echo off
-echo Starting CaseyApp installer...
+echo Starting PhantomRecall installer...
+echo.
 powershell -ExecutionPolicy Bypass -File "%~dp0install.ps1"
-"@ | Out-File -FilePath "$BuildDir\Install-CaseyApp.bat" -Encoding ascii
+echo.
+echo -----------------------------------------------
+echo Installer finished. Review output above.
+echo -----------------------------------------------
+pause
+"@ | Out-File -FilePath "$BuildDir\Install-PhantomRecall.bat" -Encoding ascii
 
 # Create zip
 if (Test-Path $OutputFile) { Remove-Item $OutputFile }
@@ -69,7 +75,7 @@ Compress-Archive -Path "$BuildDir\*" -DestinationPath $OutputFile -CompressionLe
 $size = (Get-Item $OutputFile).Length / 1MB
 Write-Host ""
 Write-Host "Installer built: $OutputFile ($([math]::Round($size, 1)) MB)" -ForegroundColor Green
-Write-Host "Distribute this zip. User extracts and double-clicks Install-CaseyApp.bat" -ForegroundColor Gray
+Write-Host "Distribute this zip. User extracts and double-clicks Install-PhantomRecall.bat" -ForegroundColor Gray
 
 # Clean build dir
 Remove-Item -Recurse -Force $BuildDir

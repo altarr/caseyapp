@@ -1,4 +1,4 @@
-// CaseyApp background service worker
+// Phantom Recall background service worker
 // Captures timed screenshots and POSTs them to the local packager service.
 // Records microphone audio via offscreen document.
 // Polls S3 for session lifecycle via SigV4 signed requests.
@@ -21,10 +21,10 @@ async function ensureOffscreen() {
       justification: 'Recording microphone for demo session',
     });
     offscreenReady = true;
-    console.log('CaseyApp: offscreen document created');
+    console.log('Phantom Recall: offscreen document created');
   } catch (e) {
     if (e.message?.includes('single offscreen')) offscreenReady = true;
-    else console.error('CaseyApp: offscreen error:', e);
+    else console.error('Phantom Recall: offscreen error:', e);
   }
 }
 
@@ -32,10 +32,10 @@ async function startAudioRecording() {
   await ensureOffscreen();
   try {
     const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'start-recording' });
-    console.log('CaseyApp: audio start response:', resp);
+    console.log('Phantom Recall: audio start response:', resp);
     return resp?.ok || false;
   } catch (e) {
-    console.error('CaseyApp: audio start failed:', e);
+    console.error('Phantom Recall: audio start failed:', e);
     return false;
   }
 }
@@ -43,7 +43,7 @@ async function startAudioRecording() {
 async function stopAudioAndUpload() {
   try {
     const resp = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop-recording' });
-    if (!resp?.ok || !resp?.data) { console.log('CaseyApp: no audio data'); return; }
+    if (!resp?.ok || !resp?.data) { console.log('Phantom Recall: no audio data'); return; }
 
     // Convert base64 data URL to blob and POST to packager
     const fetchResp = await fetch(resp.data);
@@ -55,9 +55,9 @@ async function stopAudioAndUpload() {
       headers: { 'X-Filename': `recording.${ext}` },
       body: blob,
     });
-    console.log('CaseyApp: audio uploaded, size:', blob.size);
+    console.log('Phantom Recall: audio uploaded, size:', blob.size);
   } catch (e) {
-    console.error('CaseyApp: audio upload failed:', e);
+    console.error('Phantom Recall: audio upload failed:', e);
   }
 }
 
@@ -207,12 +207,12 @@ async function captureAndPost() {
       await postScreenshot(filename, blob);
       screenshotCount++;
     } catch (err) {
-      console.warn('CaseyApp: packager POST failed:', err.message);
+      console.warn('Phantom Recall: packager POST failed:', err.message);
     }
 
     return filename;
   } catch (err) {
-    console.warn('CaseyApp: screenshot capture failed:', err.message);
+    console.warn('Phantom Recall: screenshot capture failed:', err.message);
     return null;
   }
 }
@@ -349,7 +349,7 @@ async function handleSessionData(data) {
       startTimedScreenshots();
       startAudioRecording().then(ok => {
         audioRecordingActive = ok;
-        console.log('CaseyApp: audio started:', ok);
+        console.log('Phantom Recall: audio started:', ok);
       });
     } else if (data.stop_audio !== undefined) {
       const { v1helper_session } = await chrome.storage.local.get(['v1helper_session']);
@@ -396,7 +396,7 @@ async function handleSessionData(data) {
         }
         await postToPackager('/session/end', '{}', 'application/json');
       } catch (err) {
-        console.warn('CaseyApp: packager end signal failed:', err.message);
+        console.warn('Phantom Recall: packager end signal failed:', err.message);
       }
 
       // Clear local data
@@ -462,7 +462,7 @@ chrome.runtime.onConnect.addListener((port) => {
 // ─── Message Handler ──────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('CaseyApp extension installed');
+  console.log('Phantom Recall extension installed');
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

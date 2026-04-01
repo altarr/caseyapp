@@ -40,7 +40,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const token = auth.createSessionToken(user.id);
-  res.cookie('caseyapp_token', token, {
+  res.cookie('phantomrecall_token', token, {
     httpOnly: true,
     secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
     sameSite: 'lax',
@@ -53,14 +53,14 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const token = req.cookies?.phantomrecall_token || req.headers['x-auth-token'];
   if (token) auth.deleteSession(token);
-  res.clearCookie('caseyapp_token');
+  res.clearCookie('phantomrecall_token');
   res.json({ ok: true });
 });
 
 app.post('/api/auth/change-password', (req, res) => {
-  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const token = req.cookies?.phantomrecall_token || req.headers['x-auth-token'];
   const session = auth.getSessionUser(token);
   if (!session) return res.status(401).json({ error: 'Not authenticated' });
 
@@ -83,7 +83,7 @@ app.post('/api/auth/change-password', (req, res) => {
 });
 
 app.get('/api/auth/me', (req, res) => {
-  const token = req.cookies?.caseyapp_token || req.headers['x-auth-token'];
+  const token = req.cookies?.phantomrecall_token || req.headers['x-auth-token'];
   const session = auth.getSessionUser(token);
   if (!session) return res.status(401).json({ error: 'Not authenticated' });
   res.json({
@@ -156,7 +156,7 @@ const csvUpload = multer({
 
 // ── Health ──────────────────────────────────────────────────────────────────
 app.get('/api/health', (_, res) => {
-  res.json({ status: 'ok', service: 'caseyapp-management', version: '1.0.0' });
+  res.json({ status: 'ok', service: 'phantomrecall-management', version: '1.0.0' });
 });
 
 app.get('/api/config', (_, res) => {
@@ -576,7 +576,7 @@ app.get('/api/demo-pcs/:id/qr-payload', (req, res) => {
   const baseUrl = process.env.MANAGEMENT_URL || `${req.protocol}://${req.get('host')}`;
 
   res.json({
-    type: 'caseyapp-pair',
+    type: 'phantomrecall-pair',
     v: 2,
     managementUrl: baseUrl,
     eventId: pc.event_id,
@@ -738,7 +738,7 @@ setInterval(() => auth.cleanExpiredSessions(), 60 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log('============================================================');
-  console.log('  CaseyApp Management Server');
+  console.log('  Phantom Recall Management Server');
   console.log(`  http://localhost:${PORT}`);
   console.log(`  S3: ${S3_BUCKET}`);
   console.log('============================================================');
