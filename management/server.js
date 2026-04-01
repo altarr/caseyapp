@@ -432,11 +432,43 @@ app.get('/api/demo-pcs', (req, res) => {
   res.json({ demo_pcs: db.listDemoPcs(req.query.event_id) });
 });
 
-app.post('/api/demo-pcs/register', (req, res) => {
+app.post('/api/demo-pcs/register', async (req, res) => {
   const { event_id, demo_pc_name } = req.body;
   if (!event_id || !demo_pc_name) return res.status(400).json({ error: 'event_id and demo_pc_name required' });
   const pc = db.registerDemoPc(event_id, demo_pc_name);
-  res.json({ demo_pc: pc });
+
+  // Return S3 config + event config so the extension has everything it needs
+  const event = db.getEvent(event_id);
+  let badgeFields = ['name', 'company'];
+  if (event && event.badge_profile_id) {
+    const profile = db.getProfile(event.badge_profile_id);
+    if (profile) {
+      const mappings = typeof profile.field_mappings === 'string'
+        ? JSON.parse(profile.field_mappings) : profile.field_mappings;
+      badgeFields = mappings.map(m => m.field_type);
+    }
+  }
+
+  // Get AWS credentials from instance metadata
+  let s3Config = { bucket: S3_BUCKET, region: process.env.AWS_REGION || 'us-east-1' };
+  try {
+    const { fromInstanceMetadata } = require('@aws-sdk/credential-providers');
+    const creds = await fromInstanceMetadata({ maxRetries: 2 })();
+    s3Config.access_key_id = creds.accessKeyId;
+    s3Config.secret_access_key = creds.secretAccessKey;
+    s3Config.session_token = creds.sessionToken || '';
+  } catch (_) {
+    s3Config.access_key_id = process.env.AWS_ACCESS_KEY_ID || '';
+    s3Config.secret_access_key = process.env.AWS_SECRET_ACCESS_KEY || '';
+  }
+
+  res.json({
+    demo_pc: pc,
+    event: event,
+    badge_fields: badgeFields,
+    management_url: process.env.MANAGEMENT_URL || `${req.protocol}://${req.get('host')}`,
+    s3_config: s3Config,
+  });
 });
 
 // Generate a pairing code for a demo PC to register with

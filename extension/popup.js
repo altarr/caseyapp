@@ -122,6 +122,22 @@ function refreshStatus() {
       s3Text.textContent = 'S3';
       s3Text.classList.remove('active');
     }
+
+    // Phone paired indicator — check if phone has scanned this QR
+    var phoneDot = document.getElementById('phoneDot');
+    var phoneText = document.getElementById('phoneText');
+    if (phoneDot) {
+      chrome.storage.local.get(['phonePaired'], function(data) {
+        if (data.phonePaired) {
+          phoneDot.classList.add('active');
+          phoneText.classList.add('active');
+        } else {
+          phoneDot.classList.remove('active');
+          phoneText.classList.remove('active');
+        }
+      });
+    }
+
     updateButtonVisibility();
 
     var heroVisitor = document.getElementById('heroVisitor');
@@ -248,15 +264,16 @@ document.getElementById('gearBtn').addEventListener('click', function() {
 
 var MGMT_KEYS = ['managementUrl', 'managementToken', 'eventId', 'demoPcId', 'demoPcDbId', 'demoPcName'];
 
+var DEFAULT_MGMT_URL = 'https://caseyapp.trendcyberrange.com';
+
 // Load saved management values
 chrome.storage.local.get(MGMT_KEYS, function(config) {
-  if (config.managementUrl) document.getElementById('managementUrl').value = config.managementUrl;
+  document.getElementById('managementUrl').value = config.managementUrl || DEFAULT_MGMT_URL;
   if (config.managementToken) document.getElementById('managementToken').value = config.managementToken;
   if (config.demoPcName) document.getElementById('demoPcName').value = config.demoPcName;
   // If management URL is configured, try to load events
-  if (config.managementUrl) {
-    fetchEvents(config.managementUrl, config.managementToken, config.eventId);
-  }
+  var url = config.managementUrl || DEFAULT_MGMT_URL;
+  fetchEvents(url, config.managementToken, config.eventId);
 });
 
 function fetchEvents(mgmtUrl, token, selectedEventId) {
@@ -358,6 +375,14 @@ document.getElementById('mgmtConnectBtn').addEventListener('click', function() {
           .then(function(data) {
             if (data && data.demo_pc && data.demo_pc.id) {
               config.demoPcDbId = data.demo_pc.id;
+            }
+            // Save S3 credentials from management server
+            if (data && data.s3_config) {
+              config.s3Bucket = data.s3_config.bucket || '';
+              config.s3Region = data.s3_config.region || '';
+              if (data.s3_config.access_key_id) config.awsAccessKeyId = data.s3_config.access_key_id;
+              if (data.s3_config.secret_access_key) config.awsSecretAccessKey = data.s3_config.secret_access_key;
+              if (data.s3_config.session_token) config.awsSessionToken = data.s3_config.session_token;
             }
             chrome.storage.local.set(config, function() {
               statusDot.classList.add('active');

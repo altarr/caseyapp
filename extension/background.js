@@ -276,6 +276,7 @@ async function handleSessionData(data) {
       });
 
       chrome.storage.local.set({
+        phonePaired: true,
         v1helper_session: {
           active: true,
           session_id: data.session_id,
