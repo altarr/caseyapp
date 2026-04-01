@@ -3,9 +3,8 @@ const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const EventEmitter = require('events');
 const path = require('path');
 const fs = require('fs');
+const { AudioManager } = require('./audio-manager');
 const { packageAndUpload } = require('./packager');
-// Audio recording is now handled by the Chrome extension via offscreen API
-// No ffmpeg dependency needed on the demo PC
 
 class SessionManager extends EventEmitter {
   constructor(opts = {}) {
@@ -16,7 +15,7 @@ class SessionManager extends EventEmitter {
     this.outputDir = opts.outputDir || path.join(process.cwd(), 'sessions');
 
     this.s3 = new S3Client({ region: this.region });
-    // Audio handled by Chrome extension offscreen API
+    this.audio = new AudioManager();
     this.poller = null;
 
     // Session state
@@ -91,7 +90,13 @@ class SessionManager extends EventEmitter {
     const sessionDir = path.join(this.outputDir, sessionId);
     fs.mkdirSync(path.join(sessionDir, 'screenshots'), { recursive: true });
 
-    // Audio recording handled by Chrome extension — WebM posted to /audio endpoint
+    // Start audio recording via ffmpeg
+    const audioStarted = await this.audio.start(sessionDir);
+    if (audioStarted) {
+      console.log('  [session] Audio recording started');
+    } else {
+      console.log('  [session] No microphone detected — audio disabled');
+    }
 
     this.emit('session-start', this.session);
   }
@@ -99,7 +104,7 @@ class SessionManager extends EventEmitter {
   async _onAudioStop() {
     console.log('  [session] Audio stop requested by visitor');
     this.audioOptedOut = true;
-    // Audio is now managed by the Chrome extension, not the packager
+    await this.audio.stop();
     this.emit('audio-stopped', this.session);
   }
 
@@ -116,8 +121,8 @@ class SessionManager extends EventEmitter {
     const sessionDir = path.join(this.outputDir, session.session_id);
 
     try {
-      // Audio WebM is already saved by POST /audio from the extension
-      // No ffmpeg conversion needed — Claude can process WebM directly
+      // Stop audio and save WAV (no conversion — Claude can transcribe WAV directly)
+      await this.audio.stop();
 
       // Package and upload
       const manifest = await packageAndUpload({
@@ -172,7 +177,7 @@ class SessionManager extends EventEmitter {
       session_id: this.session?.session_id || null,
       active: !!this.session,
       screenshot_count: this.screenshotCount,
-      audio_recording: false, // now managed by extension
+      audio_recording: this.audio.recording,
       audio_opted_out: this.audioOptedOut,
       packaging: this.packaging,
       packager_version: '1.0.0',

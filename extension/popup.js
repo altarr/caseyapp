@@ -123,11 +123,11 @@ function refreshStatus() {
       s3Text.classList.remove('active');
     }
 
-    // Mic recording indicator
+    // Mic recording indicator (from packager status)
     var micDot = document.getElementById('micDot');
     var micText = document.getElementById('micText');
-    if (micDot) {
-      if (response.session_active && response.audio_recording) {
+    if (micDot && response.packager_status) {
+      if (response.packager_status.audio_recording) {
         micDot.classList.add('active');
         micText.classList.add('active');
       } else {

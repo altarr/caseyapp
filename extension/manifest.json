@@ -6,8 +6,7 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "storage",
-    "offscreen"
+    "storage"
   ],
   "host_permissions": ["<all_urls>"],
   "icons": {
