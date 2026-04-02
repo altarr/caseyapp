@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phantom Recall — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0a;color:#e5e5e5;font-family:'Inter',system-ui,sans-serif;padding:2rem;min-height:100vh}
+  h1{text-align:center;font-size:1.8rem;font-weight:700;margin-bottom:0.5rem;background:linear-gradient(135deg,#d71920,#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{text-align:center;color:#888;font-size:0.9rem;margin-bottom:3rem}
+  .diagram{position:relative;max-width:1400px;margin:0 auto;height:850px}
+
+  .node{
+    position:absolute;
+    background:#111;border:2px solid #1a1a1a;border-radius:16px;
+    padding:1.25rem;text-align:center;
+    box-shadow:0 8px 30px rgba(0,0,0,0.4);
+    transition:border-color 0.2s,box-shadow 0.2s;
+    cursor:default;z-index:2;
+  }
+  .node:hover{border-color:#d71920;box-shadow:0 8px 30px rgba(215,25,32,0.2)}
+  .node-icon{font-size:2.5rem;margin-bottom:0.5rem}
+  .node-title{font-size:0.85rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#e5e5e5;margin-bottom:0.25rem}
+  .node-desc{font-size:0.7rem;color:#888;line-height:1.4}
+  .node-tech{font-size:0.6rem;color:#555;margin-top:0.4rem;font-family:monospace}
+  .node.primary{border-color:#d71920;background:linear-gradient(135deg,rgba(215,25,32,0.08),rgba(255,149,0,0.05))}
+  .node.aws{border-color:#ff9500;background:rgba(255,149,0,0.05)}
+  .node.device{border-color:#58a6ff;background:rgba(88,166,255,0.05)}
+
+  svg.arrows{position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%}
+  .arrow{fill:none;stroke-width:2}
+  .arrow-label{
+    font-size:0.75rem;fill:#fff;font-family:'Inter',sans-serif;font-weight:500;
+    text-anchor:middle;dominant-baseline:central;
+    paint-order:stroke;stroke:#0a0a0a;stroke-width:4px;stroke-linejoin:round;
+  }
+  .legend{display:flex;gap:2rem;justify-content:center;margin-top:2rem;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:0.5rem;font-size:0.75rem;color:#888}
+  .legend-line{width:30px;height:3px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<h1>Phantom Recall Architecture</h1>
+<p class="subtitle">AI-powered trade show demo capture and follow-up</p>
+
+<div class="diagram">
+
+<!--
+  Node positions (x,y,w,h):
+  Phone:      30, 80,  210, 180   → right edge 240, center-y 170
+  Packager:   30, 370, 210, 150   → right edge 240, center-y 445, top 370, bottom 520
+  Extension:  30, 610, 210, 160   → right edge 240, center-y 690, top 610
+  Management: 530,60,  280, 230   → left 530, right 810, center-x 670, center-y 175, bottom 290
+  S3:         530,480, 240, 180   → left 530, right 770, center-x 650, top 480, center-y 570
+  Transcribe: 1060,80, 210, 150   → left 1060, center-y 155
+  Claude:     1060,340,210, 170   → left 1060, center-y 425
+-->
+
+<svg class="arrows" viewBox="0 0 1400 850">
+  <defs>
+    <marker id="ah-amber" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#ff9500"/></marker>
+    <marker id="ah-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#22c55e"/></marker>
+    <marker id="ah-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#d71920"/></marker>
+    <marker id="ah-blue" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#58a6ff"/></marker>
+    <marker id="ah-gray" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#666"/></marker>
+  </defs>
+
+  <!-- Phone right → Management left: badge scan + session -->
+  <path d="M 240 130 C 380 100, 430 100, 530 120" stroke="#ff9500" stroke-width="2" class="arrow" marker-end="url(#ah-amber)"/>
+  <text x="385" y="90" class="arrow-label">Badge scan + session create</text>
+
+  <!-- Phone right → Management left: audio upload -->
+  <path d="M 240 200 C 380 210, 430 200, 530 190" stroke="#ff9500" stroke-width="2" stroke-dasharray="6 3" class="arrow" marker-end="url(#ah-amber)"/>
+  <text x="385" y="220" class="arrow-label">Audio upload (M4A)</text>
+
+  <!-- Extension top → Packager bottom: screenshots -->
+  <path d="M 135 610 L 135 520" stroke="#666" stroke-width="2" class="arrow" marker-end="url(#ah-gray)"/>
+  <text x="75" y="565" class="arrow-label">Screenshots</text>
+
+  <!-- Packager right → S3 left: zip upload -->
+  <path d="M 240 445 C 350 460, 430 490, 530 530" stroke="#22c55e" stroke-width="2" class="arrow" marker-end="url(#ah-green)"/>
+  <text x="370" y="475" class="arrow-label">Zip (screenshots + clicks)</text>
+
+  <!-- Management bottom → S3 top: session signals -->
+  <path d="M 650 290 L 650 480" stroke="#22c55e" stroke-width="2" class="arrow" marker-end="url(#ah-green)"/>
+  <text x="710" y="390" class="arrow-label">Session signals</text>
+
+  <!-- S3 top → Management bottom: import -->
+  <path d="M 600 480 L 600 290" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 4" class="arrow" marker-end="url(#ah-green)"/>
+  <text x="555" y="390" class="arrow-label">Import</text>
+
+  <!-- Management right → Transcribe left -->
+  <path d="M 810 130 L 1060 140" stroke="#ff9500" stroke-width="2" class="arrow" marker-end="url(#ah-amber)"/>
+  <text x="935" y="115" class="arrow-label">Audio → text</text>
+
+  <!-- Management right → Claude left -->
+  <path d="M 810 230 C 900 300, 960 370, 1060 400" stroke="#d71920" stroke-width="2" stroke-dasharray="6 3" class="arrow" marker-end="url(#ah-red)"/>
+  <text x="940" y="290" class="arrow-label">Screenshots + transcript</text>
+  <text x="940" y="310" class="arrow-label">→ AI summary</text>
+
+  <!-- Extension right → Management left: poll -->
+  <path d="M 240 680 C 400 720, 480 500, 530 270" stroke="#ff9500" stroke-width="1.5" stroke-dasharray="4 4" class="arrow" marker-end="url(#ah-amber)"/>
+  <text x="430" y="620" class="arrow-label">Poll active session</text>
+
+  <!-- Phone bottom → Packager top: QR pair -->
+  <path d="M 135 260 L 135 370" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4 3" class="arrow" marker-end="url(#ah-blue)"/>
+  <text x="80" y="320" class="arrow-label" fill="#58a6ff">QR pair</text>
+
+</svg>
+
+  <!-- Android App -->
+  <div class="node device" style="left:30px;top:80px;width:210px;height:180px">
+    <div class="node-icon">📱</div>
+    <div class="node-title">Android App</div>
+    <div class="node-desc">Badge OCR, session start/stop, audio recording, QR pairing</div>
+    <div class="node-tech">Kotlin + CameraX + ML Kit</div>
+  </div>
+
+  <!-- Packager -->
+  <div class="node device" style="left:30px;top:370px;width:210px;height:150px">
+    <div class="node-icon">📦</div>
+    <div class="node-title">Packager</div>
+    <div class="node-desc">Receives screenshots from extension, zips + uploads to S3</div>
+    <div class="node-tech">Node.js localhost:9222</div>
+  </div>
+
+  <!-- Chrome Extension -->
+  <div class="node device" style="left:30px;top:610px;width:210px;height:160px">
+    <div class="node-icon">🧩</div>
+    <div class="node-title">Chrome Extension</div>
+    <div class="node-desc">Timed screenshots (1/sec), click tracking, session polling</div>
+    <div class="node-tech">Manifest V3 + SigV4</div>
+  </div>
+
+  <!-- Management Server -->
+  <div class="node primary" style="left:530px;top:60px;width:280px;height:230px">
+    <div class="node-icon">🏢</div>
+    <div class="node-title">Management Server</div>
+    <div class="node-desc">Central control plane: badge training, session lifecycle, contact matching, analysis, user auth</div>
+    <div class="node-tech">Express + SQLite + nginx + SSL</div>
+    <div style="font-size:0.6rem;color:#d71920;margin-top:0.3rem">phantom.trendcyberrange.com</div>
+  </div>
+
+  <!-- S3 Bucket -->
+  <div class="node aws" style="left:530px;top:480px;width:240px;height:180px">
+    <div class="node-icon">🪣</div>
+    <div class="node-title">AWS S3</div>
+    <div class="node-desc">Session data: zips, audio, metadata, session signals, analysis output</div>
+    <div class="node-tech">boothapp-sessions-752266476357</div>
+  </div>
+
+  <!-- AWS Transcribe -->
+  <div class="node aws" style="left:1060px;top:80px;width:210px;height:150px">
+    <div class="node-icon">🎙️</div>
+    <div class="node-title">AWS Transcribe</div>
+    <div class="node-desc">Converts M4A audio to text transcript</div>
+    <div class="node-tech">en-US speech-to-text</div>
+  </div>
+
+  <!-- Claude AI -->
+  <div class="node primary" style="left:1060px;top:340px;width:210px;height:170px">
+    <div class="node-icon">🧠</div>
+    <div class="node-title">Claude AI (RONE)</div>
+    <div class="node-desc">Badge field extraction, session analysis, contact matching</div>
+    <div class="node-tech">claude-sonnet-4-6 via TrendAI</div>
+  </div>
+
+  <!-- Region labels -->
+  <div style="position:absolute;left:15px;top:50px;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#58a6ff;border:1px solid rgba(88,166,255,0.3);border-radius:8px;padding:0.3rem 0.7rem">Demo PC + Phone</div>
+  <div style="position:absolute;left:530px;top:30px;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#d71920;border:1px solid rgba(215,25,32,0.3);border-radius:8px;padding:0.3rem 0.7rem">Control Plane</div>
+  <div style="position:absolute;left:1060px;top:50px;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#ff9500;border:1px solid rgba(255,149,0,0.3);border-radius:8px;padding:0.3rem 0.7rem">AI + AWS Services</div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-line" style="background:#ff9500"></div> API calls</div>
+  <div class="legend-item"><div class="legend-line" style="background:repeating-linear-gradient(90deg,#d71920 0,#d71920 6px,transparent 6px,transparent 9px)"></div> AI analysis</div>
+  <div class="legend-item"><div class="legend-line" style="background:#22c55e"></div> S3 data flow</div>
+  <div class="legend-item"><div class="legend-line" style="background:repeating-linear-gradient(90deg,#58a6ff 0,#58a6ff 4px,transparent 4px,transparent 7px)"></div> QR pairing</div>
+  <div class="legend-item"><div class="legend-line" style="background:#666"></div> Local (localhost)</div>
+</div>
+
+</body>
+</html>

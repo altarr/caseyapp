@@ -1,24 +1,16 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>CaseyApp APK Download</title>
-<style>
-body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:system-ui,sans-serif}
-.wrap{text-align:center;padding:2rem}
-h1{color:#d71920;font-size:1.5rem;margin-bottom:.5rem}
-p{color:#888;font-size:.9rem;margin-bottom:1.5rem}
-#qr{display:inline-block;background:#fff;padding:20px;border-radius:12px}
-</style>
-</head><body>
-<div class="wrap">
-<h1>CaseyApp</h1>
-<p>Scan with your Android phone to download the APK</p>
-<div id="qr"></div>
+<html><head><meta charset="UTF-8"><title>Phantom Recall</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#000;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}.card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:24px;padding:3rem;max-width:420px;width:100%;text-align:center}h1{font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,#d71920,#ff9500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.25rem}.sub{color:#888;font-size:0.85rem;margin-bottom:2rem}.qr-wrap{display:inline-block;background:#fff;padding:20px;border-radius:16px;margin-bottom:1.5rem}.btn{display:inline-block;background:linear-gradient(135deg,#d71920,#ff9500);color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;text-decoration:none}.note{color:#444;font-size:0.7rem;margin-top:1.25rem;line-height:1.5}</style>
+</head><body><div class="card">
+<img src="brand/digital/logos/horizontal/TrendAI-Logo-White-RGB.png" style="height:28px;margin-bottom:1rem">
+<h1>Phantom Recall</h1>
+<p class="sub">Scan to download the Android app</p>
+<div class="qr-wrap"><div id="qr"></div></div><br>
+<a class="btn" href="https://boothapp-sessions-752266476357.s3.us-east-1.amazonaws.com/demo-setup/CaseyApp.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA26JUTPNC44I34IOO%2F20260401%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260401T035943Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=c355c0ec96ce70d2be1e8b1a4efc384f3eabeadd3732cf900b5fd08388edfa39">Download APK</a>
+<div class="note">Android 8.0+ required<br>Enable "Install from unknown sources"</div>
 </div>
 <script src="brand/digital/qrcode.min.js"></script>
 <script>
-new QRCode(document.getElementById('qr'),{
-text:'https://boothapp-sessions-752266476357.s3.us-east-1.amazonaws.com/demo-setup/CaseyApp.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA26JUTPNC44I34IOO%2F20260401%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260401T015148Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=6799d117c4f502eea085e93705c7dac5d4404d4368122b6ed47f13764081617f',
-width:300,height:300,colorDark:'#d71920',colorLight:'#ffffff',
-correctLevel:QRCode.CorrectLevel.H
-});
-</script>
-</body></html>
+new QRCode(document.getElementById('qr'),{text:'https://boothapp-sessions-752266476357.s3.us-east-1.amazonaws.com/demo-setup/CaseyApp.apk?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIA26JUTPNC44I34IOO%2F20260401%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260401T035943Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=c355c0ec96ce70d2be1e8b1a4efc384f3eabeadd3732cf900b5fd08388edfa39',width:280,height:280,colorDark:'#d71920',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+setTimeout(function(){var c=document.querySelector('#qr canvas');if(!c)return;var x=c.getContext('2d'),l=new Image();l.onload=function(){var s=c.width*0.22,p=s*0.2,cx=c.width/2,cy=c.height/2;x.fillStyle='#fff';x.fillRect(cx-s/2-p,cy-s/2-p,s+p*2,s+p*2);x.drawImage(l,cx-s/2,cy-s/2,s,s)};l.src='brand/digital/logos/icon/TrendAI-Logo-Icon-Full-Color-RGB.png'},300);
+</script></body></html>

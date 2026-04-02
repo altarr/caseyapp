@@ -19,7 +19,8 @@
     "cors": "^2.x",
     "express": "^4.x",
     "express-rate-limit": "^8.3.2",
-    "helmet": "^7.x"
+    "helmet": "^7.x",
+    "puppeteer": "^24.40.0"
   },
   "engines": {
     "node": ">=18"
